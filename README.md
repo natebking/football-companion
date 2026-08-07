@@ -1,6 +1,9 @@
 # football-companion
 
-Second-screen companion for learning to read football from zero. Full design context and decisions: [docs/context-brief.md](docs/context-brief.md).
+Second-screen companion for learning to read football from zero. Design docs, canonical as of Aug 6 2026:
+
+- [docs/context-brief.md](docs/context-brief.md): what this is, the eye-training loop, coordinator-keyed tendency modeling, data sourcing
+- [docs/prompt-scaffold.md](docs/prompt-scaffold.md): the card generator spec (truth boundary, card types, curation, correction loop)
 
 ## v0: feed-vs-broadcast instrument
 

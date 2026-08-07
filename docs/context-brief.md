@@ -8,46 +8,133 @@ Pairs with `football-companion-prompt-scaffold.md`. Drop both into a new chat to
 
 A second-screen companion for watching college and pro football that helps me understand what is actually happening on the field. I know very little about play design, formations, or scheme. I want the quality of analysis a serious analyst would give, delivered in a way that teaches someone starting from close to zero.
 
-The goal is not stats. I do not want a fantasy dashboard or a win probability tracker. I want to become someone who can look at the field and read it.
+The goal is not stats. I do not want a fantasy dashboard or a win probability tracker. I want to become fluent: to look at the field and read it myself.
 
 Success looks like: after a season of using this, I recognize concepts on my own and need the companion less.
 
 ---
 
-## Where I started vs. where the design landed
+## The failure mode to avoid
 
-**My opening framing:** the hard part is vision. I need the system to see what is on my TV, probably via me photographing the screen, which is too clunky to actually use.
+A previous attempt at this spec produced a page that just streamed play results. "Complete for 14 yards." That is a scoreboard, not a teacher, and dozens of apps already do it. When pushed on why it could not do more, it concluded that real analysis requires Next Gen Stats tracking data, which is not available to consumers, and stopped there.
 
-**Where we ended up:** vision is mostly the wrong bet, and the delay between the live data feed and my broadcast is an asset rather than a problem.
+That conclusion is half right and gave up too early. Tracking data is genuinely locked. But there are two ways to get analysis, and it only considered one:
 
-Key turns in the reasoning:
+- **Observation** (seeing the field, reading alignment) requires tracking data. Closed.
+- **Inference** (situation plus historical tendency) is what human analysts do most of the time anyway, and it is fully computable from free play-by-play.
 
-1. Post-snap data is cheap and solved. Play-by-play APIs give down, distance, result, and an EPA-style value on every play, in near real time.
-2. Pre-snap alignment data does not exist for consumers at any price. NFL Next Gen Stats tracking and PFF charting are not available live. So no feed will ever tell me the formation or coverage.
-3. That gap initially argued for vision or audio input as the only route to pre-snap understanding.
-4. Then the better idea: replace formation labels with **situational tendency**. "This offense throws here 78% of the time and the tight end is the usual target, watch the middle of the field" teaches me more than "trips right, 11 personnel" does at my level, and it is computable from historical play-by-play I already have access to.
-5. Which means no vision at all in v1, and no audio scaffolding either.
-
-**Rejected approaches and why:**
-
-- *Manual screenshot upload:* too much friction, would not survive week two
-- *Continuous screen capture + VLM:* legal gray area, expensive, and solves a problem tendency data solves better
-- *Phone mic listening to the broadcast with Whisper:* clever and perfectly synced by construction, but unnecessary once tendency replaced formation as the pre-snap content
-- *Raw stat surfacing:* explicitly not what I want
+The old spec pulled only the result field and never computed the tendency layer.
 
 ---
 
-## The core architectural insight
+## Where the design landed
 
-My broadcast runs 20 to 45 seconds behind the live data feed. That means the system knows the future for half a minute.
+**Original framing:** the hard part is vision. Photograph the TV, get analysis. Too clunky to survive week two.
 
-This unlocks three things a real-time system cannot do:
+**Actual design:** no continuous vision. The broadcast delay is an asset, and the user's own eyes are the confirmation layer.
 
-1. **Zero-latency rendering.** Multi-step LLM work, diagram generation, and revision all happen during the lag window. The card is finished and queued before the snap appears on my screen. No spinner, ever.
-2. **Attention priming.** "Watch the slot receiver" before the snap is the highest-value teaching act available, and it requires knowing the outcome. Direct my eyes first, explain after.
-3. **Curation.** Most plays are noise. With a lookahead buffer the system can score upcoming plays for teaching value and stay silent through boring ones, lighting up only on plays that demonstrate something I am currently learning.
+### The delay is the core insight
 
-So the system is not a computer vision problem. It is a scheduler sitting on a delay line, plus a curation policy, plus a pedagogy model. Every hard part is software I control.
+My broadcast runs 20 to 45 seconds behind the live data feed. The system knows the future for half a minute. That unlocks three things a real-time system cannot do:
+
+1. **Zero-latency rendering.** All LLM work happens during the lag window. The card is queued before the snap appears on my screen. No spinner, ever.
+2. **Attention priming.** "Watch the two deepest defenders" before the snap is the highest-value teaching act available, and it requires knowing the outcome.
+3. **Curation.** Most plays are noise. Score upcoming plays for teaching value, stay silent through boring ones, light up on the ones that demonstrate something I am currently learning.
+
+### The eye-training loop (the pedagogical core)
+
+I pressure-tested the tendency approach: if it says "the defense will likely do X" and X does not happen, does that break the learning? The resolution reframed the whole product.
+
+**The system should never just label the formation for me.** If it reads me "Cover 2," I learn to read a label, not a field. The thing that builds fluency is being told *where to look and what to look for*, then seeing it myself.
+
+The loop:
+
+1. **Prime, hedged:** "They usually show two-high here. Look at the two deepest defenders. If there are two, the middle should be open."
+2. **I look.** My eyes do the observation. This is the part that trains fluency.
+3. **Reality confirms or contradicts.** If it is actually one deep safety, I just learned the difference by seeing both cases.
+
+A miss is not a failure, it is a contrast case. This is why hedged probabilistic language ("they usually show") is not a weakness of the data, it is the correct pedagogy. The system points; I observe; the discrepancy teaches.
+
+Optional surgical vision: a single-tap screenshot read when I am specifically curious about an alignment. Not continuous. Used sparingly so it does not replace my own looking.
+
+**Rejected:** manual screenshot upload as the primary input (friction), continuous screen capture plus VLM (legal gray, expensive, solves a problem tendency solves better), phone mic plus Whisper (clever, synced by construction, but unnecessary), raw stat surfacing (explicitly not what I want).
+
+---
+
+## Data sourcing: what is real, what it costs
+
+### College (build here first)
+
+- **CollegeFootballData.com** — free API key, live data on a cheap Patreon tier
+- **cfbfastR** — R wrapper, loads seasons 2014 onward, roughly 2.3M plays across 362 columns
+- Clean, tidy, well documented, deep enough for tendency computation
+- **Recommendation: prove the whole product on college.** Free, clean, and everything learned transfers to NFL.
+
+### NFL (free data is good enough)
+
+- **nflfastR / nflverse** — free, play-by-play back to 1999, 300+ columns, updated nightly during the season
+- Better than college in one respect: explicit `shotgun` and `no_huddle` binary flags, and play description strings embed formation cues in plain text ("Shotgun", "No Huddle", "Punt formation")
+- Fully sufficient for computing tendencies and for a model to enrich
+- **Catch:** nightly, not in-game. The live layer still needs ESPN's free undocumented endpoints, or paid.
+
+### Paid, and why not to
+
+- **Sportradar** — realistic entry around $1,250/month, enterprise contracts into the thousands. Not a consumer product. Not worth it.
+- **Rolling Insights** — live data from roughly $400/month
+- **SportsDataIO** — tiers from roughly $25/month for basic stats, more for live
+
+**Money does not buy better analysis. It buys lower-latency live delivery.** Free data carries the entire tendency engine. Only revisit paid if ESPN endpoint reliability becomes the thing blocking a working product.
+
+### What no source has
+
+None of these have pre-snap alignment. They tell you what happened, not how anyone lined up. So: tendency is fully covered by free data; the "look at the deep safeties" inference comes from the model plus my own eyes. That division is deliberate and stays.
+
+---
+
+## Tendency modeling: the regime problem
+
+**The catch I raised:** teams change coaches, coordinators, and personnel. Blending years of history describes a team that no longer exists. Old data is not merely less relevant, it is actively wrong after a regime change.
+
+Resolution has four parts.
+
+### 1. Key on coordinator, not team
+
+The unit of tendency is the **offensive coordinator** for offensive tendencies and the **defensive coordinator** for defensive ones. When the coordinator changes, the clock resets. Every play gets tagged with who was calling it, and live queries filter to the current regime. This solves most of the problem by itself.
+
+### 2. Recency weighting within a regime
+
+Teams evolve mid-season as personnel and opponents change. Exponential decay so recent games outweigh early ones. The read should track who they are now, not who they were in week one.
+
+### 3. Sample-size fallback ladder
+
+Filter tightly enough (current coordinator + recent games + exact situation) and you may have 11 plays. That is noise wearing a percentage sign. So widen progressively:
+
+1. Tightest bucket: current coordinator, recent games, exact down/distance/field position
+2. Loosen the field-position band
+3. Pool similar down-and-distance situations
+4. Coordinator's career baseline
+5. League average for the situation
+
+Every step down the ladder lowers the confidence flag, and the model hedges harder in the copy.
+
+### 4. Deep history earns its keep elsewhere
+
+The 1999-onward archive is not for "what will they do tonight." It is for:
+
+- **Coordinator fingerprinting** — this caller, across every stop in his career, is pass-heavy on early downs. A stable trait that survives team changes.
+- **Cold start** — week one, or a coordinator's first game with a new team, has no current data. Lean on the career fingerprint until the season fills in.
+
+### Required enrichment: the coordinator mapping table
+
+Play-by-play does not include who called the play. It does include team and date. So build a small join table:
+
+```
+team | start_date | end_date | head_coach | off_coordinator | def_coordinator
+```
+
+A few hundred rows covers years of a league. Coordinator histories are public. Build once, top up each offseason, join on date-into-range. **Probably the single highest-leverage enrichment in the build**, because it is what makes every tendency number trustworthy rather than a blend of eras.
+
+**Caveat:** mid-season firings and quiet play-calling handoffs (head coach takes over the offense without a title change) are messy and the public record lags. Exception cases, and the confidence flag absorbs them: after a regime change the recent sample is thin by definition, so the system already hedges.
 
 ---
 
@@ -55,30 +142,15 @@ So the system is not a computer vision problem. It is a scheduler sitting on a d
 
 Need one number: broadcast offset.
 
-- Acquire with a single tap. I tap when I see a snap, system diffs against the feed timestamp for that play.
-- More robust alternative: one screenshot of the score bug, OCR the game clock, reconcile against the feed's clock at each play.
+- Acquire with a single tap. I tap when I see a snap; system diffs against the feed timestamp.
+- Alternative: screenshot the score bug, OCR the game clock, reconcile against the feed clock.
 - Release rule: `release_at = feed_event_time + measured_offset + safety_pad`
 - Safety pad of 5 to 8 seconds is mandatory. Feed latency is variable. If feed lag ever exceeds broadcast lag, the play gets spoiled. **Failing late is invisible. Failing early ruins the product.**
-- Drift is real over three hours from commercial breaks and replay reviews. Re-anchor at quarter boundaries automatically, plus a permanent one-tap resync for DVR pauses.
-
----
-
-## Data sources evaluated
-
-| Source | Notes |
-|---|---|
-| CollegeFootballData.com | Free API key, live data on paid Patreon tiers, deep historical for tendency computation. Primary for college. |
-| cfbfastR | R wrapper over CFBD plus live ESPN play-by-play |
-| ESPN undocumented endpoints | Free, fast, well-documented by the community. Primary for NFL in v1. |
-| Sportradar NFL API | Push feeds for real-time customers, full PBP on every game including preseason. The contractual option if ESPN scraping gets fragile. |
-| SportsDataIO, BallDontLie, MySportsFeeds | Alternatives, not evaluated in depth |
-| Next Gen Stats, PFF | The data I actually want. Not available. |
+- Drift accumulates over three hours from commercials and replay reviews. Re-anchor at quarter boundaries, plus a permanent one-tap resync for DVR pauses.
 
 ---
 
 ## What the API actually returns
-
-Important expectation-setting. A play object is roughly:
 
 ```json
 {
@@ -89,21 +161,21 @@ Important expectation-setting. A play object is roughly:
 }
 ```
 
-A sentence and some numbers. No formation, no coverage, no route concept. The teaching content is not in the feed. It comes from two things I build: situational history aggregated from past plays, and an LLM's football knowledge applied to a thin text description.
-
-**The API is plumbing. The product is everything on top of it.**
+A sentence and some numbers. The teaching content is not in the feed. It comes from two things I build: coordinator-keyed situational history, and an LLM's football knowledge applied to a thin text description. **The API is plumbing. The product is everything on top of it.**
 
 ---
 
-## The known accuracy risk
+## Known accuracy risk
 
 Schematic narration ("that's a seam route") is inference from a text string, not observation. The model will sometimes call a crosser a seam.
 
-Mitigation is threefold and all of it is in the scaffold doc:
+Mitigations, all detailed in the scaffold doc:
 
-1. A truth boundary in the system prompt that separates verified tendency data from thin play text from model inference, with mandatory hedging on the third category
+1. A truth boundary in the system prompt separating verified tendency data from thin play text from model inference, with mandatory hedging on the third
 2. A per-card correction tap that decrements concept confidence and eventually stops the system asserting a concept it has been corrected on
-3. Leaning hard on tendency percentages, which are computed and verifiable, and letting schematic language stay soft
+3. Leaning on tendency percentages (computed, verifiable) and letting schematic language stay soft
+
+The eye-training loop is itself a mitigation: I am the ground truth, not the model.
 
 ---
 
@@ -111,11 +183,11 @@ Mitigation is threefold and all of it is in the scaffold doc:
 
 The differentiator is not the analysis, which is commoditized. It is the scaffolding.
 
-- **Concept ledger:** persistent per-user record of every concept, how many times I have seen it, and when. State machine runs unknown → introduced → learning → familiar → dormant.
-- **Depth gradient:** first exposure to Cover 3 gets a full explanation. Tenth exposure just says "Cover 3." A card getting shorter is the system working correctly.
-- **Spaced re-surfacing:** concepts unseen for 21+ days go dormant and get re-introduced at a shallower depth.
-- **Two registers:** prime cards (pre-snap, under 25 words, attention-directing, must not spoil) and explain cards (post-play, 40 to 70 words, name the pattern and the consequence).
-- **Consequence over statistics:** never print a raw PPA or win probability. Translate to plain stakes.
+- **Concept ledger:** persistent record of every concept, exposure count, last seen. States: unknown → introduced → learning → familiar → dormant.
+- **Depth gradient:** first exposure gets a full explanation. Tenth just says the name. Cards getting shorter is the system working.
+- **Spaced re-surfacing:** concepts unseen 21+ days go dormant, return at shallower depth.
+- **Two registers:** prime cards (pre-snap, under 25 words, attention-directing, must not spoil) and explain cards (post-play, 40 to 70 words, pattern plus consequence).
+- **Consequence over statistics:** never print raw PPA or win probability. Translate to plain stakes. Tendency percentages are allowed and encouraged, because they are concrete and predictive.
 
 ---
 
@@ -123,17 +195,17 @@ The differentiator is not the analysis, which is commoditized. It is the scaffol
 
 "Pro-grade analysis for a beginner" is a genuine conflict, not a formatting problem. Coach-level analysis assumes 200 shared terms. Translating live costs more words than fit between snaps.
 
-My position: **v1 should be aggressively shallow and fast.** Depth belongs in a post-game review mode with no time pressure, where I can scroll back through drives. Trying to be deep in real time is how this becomes a thing I stop opening.
+Position: **v1 should be aggressively shallow and fast.** Depth belongs in a post-game review mode with no time pressure. Trying to be deep in real time is how this becomes a thing I stop opening.
 
 ---
 
 ## Open threads
 
-- Scoring function for teaching value is drafted in the scaffold but untuned. Target roughly one card per four to six plays.
-- Cold start: week 1 has no current-season tendency data. Fall back to prior season, flag as low confidence so the model hedges the percentages too.
-- Watching two games at once: concept ledger is global, tendency cache is per team, card density needs a global cap.
-- Post-game review mode: same scaffold, no spoiler constraint, much deeper. Probably where the real learning happens. Build second.
-- Not yet discussed: delivery surface (phone app, tablet, web), buffer storage, whether prime cards need diagrams or stay text-only.
+- Teaching-value scoring function is drafted in the scaffold but untuned. Target one card per four to six plays.
+- Two games at once: concept ledger is global, tendency cache is per coordinator, card density needs a global cap.
+- Post-game review mode: same scaffold, no spoiler constraint, much deeper. Build second.
+- Not yet discussed: delivery surface (phone, tablet, web), buffer storage, whether prime cards need diagrams or stay text-only.
+- Mid-season play-calling changes: detection heuristic, or accept the confidence flag as sufficient?
 
 ---
 
@@ -142,4 +214,4 @@ My position: **v1 should be aggressively shallow and fast.** Depth belongs in a 
 - No em dashes
 - Push back on my ideas rather than agreeing by default
 - Times in PST, with the standardized zone in parentheses if different
-- I have a technical background: I build Pine Script indicators, run a market data pipeline, and have shipped API products, so implementation detail is welcome rather than intimidating
+- Technical background: I build Pine Script indicators, run a market data pipeline, and have shipped API products. Implementation detail is welcome.
