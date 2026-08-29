@@ -26,7 +26,8 @@
     "no_team_placeholder": "Templates say 'They', never the team name. CFB names run one to three words (Michigan, Ohio State, North Carolina Central), which would make the 25 word cap unenforceable. Render the team name in the card header outside the three prime lines if the surface wants it.",
     "confidence": "Use `tendency` at confidence high and medium. Use `tendency_low` at low, which drops 'They' for 'Offenses' so the number is never attributed to this team, per CONTRACT.md.",
     "exposure": "Use `watch` while every concept in this card sits at unknown or introduced. Use `watch_short` once all of them reach learning or familiar. `watch` carries the inline definitions; `watch_short` drops them.",
-    "assembly": "Render as three lines: situation, tendency, watch. Combined word count is capped at 25 and every variant pairing in this file is at or under it."
+    "assembly": "Render as three lines: situation, tendency, watch. Combined word count is capped at 25 and every variant pairing in this file is at or under it.",
+    "example_fill": "Not for rendering. Real numbers from data/plays_{nfl,cfb}.parquet used to verify the word cap; `team` records which offense the numbers describe."
   },
   "concepts": {
     "blitz": "extra defenders rushing the quarterback instead of covering",
@@ -68,7 +69,7 @@
     {
       "id": "two_minute_sideline",
       "priority": 85,
-      "applies": { "down": [1, 2, 3, 4], "period": [2, 4], "max_clock_seconds": 120 },
+      "applies": { "down": [1, 2, 3, 4], "period": [2, 4], "max_clock_seconds": 120, "max_score_diff": 8 },
       "prime": {
         "situation": "Under two minutes.",
         "tendency": "They throw here {pass_rate}% of the time.",
@@ -167,7 +168,7 @@
         "watch_short": "Watch whether a punter is standing behind the center."
       },
       "concepts": ["punt", "field_goal"],
-      "explain_hint": "Between the opponent's twenty and forty, most teams now go for it rather than kick. Closer in, the field goal wins out.",
+      "explain_hint": "Between the opponent's twenty and forty, most teams go for it rather than kick. Closer in, the field goal wins out.",
       "example_fill": { "team": "Philadelphia", "distance": 1, "pass_rate": 45, "run_rate": 55 }
     },
     {
@@ -278,7 +279,7 @@
     {
       "id": "d1_run_lean_play_action",
       "priority": 12,
-      "applies": { "down": [1], "distance_band": ["long"], "field_zone": ["own", "mid", "opp"], "max_pass_rate": 0.42 },
+      "applies": { "down": [1], "field_zone": ["own", "mid", "opp"], "max_pass_rate": 0.42 },
       "prime": {
         "situation": "First and {distance}.",
         "tendency": "They run here {run_rate}% of the time.",
@@ -293,7 +294,7 @@
     {
       "id": "d1_pass_lean_cushion",
       "priority": 12,
-      "applies": { "down": [1], "distance_band": ["long"], "field_zone": ["own", "mid", "opp"], "min_pass_rate": 0.55 },
+      "applies": { "down": [1], "field_zone": ["own", "mid", "opp"], "min_pass_rate": 0.52 },
       "prime": {
         "situation": "First and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
@@ -308,7 +309,7 @@
     {
       "id": "d1_box_count",
       "priority": 10,
-      "applies": { "down": [1], "distance_band": ["long"], "field_zone": ["own", "mid", "opp"] },
+      "applies": { "down": [1], "field_zone": ["own", "mid", "opp"] },
       "prime": {
         "situation": "First and {distance}.",
         "tendency": "They run here {run_rate}% of the time.",

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="color-scheme" content="dark">
+<title>Football Companion</title>
+<style>
+  :root {
+    --bg: #0b0d10; --card: #14181d; --line: #232a31;
+    --text: #e8eaed; --dim: #9aa1a8; --faint: #6b7278;
+    --accent: #2dd4bf; --warn: #f0b429; --bad: #ef6a5a;
+    --hdr: calc(56px + env(safe-area-inset-top));
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100dvh; overscroll-behavior-y: none;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 4;
+    height: var(--hdr); padding: env(safe-area-inset-top) 14px 0;
+    background: var(--bg); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .hgrow { flex: 1; min-width: 0; }
+  #score { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #score .win { color: var(--text); }
+  #score .sep { color: var(--faint); font-weight: 400; margin: 0 5px; }
+  .hmeta { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .hmeta .ball { color: var(--accent); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
+  .dot.ok { background: var(--accent); }
+
+  #err { display: none; background: rgba(239,106,90,.12); color: var(--bad);
+         font-size: 12px; padding: 6px 14px; border-bottom: 1px solid var(--line); }
+  #err.on { display: block; }
+
+  /* ---------- prime card ---------- */
+  main { padding: 0 0 calc(96px + env(safe-area-inset-bottom)); }
+
+  #prime {
+    position: sticky; top: var(--hdr); z-index: 3;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    padding: 12px 14px 11px;
+    transition: border-left-color 900ms ease-out;
+  }
+  #prime.low { border-left-color: var(--line); }
+  #prime.fresh, #prime.low.fresh { border-left-color: var(--accent); transition: none; }
+
+  .pTop { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .pTop[hidden] { display: none; }
+  #pDD { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+  #pSpot { font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  #pSit   { font-size: 14px; color: var(--dim); text-wrap: pretty; }
+  #pTen   { font-size: 17px; color: var(--accent); font-weight: 600; margin-top: 3px; text-wrap: pretty; }
+  #prime.low #pTen { color: var(--warn); }
+  #pWatch { font-size: 19px; line-height: 1.32; font-weight: 700; margin-top: 8px; text-wrap: pretty; }
+
+  .pFoot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  .chip {
+    font-size: 11px; font-weight: 600; border-radius: 5px; padding: 3px 7px;
+    background: var(--line); color: var(--dim); border: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip.src  { background: rgba(45,212,191,.13); color: var(--accent); }
+  .chip.srcl { background: rgba(240,180,41,.13); color: var(--warn); }
+  button.chip { cursor: pointer; }
+  button.chip .st { color: var(--faint); font-weight: 400; margin-left: 4px; }
+  button.chip.known { color: var(--faint); }
+  #pDef { display: none; font-size: 12.5px; color: var(--dim); margin-top: 8px;
+          border-left: 2px solid var(--line); padding-left: 9px; text-wrap: pretty; }
+  #pDef.on { display: block; }
+
+  .pQuiet { font-size: 15px; color: var(--faint); text-wrap: pretty; padding: 2px 0 4px; }
+
+  /* ---------- feed ---------- */
+  .feedhead {
+    font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700;
+    color: var(--faint); padding: 14px 14px 6px;
+  }
+  #feed { padding: 0 14px; }
+  .play { border-bottom: 1px solid var(--line); padding: 9px 0; }
+  .pl1 { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--faint); }
+  .pl1 b { color: var(--dim); font-weight: 700; }
+  .pl1 .t { margin-left: auto; white-space: nowrap; }
+  .pl2 { font-size: 15px; margin-top: 3px; text-wrap: pretty; }
+  .pl2.score { color: var(--accent); }
+  .pl2.turn { color: var(--warn); }
+  .pl3 { font-size: 12px; color: var(--faint); margin-top: 3px; text-wrap: pretty; }
+  .empty { color: var(--faint); text-align: center; padding: 34px 20px; text-wrap: pretty; }
+
+  /* ---------- footer ---------- */
+  footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: var(--bg); border-top: 1px solid var(--line);
+    padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
+  }
+  #pickBtn {
+    width: 100%; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); color: var(--text); padding: 11px 14px;
+    text-align: left; cursor: pointer; display: block;
+    transition: transform 120ms ease-out;
+  }
+  #pickBtn:active { transform: scale(.985); }
+  #pickBtn b { display: block; font-size: 15px; }
+  #pickBtn small { display: block; font-size: 12px; color: var(--dim); margin-top: 2px;
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- sheet ---------- */
+  #sheet {
+    position: fixed; inset: 0; z-index: 9; background: rgba(6,8,10,.72);
+    display: flex; align-items: flex-end;
+    opacity: 0; pointer-events: none; transition: opacity 130ms ease-out;
+  }
+  #sheet.on { opacity: 1; pointer-events: auto; }
+  .sheetInner {
+    width: 100%; max-height: 86dvh; overflow-y: auto;
+    background: var(--bg); border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    padding: 10px 14px calc(16px + env(safe-area-inset-bottom));
+  }
+  .sheetTop { display: flex; gap: 8px; align-items: center; position: sticky; top: 0;
+              background: var(--bg); padding: 4px 0 10px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { background: transparent; color: var(--dim); border: 0; padding: 8px 15px;
+                font-size: 14px; font-weight: 600; cursor: pointer; }
+  .seg button.on { background: var(--card); color: var(--accent); }
+  #closeSheet { margin-left: auto; background: transparent; border: 0; color: var(--dim);
+                font-size: 14px; padding: 8px 4px; cursor: pointer; }
+  .grouphead { font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+               font-weight: 700; color: var(--faint); padding: 12px 0 6px; }
+  .gbtn {
+    width: 100%; text-align: left; background: var(--card); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    margin-bottom: 7px; cursor: pointer; display: block;
+  }
+  .gbtn.sel { border-color: var(--accent); }
+  .gbtn b { display: block; font-size: 15px; }
+  .gbtn small { display: block; font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .gbtn.sel small { color: var(--accent); }
+  .ledger { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; }
+  #resetLedger { background: transparent; border: 1px solid var(--line); border-radius: 8px;
+                 color: var(--faint); font-size: 12px; padding: 7px 11px; cursor: pointer; }
+  .note { font-size: 12px; color: var(--faint); padding: 4px 0 10px; text-wrap: pretty; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, #prime { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hgrow">
+    <div id="score">loading…</div>
+    <div class="hmeta" id="hmeta"></div>
+  </div>
+  <span class="dot" id="dot"></span>
+</header>
+
+<div id="err"></div>
+
+<main>
+  <section id="prime">
+    <div class="pQuiet" id="pQuiet">Pick a game to start.</div>
+    <div class="pTop" hidden><span id="pDD"></span><span id="pSpot"></span></div>
+    <p id="pSit"></p>
+    <p id="pTen"></p>
+    <p id="pWatch"></p>
+    <div class="pFoot" id="pFoot"></div>
+    <div id="pDef"></div>
+  </section>
+
+  <div class="feedhead">Recent plays</div>
+  <div id="feed"><div class="empty">Nothing yet.</div></div>
+</main>
+
+<footer>
+  <button id="pickBtn">
+    <b id="pickLbl">Pick a game</b>
+    <small id="pickSub">college and pro, whatever is live now</small>
+  </button>
+</footer>
+
+<div id="sheet">
+  <div class="sheetInner">
+    <div class="sheetTop">
+      <div class="seg">
+        <button data-lg="cfb">College</button>
+        <button data-lg="nfl">NFL</button>
+      </div>
+      <button id="closeSheet">Close</button>
+    </div>
+    <div id="games"><div class="empty">Loading games…</div></div>
+    <div class="grouphead">What you have been shown</div>
+    <div class="ledger" id="ledgerView"></div>
+    <p class="note" id="ledgerNote"></p>
+    <button id="resetLedger">Reset what I have learned</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
