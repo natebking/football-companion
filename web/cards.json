@@ -1,325 +1,1220 @@
 {
-  "version": 1,
-  "generated": "2026-08-29",
+  "version": 2,
+  "generated": "2026-08-30",
   "schema": {
-    "selection": "A card applies when every key in its `applies` block passes. Absent key means no constraint. Among applying cards, highest `priority` wins; ties break on array order, earliest first.",
+    "selection": "A card applies when every key in its `applies` block passes. Absent key means no constraint. Among applying cards, highest `priority` wins; ties break on array order, earliest first. See pickCard/cardApplies in web/app.js.",
     "applies_keys": {
       "down": "list of ints, matches the current down",
       "distance_band": "list of short|medium|long, from engine/buckets.py",
       "field_zone": "list of own_deep|own|mid|opp|red, from engine/buckets.py",
-      "min_pass_rate": "float, tendency block pass_rate must be >= this",
-      "max_pass_rate": "float, tendency block pass_rate must be <= this",
+      "min_pass_rate": "float, the rate the card would print must be >= this",
+      "max_pass_rate": "float, the rate the card would print must be <= this",
       "min_yards_to_goal": "int, inclusive",
       "max_yards_to_goal": "int, inclusive",
       "period": "list of ints, 1-4 plus 5+ for overtime",
-      "max_clock_seconds": "int, seconds remaining in the current period must be <= this",
+      "max_clock_seconds": "int, seconds left in the period must be <= this, and a null clock fails the gate",
       "min_score_diff": "int, offense score minus defense score, pre-snap, must be >= this",
       "max_score_diff": "int, same, must be <= this"
     },
     "placeholders": {
       "{distance}": "yards to go, integer",
-      "{pass_rate}": "round(100 * tendency.pass_rate), integer, no percent sign in the value",
-      "{run_rate}": "round(100 * (1 - tendency.pass_rate)), integer",
+      "{pass_rate}": "round(100 * printed rate), integer, no percent sign in the value",
+      "{run_rate}": "round(100 * (1 - printed rate)), integer",
       "{yards_to_goal}": "yards to the opponent end zone, integer",
       "{lead}": "abs(score_diff), integer"
     },
-    "no_team_placeholder": "Templates say 'They', never the team name. CFB names run one to three words (Michigan, Ohio State, North Carolina Central), which would make the 25 word cap unenforceable. Render the team name in the card header outside the three prime lines if the surface wants it.",
-    "confidence": "Use `tendency` at confidence high and medium. Use `tendency_low` at low, which drops 'They' for 'Offenses' so the number is never attributed to this team, per CONTRACT.md.",
-    "exposure": "Use `watch` while every concept in this card sits at unknown or introduced. Use `watch_short` once all of them reach learning or familiar. `watch` carries the inline definitions; `watch_short` drops them.",
-    "assembly": "Render as three lines: situation, tendency, watch. Combined word count is capped at 25 and every variant pairing in this file is at or under it.",
-    "example_fill": "Not for rendering. Real numbers from data/plays_{nfl,cfb}.parquet used to verify the word cap; `team` records which offense the numbers describe."
+    "no_team_placeholder": "There is no {team} placeholder and there must not be one. `fill` in app.js does not substitute it, and CFB team names run one to three words, which would make the 25 word cap unenforceable. The team name is carried by the source chip app.js draws under the card, on exactly the snaps `can_attribute` allows and never on the rest.",
+    "attribution": "Two registers, chosen by the exported `can_attribute` flag alone, per CONTRACT.md. `tendency` is the attributed line and says 'They', with the team named in the chip beside it. `tendency_low` is the unattributed line and says 'Offenses', with the chip reading 'All offenses'. Measured over every eligible snap in the parquet, 42.7% of NFL and 48.7% of CFB snaps may name the team and the rest must say offenses. Neither line hedges a number it prints: no 'usually', no 'about', no 'roughly' next to a percentage.",
+    "prints_number": "True when the card's tendency lines carry {pass_rate} or {run_rate}. False cards say something qualitative that is true of the situation the card actually gates on. Eight cards are false, for three reasons given below. On a false card the source chip is telling the reader nothing, because no number came from that team; app.js does not read this field yet and still draws the chip.",
+    "why_some_cards_print_no_number": "The tendency tables are keyed on down, distance band and field zone only. A card that also gates on clock or score prints a number averaged over every clock and every score, which was measured 30 to 35 points wrong on the three late-game cards. Those three carry a qualitative line verified against their own gate instead. Separately, the NFL table has no league baseline and no team row for d1_short_own_deep, d1_short_own, d1_short_mid or d1_short_opp, so no card that can fire on first-and-short outside the red zone is allowed to print a number. Third, the tables count throws and runs, so a card about whether a team kicks at all cannot read its answer out of them; the four fourth-down cards state a kick frequency verified directly against the parquet over their own gate, or in the case of d4_kick_range_edge state none, because that band splits 82% kicks in the NFL against 55% in college and no single sentence is true of both.",
+    "ask": "Temporal occlusion, the one intervention in this literature with a large field-transferring effect. `kind` selects the answer buttons from ASK_KINDS in app.js and must be one of passrun, gokick, kickrunpass, sticks; `q` overrides the default question; `opts` mirrors what app.js renders and is here so the file is readable on its own; `resolve` says how the reader can tell what the right answer was. `ask_priority` rations the mechanic: app.js asks sooner on high numbers and later on low ones. Simulated over the whole parquet through app.js's own askEligible, this file asks once per 6.6 plays in both leagues, counted over every snap the app sees, and never twice running.",
+    "ask_reassure": "Shown once, after the first wrong call. app.js hardcodes this same sentence; this is the copy of record.",
+    "exposure": "Use `watch` while any concept on the card is below `learning`. Use `watch_short` once all of them reach learning or familiar. `watch` carries the inline definition; `watch_short` drops the definition and keeps the word, so no term is ever promoted before the reader has seen it defined.",
+    "assembly": "Three lines: situation, tendency, watch. Combined word count is capped at 25 and every variant pairing in this file is at or under it.",
+    "example_fill": "Not for rendering. A real snap from data/plays_{nfl,cfb}.parquet that selects this card, with the number app.js would print for it read out of the shipped tendency table, and the assembled word count. Regenerated whenever the tables are rebuilt."
   },
+  "ask_reassure": "Being wrong here is normal. Defenses are built to hide what they are doing.",
   "concepts": {
-    "blitz": "extra defenders rushing the quarterback instead of covering",
-    "box": "the defenders standing within five yards of the ball",
-    "clock_stoppage": "the clock stops out of bounds or on incompletions",
-    "cushion": "the space a defender leaves between himself and a receiver",
-    "field_goal": "a kick through the uprights, worth three points",
+    "blitz": "extra defenders running at the quarterback instead of covering",
+    "box": "the defenders crowded near where the ball sits",
+    "center": "the man in the middle who hands the ball back",
+    "clock_stops": "the clock stops out of bounds and on missed passes",
+    "cushion": "the space a defender leaves in front of a receiver",
+    "field_goal": "a kick between the tall posts, worth three points",
     "line_of_scrimmage": "the line across the field where the ball sits",
-    "linebacker": "a defender in the second row, behind the linemen",
-    "man_coverage": "each defender is assigned one specific receiver",
+    "linebacker": "a defender in the second row, behind the big men",
     "motion": "a player jogging sideways behind the line before the snap",
     "offensive_line": "the five big blockers standing in a row up front",
-    "play_action": "a fake handoff on the way to a pass",
-    "pocket": "the space the linemen build around the quarterback",
-    "punt": "a kick that gives the ball to the other team",
+    "play_action": "the quarterback fakes giving the ball away, then throws",
+    "pocket": "the space the blockers build around the quarterback",
+    "punt": "a kick that hands the ball to the other team",
+    "quarterback": "the player who starts every play with the ball",
+    "receiver": "a player whose job is to run out and catch",
     "red_zone": "inside the opponent's twenty yard line",
-    "returner": "the lone player downfield waiting to catch a kick",
+    "returner": "the lone player waiting far away to catch a kick",
     "safety": "the deepest defender, playing behind everyone else",
-    "sticks": "the first-down marker, drawn as a yellow line",
     "slot": "a receiver lined up inside the widest one",
+    "snap": "the moment the ball is passed back to start play",
+    "sticks": "the first-down marker, drawn on TV as a yellow line",
     "zone_coverage": "each defender guards an area, not a specific man"
   },
   "cards": [
     {
       "id": "goal_line_bodies",
       "priority": 90,
-      "applies": { "down": [1, 2, 3, 4], "max_yards_to_goal": 5 },
-      "prime": {
-        "situation": "{yards_to_goal} yards out.",
-        "tendency": "They throw here {pass_rate}% of the time.",
-        "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Count the players on the line of scrimmage, where the ball sits.",
-        "watch_short": "Count the players on the line of scrimmage."
+      "prints_number": true,
+      "applies": {
+        "down": [1, 2, 3],
+        "max_yards_to_goal": 5,
+        "max_pass_rate": 0.45
       },
-      "concepts": ["line_of_scrimmage"],
-      "explain_hint": "Inside the two, offenses run most of the time. Three yards of space is worth more than any route.",
-      "example_fill": { "team": "Detroit", "yards_to_goal": 2, "pass_rate": 30, "run_rate": 70 }
-    },
-    {
-      "id": "two_minute_sideline",
-      "priority": 85,
-      "applies": { "down": [1, 2, 3, 4], "period": [2, 4], "max_clock_seconds": 120, "max_score_diff": 8 },
       "prime": {
-        "situation": "Under two minutes.",
-        "tendency": "They throw here {pass_rate}% of the time.",
-        "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the sideline. A catch that ends out of bounds stops the clock.",
-        "watch_short": "Watch whether the catch ends out of bounds."
-      },
-      "concepts": ["clock_stoppage"],
-      "explain_hint": "Out of bounds and incomplete both stop the clock. A catch in the middle does not, so routes break outward.",
-      "example_fill": { "team": "Buffalo", "distance": 7, "pass_rate": 73, "run_rate": 27 }
-    },
-    {
-      "id": "red_zone_slot",
-      "priority": 80,
-      "applies": { "down": [1, 2, 3], "field_zone": ["red"], "min_yards_to_goal": 6 },
-      "prime": {
-        "situation": "Inside the 20.",
-        "tendency": "They throw here {pass_rate}% of the time.",
-        "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the receiver just inside the widest one. That inside spot is the slot.",
-        "watch_short": "Watch the slot receiver on the short side."
-      },
-      "concepts": ["slot", "red_zone"],
-      "explain_hint": "Inside the twenty the end zone works like an extra defender. Deep routes run out of room, so throws go inside.",
-      "example_fill": { "team": "Michigan", "distance": 8, "yards_to_goal": 14, "pass_rate": 49, "run_rate": 51 }
-    },
-    {
-      "id": "lead_late_clock",
-      "priority": 70,
-      "applies": { "down": [1, 2, 3], "period": [4], "max_clock_seconds": 480, "min_score_diff": 9 },
-      "prime": {
-        "situation": "Up {lead}, late.",
+        "situation": "Ball on the {yards_to_goal}.",
         "tendency": "They run here {run_rate}% of the time.",
         "tendency_low": "Offenses run here {run_rate}% of the time.",
-        "watch": "Watch the game clock after the tackle. It keeps running if the runner stays inbounds.",
-        "watch_short": "Watch the clock keep running after the tackle."
+        "watch": "Watch the line of scrimmage, where the ball sits. Everyone is packed in.",
+        "watch_short": "Watch how packed the line of scrimmage is."
       },
-      "concepts": ["clock_stoppage"],
-      "explain_hint": "Every inbounds tackle burns up to forty more seconds before the next snap. Running is how a team spends a lead.",
-      "example_fill": { "team": "Baltimore", "lead": 14, "distance": 10, "pass_rate": 18, "run_rate": 82 }
+      "concepts": [
+        "line_of_scrimmage"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at how packed the line is, then call it.",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "Watch the quarterback's hands. If the ball went to a runner, you called run right."
+      },
+      "ask_priority": 60,
+      "explain_hint": "This close, the end zone leaves no room for a deep throw, so offenses add blockers and run at the pile.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BAL",
+        "down": 2,
+        "distance": 2,
+        "yards_to_goal": 5,
+        "bucket": "d2_short_red",
+        "sample_size": 57,
+        "attributed": true,
+        "words": 24,
+        "pass_rate": 29,
+        "run_rate": 71
+      }
     },
     {
-      "id": "trail_late_deep_safeties",
-      "priority": 70,
-      "applies": { "down": [1, 2, 3], "period": [4], "max_clock_seconds": 480, "max_score_diff": -9 },
+      "id": "trail_late_pass",
+      "priority": 72,
+      "prints_number": false,
+      "applies": {
+        "down": [1, 2, 3],
+        "period": [4],
+        "max_clock_seconds": 480,
+        "max_score_diff": -9
+      },
       "prime": {
         "situation": "Down {lead}, late.",
-        "tendency": "They throw here {pass_rate}% of the time.",
-        "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the deepest defenders, the safeties. A defense protecting a lead starts them deeper.",
-        "watch_short": "Watch how deep the safeties start with a lead to protect."
+        "tendency": "Trailing late, they mostly throw.",
+        "tendency_low": "Trailing late, offenses mostly throw.",
+        "watch": "Watch for the safeties, the deepest defenders. You may not see them at all.",
+        "watch_short": "Watch how deep the safeties start."
       },
-      "concepts": ["safety"],
-      "explain_hint": "Two scores down, the defense stops fearing the run and guards deep. Short catches come free but cost clock.",
-      "example_fill": { "team": "Chicago", "lead": 14, "distance": 10, "pass_rate": 79, "run_rate": 21 }
+      "concepts": [
+        "safety"
+      ],
+      "ask": {
+        "kind": "sticks",
+        "q": "Look at where the safeties are. Does this one get past the yellow line?",
+        "opts": [
+          {
+            "v": "past",
+            "label": "Past it"
+          },
+          {
+            "v": "short",
+            "label": "Lands short"
+          }
+        ],
+        "resolve": "The yellow line settles it. A catch in front of the line leaves them still short."
+      },
+      "ask_priority": 68,
+      "explain_hint": "Two scores down, the defense stops fearing the run and guards the deep part of the field. Short catches come free but cost time.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BAL",
+        "down": 1,
+        "distance": 10,
+        "yards_to_goal": 31,
+        "bucket": "d1_long_opp",
+        "sample_size": 99,
+        "attributed": true,
+        "words": 22
+      }
+    },
+    {
+      "id": "lead_late_run",
+      "priority": 72,
+      "prints_number": false,
+      "applies": {
+        "down": [1, 2, 3],
+        "period": [4],
+        "max_clock_seconds": 480,
+        "min_score_diff": 9
+      },
+      "prime": {
+        "situation": "Up {lead}, late.",
+        "tendency": "Leading late, they mostly run.",
+        "tendency_low": "Leading late, offenses mostly run.",
+        "watch": "Watch the box, the defenders crowded near the ball.",
+        "watch_short": "Watch how crowded the box is."
+      },
+      "concepts": [
+        "box"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Check the box first. Does it say throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If the box was crowded and they ran anyway, the clock mattered more than the picture."
+      },
+      "ask_priority": 44,
+      "explain_hint": "Every tackle inside the field burns up to forty more seconds before the next play. Running is how a lead gets spent.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "NO",
+        "down": 3,
+        "distance": 2,
+        "yards_to_goal": 73,
+        "bucket": "d3_short_own",
+        "sample_size": 35,
+        "attributed": true,
+        "words": 17
+      }
     },
     {
       "id": "backed_up_pocket",
       "priority": 60,
-      "applies": { "down": [1, 2], "field_zone": ["own_deep"] },
+      "prints_number": true,
+      "applies": {
+        "down": [1, 2],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "field_zone": [
+          "own_deep"
+        ]
+      },
       "prime": {
-        "situation": "Inside their own 20.",
+        "situation": "Backed up deep.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the space the linemen build around the quarterback. That space is the pocket.",
-        "watch_short": "Watch how much room the pocket gives him back here."
+        "watch": "Watch the pocket, the space the blockers build around the quarterback.",
+        "watch_short": "Watch how much room the pocket gives the quarterback."
       },
-      "concepts": ["pocket"],
-      "explain_hint": "The pocket has no depth to give back here. A sack in his own end zone hands the defense two points.",
-      "example_fill": { "team": "Cleveland", "distance": 10, "pass_rate": 44, "run_rate": 56 }
+      "concepts": [
+        "pocket",
+        "quarterback"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at how many blockers stayed in. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If he dropped straight back and the pocket held, it was a throw all along."
+      },
+      "ask_priority": 46,
+      "explain_hint": "There is no room behind him here, so a sack costs more than it would anywhere else on the field.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BAL",
+        "down": 1,
+        "distance": 10,
+        "yards_to_goal": 80,
+        "bucket": "d1_long_own_deep",
+        "sample_size": 74,
+        "attributed": true,
+        "words": 21,
+        "pass_rate": 38,
+        "run_rate": 62
+      }
     },
     {
       "id": "d3_own_half_blitz",
       "priority": 50,
-      "applies": { "down": [3], "distance_band": ["medium", "long"], "field_zone": ["own_deep", "own"] },
+      "prints_number": true,
+      "applies": {
+        "down": [3],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "field_zone": [
+          "own_deep",
+          "own"
+        ]
+      },
       "prime": {
-        "situation": "Third and {distance}.",
+        "situation": "Third and {distance}, backed up.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "A blitz is extra rushers. Watch which defenders creep to the line late.",
-        "watch_short": "Watch which defenders creep up late, hinting at a blitz."
+        "watch": "A blitz is extra rushers. Watch who creeps toward the line late.",
+        "watch_short": "Watch who creeps up late for the blitz."
       },
-      "concepts": ["blitz"],
-      "explain_hint": "Extra rushers means fewer defenders left in coverage. Somebody downfield is alone, and the throw has to come out fast.",
-      "example_fill": { "team": "Ohio State", "distance": 9, "pass_rate": 77, "run_rate": 23 }
+      "concepts": [
+        "blitz"
+      ],
+      "ask": {
+        "kind": "sticks",
+        "q": "Count who is creeping up. Does this one get past the yellow line?",
+        "opts": [
+          {
+            "v": "past",
+            "label": "Past it"
+          },
+          {
+            "v": "short",
+            "label": "Lands short"
+          }
+        ],
+        "resolve": "The yellow line settles it. Note how fast the ball came out once the rushers arrived."
+      },
+      "ask_priority": 78,
+      "explain_hint": "Extra rushers means fewer defenders left in coverage, so the throw has to come out fast.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 3,
+        "distance": 10,
+        "yards_to_goal": 81,
+        "bucket": "d3_long_own_deep",
+        "sample_size": 57,
+        "attributed": true,
+        "words": 24,
+        "pass_rate": 76,
+        "run_rate": 24
+      }
     },
     {
       "id": "d4_short_go",
-      "priority": 30,
-      "applies": { "down": [4], "distance_band": ["short"] },
+      "priority": 34,
+      "prints_number": true,
+      "applies": {
+        "down": [4],
+        "distance_band": [
+          "short"
+        ],
+        "max_yards_to_goal": 59
+      },
       "prime": {
         "situation": "Fourth and {distance}.",
         "tendency": "They throw {pass_rate}% when they go for it.",
         "tendency_low": "Offenses throw {pass_rate}% when they go for it.",
-        "watch": "Watch who stands behind the center. A punter back there means they kick.",
-        "watch_short": "Watch whether a punter is standing behind the center."
+        "watch": "Watch who stands behind the center, the man who hands the ball back.",
+        "watch_short": "Watch who stands behind the center."
       },
-      "concepts": ["punt", "field_goal"],
-      "explain_hint": "Between the opponent's twenty and forty, most teams go for it rather than kick. Closer in, the field goal wins out.",
-      "example_fill": { "team": "Philadelphia", "distance": 1, "pass_rate": 45, "run_rate": 55 }
+      "concepts": [
+        "center"
+      ],
+      "ask": {
+        "kind": "kickrunpass",
+        "q": "Look at who is behind the center. Kick, run, or throw?",
+        "opts": [
+          {
+            "v": "kick",
+            "label": "Kick"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          },
+          {
+            "v": "pass",
+            "label": "Throw"
+          }
+        ],
+        "resolve": "A kicker swings his leg. A quarterback takes it and turns. You could see which was back there."
+      },
+      "ask_priority": 84,
+      "explain_hint": "Inside the opponent's half, going for it wins out most of the time, so the kicking team stays off the field.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BUF",
+        "down": 4,
+        "distance": 1,
+        "yards_to_goal": 12,
+        "bucket": "d4_short_red",
+        "sample_size": 146,
+        "attributed": false,
+        "words": 24,
+        "pass_rate": 50,
+        "run_rate": 50
+      }
     },
     {
-      "id": "d4_kick_likely",
-      "priority": 30,
-      "applies": { "down": [4], "distance_band": ["medium", "long"] },
+      "id": "d4_short_own_half",
+      "priority": 34,
+      "prints_number": false,
+      "applies": {
+        "down": [4],
+        "distance_band": [
+          "short"
+        ],
+        "min_yards_to_goal": 60
+      },
+      "prime": {
+        "situation": "Fourth and {distance}, backed up.",
+        "tendency": "Three times in four, they punt.",
+        "tendency_low": "Three times in four, offenses punt.",
+        "watch": "A punt hands the ball over. Watch the punter standing fifteen yards back.",
+        "watch_short": "Watch whether the punter is standing back there."
+      },
+      "concepts": [
+        "punt"
+      ],
+      "ask": {
+        "kind": "gokick",
+        "q": "Is the punter back there? Kick, or go for it?",
+        "opts": [
+          {
+            "v": "kick",
+            "label": "Kick"
+          },
+          {
+            "v": "go",
+            "label": "Go for it"
+          }
+        ],
+        "resolve": "If the punter was standing fifteen yards back, it was always going to be a kick."
+      },
+      "ask_priority": 80,
+      "explain_hint": "Backed up, a failed try hands the other team the ball already in scoring range, so the kick almost always wins.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "NO",
+        "down": 4,
+        "distance": 2,
+        "yards_to_goal": 73,
+        "bucket": "d4_short_own",
+        "sample_size": 76,
+        "attributed": false,
+        "words": 24
+      }
+    },
+    {
+      "id": "d4_field_goal",
+      "priority": 34,
+      "prints_number": false,
+      "applies": {
+        "down": [4],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "field_zone": [
+          "opp",
+          "red"
+        ],
+        "max_yards_to_goal": 34
+      },
       "prime": {
         "situation": "Fourth and {distance}.",
-        "tendency": "Most fourth downs from here are kicked.",
-        "tendency_low": "Most fourth downs from here are kicked.",
-        "watch": "Watch the lone player standing far downfield. He is the returner waiting on a kick.",
-        "watch_short": "Watch the returner set up downfield before the snap."
+        "tendency": "They kick from here most of the time.",
+        "tendency_low": "Offenses kick from here most of the time.",
+        "watch": "A field goal is a kick between the posts. Watch the holder kneel.",
+        "watch_short": "Watch the field goal holder kneel down."
       },
-      "concepts": ["punt", "returner"],
-      "explain_hint": "Most fourth downs at this distance get kicked. Field position is the whole argument, and the return is where it swings.",
-      "example_fill": { "team": "Denver", "distance": 12, "pass_rate": 90, "run_rate": 10 }
+      "concepts": [
+        "field_goal"
+      ],
+      "ask": {
+        "kind": "gokick",
+        "q": "Is a holder kneeling down out there? Kick, or go for it?",
+        "opts": [
+          {
+            "v": "kick",
+            "label": "Kick"
+          },
+          {
+            "v": "go",
+            "label": "Go for it"
+          }
+        ],
+        "resolve": "If a man knelt down to hold the ball, the field goal team was on the field."
+      },
+      "ask_priority": 82,
+      "explain_hint": "Close enough to kick, and three points in hand are worth more than a fourth-down try that fails half the time.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 4,
+        "distance": 4,
+        "yards_to_goal": 11,
+        "bucket": "d4_medium_red",
+        "sample_size": 28,
+        "attributed": false,
+        "words": 24
+      }
+    },
+    {
+      "id": "d4_kick_range_edge",
+      "priority": 34,
+      "prints_number": false,
+      "applies": {
+        "down": [4],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "min_yards_to_goal": 35,
+        "max_yards_to_goal": 39
+      },
+      "prime": {
+        "situation": "Fourth and {distance}, far out.",
+        "tendency": "Kick, or go for it. A real decision.",
+        "tendency_low": "Kick, or go for it. A real decision.",
+        "watch": "Watch which players run on. That choice is the play.",
+        "watch_short": "Watch which players run on."
+      },
+      "concepts": [],
+      "ask": {
+        "kind": "gokick",
+        "q": "Watch who runs onto the field. Kick, or go for it?",
+        "opts": [
+          {
+            "v": "kick",
+            "label": "Kick"
+          },
+          {
+            "v": "go",
+            "label": "Go for it"
+          }
+        ],
+        "resolve": "The group that ran on settled this before the ball ever moved."
+      },
+      "ask_priority": 86,
+      "explain_hint": "This is the longest kick most teams will try, and a punt gains little from here, so more teams go for it than anywhere else on fourth down.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BAL",
+        "down": 4,
+        "distance": 8,
+        "yards_to_goal": 35,
+        "bucket": "d4_long_opp",
+        "sample_size": 27,
+        "attributed": false,
+        "words": 23
+      }
+    },
+    {
+      "id": "d4_punt_returner",
+      "priority": 34,
+      "prints_number": false,
+      "applies": {
+        "down": [4],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "min_yards_to_goal": 40
+      },
+      "prime": {
+        "situation": "Fourth and {distance}.",
+        "tendency": "Nine times in ten, they punt.",
+        "tendency_low": "Nine times in ten, offenses punt.",
+        "watch": "A punt hands the ball over. Watch the returner waiting far away to catch it.",
+        "watch_short": "Watch the returner set up far away for the punt."
+      },
+      "concepts": [
+        "returner",
+        "punt"
+      ],
+      "ask": {
+        "kind": "gokick",
+        "q": "Is anyone standing alone far away? Kick, or go for it?",
+        "opts": [
+          {
+            "v": "kick",
+            "label": "Kick"
+          },
+          {
+            "v": "go",
+            "label": "Go for it"
+          }
+        ],
+        "resolve": "If one player was standing alone forty yards away, the kick was coming."
+      },
+      "ask_priority": 84,
+      "explain_hint": "Too far to kick for points and too far to go for it, so the ball gets handed over on their terms instead.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 4,
+        "distance": 14,
+        "yards_to_goal": 74,
+        "bucket": "d4_long_own",
+        "sample_size": 29,
+        "attributed": false,
+        "words": 24
+      }
     },
     {
       "id": "d3_short_line",
       "priority": 20,
-      "applies": { "down": [3], "distance_band": ["short"] },
+      "prints_number": true,
+      "applies": {
+        "down": [3],
+        "distance_band": [
+          "short"
+        ]
+      },
       "prime": {
         "situation": "Third and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the five big men in a row. At the snap, forward means run.",
-        "watch_short": "Watch the offensive line fire forward or drop back."
+        "watch": "Watch the offensive line, the five big blockers in a row up front.",
+        "watch_short": "Watch the offensive line up front."
       },
-      "concepts": ["offensive_line"],
-      "explain_hint": "Linemen cannot disguise it for long. Forward steps mean run. A quick step back and set means pass protection.",
-      "example_fill": { "team": "Kansas City", "distance": 2, "pass_rate": 48, "run_rate": 52 }
+      "concepts": [
+        "offensive_line"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at the line before you answer. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If the line fired forward off the ball, that was the run you called."
+      },
+      "ask_priority": 68,
+      "explain_hint": "Short yardage is decided up front. Nothing fancy has to work; somebody just has to move somebody.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BUF",
+        "down": 3,
+        "distance": 2,
+        "yards_to_goal": 13,
+        "bucket": "d3_short_red",
+        "sample_size": 36,
+        "attributed": true,
+        "words": 23,
+        "pass_rate": 38,
+        "run_rate": 62
+      }
     },
     {
       "id": "d3_medium_sticks",
       "priority": 20,
-      "applies": { "down": [3], "distance_band": ["medium"] },
+      "prints_number": true,
+      "applies": {
+        "down": [3],
+        "distance_band": [
+          "medium"
+        ]
+      },
       "prime": {
         "situation": "Third and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch which defenders set up behind the yellow line, the sticks.",
-        "watch_short": "Watch which defenders set up behind the sticks."
+        "watch": "Watch where defenders set up against the sticks, the yellow first-down line.",
+        "watch_short": "Watch who sets up short of the sticks."
       },
-      "concepts": ["sticks"],
-      "explain_hint": "Zone defenders are coached to settle right at the sticks, which is why so many catches land a yard short of them.",
-      "example_fill": { "team": "Michigan", "distance": 6, "pass_rate": 78, "run_rate": 22 }
+      "concepts": [
+        "sticks"
+      ],
+      "ask": {
+        "kind": "sticks",
+        "q": "Look at where they are standing. Does this one get past the yellow line?",
+        "opts": [
+          {
+            "v": "past",
+            "label": "Past it"
+          },
+          {
+            "v": "short",
+            "label": "Lands short"
+          }
+        ],
+        "resolve": "The yellow line settles it. What counts is where he was stopped, not where he caught it."
+      },
+      "ask_priority": 82,
+      "explain_hint": "Defenders in a zone settle right at the marker, which is why so many catches land a yard short of it.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 3,
+        "distance": 6,
+        "yards_to_goal": 30,
+        "bucket": "d3_medium_opp",
+        "sample_size": 55,
+        "attributed": true,
+        "words": 22,
+        "pass_rate": 79,
+        "run_rate": 21
+      }
     },
     {
-      "id": "d3_long_safeties",
+      "id": "d3_long_sticks",
       "priority": 20,
-      "applies": { "down": [3], "distance_band": ["long"] },
+      "prints_number": true,
+      "applies": {
+        "down": [3],
+        "distance_band": [
+          "long"
+        ]
+      },
       "prime": {
         "situation": "Third and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the deepest defenders, the safeties. They start well behind the yellow line.",
+        "watch": "Watch the safeties, the deepest defenders. They start behind the sticks, the yellow line.",
         "watch_short": "Watch how far behind the sticks the safeties start."
       },
-      "concepts": ["safety", "sticks"],
-      "explain_hint": "Third and long converts about one time in four. The defense gives up the short catch on purpose and tackles in front of the marker.",
-      "example_fill": { "team": "Michigan", "distance": 11, "pass_rate": 84, "run_rate": 16 }
+      "concepts": [
+        "safety",
+        "sticks"
+      ],
+      "ask": {
+        "kind": "sticks",
+        "q": "The safeties are deep. Does this one get past the yellow line?",
+        "opts": [
+          {
+            "v": "past",
+            "label": "Past it"
+          },
+          {
+            "v": "short",
+            "label": "Lands short"
+          }
+        ],
+        "resolve": "The yellow line settles it. Short of it on third down means the punt team comes on."
+      },
+      "ask_priority": 88,
+      "explain_hint": "Third and long is converted about one time in four. The defense gives up the short catch on purpose.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BAL",
+        "down": 3,
+        "distance": 8,
+        "yards_to_goal": 35,
+        "bucket": "d3_long_opp",
+        "sample_size": 54,
+        "attributed": true,
+        "words": 24,
+        "pass_rate": 88,
+        "run_rate": 12
+      }
+    },
+    {
+      "id": "two_minute_pass",
+      "priority": 18,
+      "prints_number": false,
+      "applies": {
+        "down": [1, 2, 3],
+        "period": [2, 4],
+        "max_clock_seconds": 120,
+        "max_score_diff": 0
+      },
+      "prime": {
+        "situation": "Under two minutes.",
+        "tendency": "Down or tied late, they mostly throw.",
+        "tendency_low": "Down or tied late, offenses mostly throw.",
+        "watch": "Watch the sideline. The clock stops when the ball goes out of bounds.",
+        "watch_short": "Watch the sideline. The clock stops out there."
+      },
+      "concepts": [
+        "clock_stops"
+      ],
+      "ask": {
+        "kind": "sticks",
+        "q": "They need this one. Does it get past the yellow line?",
+        "opts": [
+          {
+            "v": "past",
+            "label": "Past it"
+          },
+          {
+            "v": "short",
+            "label": "Lands short"
+          }
+        ],
+        "resolve": "The yellow line settles it. Past the line is a new first down and the chains move."
+      },
+      "ask_priority": 56,
+      "explain_hint": "A throw that ends out of bounds stops the clock. A run that ends inside the field does not.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BUF",
+        "down": 1,
+        "distance": 15,
+        "yards_to_goal": 52,
+        "bucket": "d1_long_mid",
+        "sample_size": 126,
+        "attributed": true,
+        "words": 23
+      }
+    },
+    {
+      "id": "red_zone_slot",
+      "priority": 16,
+      "prints_number": true,
+      "applies": {
+        "down": [1, 2, 3],
+        "field_zone": [
+          "red"
+        ]
+      },
+      "prime": {
+        "situation": "Red zone, inside their 20.",
+        "tendency": "They throw here {pass_rate}% of the time.",
+        "tendency_low": "Offenses throw here {pass_rate}% of the time.",
+        "watch": "Watch the slot, the player lined up just inside the widest one.",
+        "watch_short": "Watch the slot in the red zone."
+      },
+      "concepts": [
+        "red_zone",
+        "slot"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at the slot before you answer. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If the ball went to the slot on a short route, your read on that inside spot was right."
+      },
+      "ask_priority": 48,
+      "explain_hint": "Inside the twenty the end zone works like an extra defender. Deep routes run out of room, so throws go inside.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BUF",
+        "down": 1,
+        "distance": 10,
+        "yards_to_goal": 19,
+        "bucket": "d1_long_red",
+        "sample_size": 48,
+        "attributed": true,
+        "words": 24,
+        "pass_rate": 33,
+        "run_rate": 67
+      }
     },
     {
       "id": "d2_short_safety_creep",
       "priority": 15,
-      "applies": { "down": [2], "distance_band": ["short"] },
+      "prints_number": true,
+      "applies": {
+        "down": [2],
+        "distance_band": [
+          "short"
+        ]
+      },
       "prime": {
         "situation": "Second and {distance}.",
         "tendency": "They run here {run_rate}% of the time.",
         "tendency_low": "Offenses run here {run_rate}% of the time.",
-        "watch": "The safety is the deepest defender. Watch him creep toward the line here.",
+        "watch": "Watch the safeties, the deepest defenders, creep toward the line here.",
         "watch_short": "Watch the safeties creep toward the line."
       },
-      "concepts": ["safety"],
-      "explain_hint": "Second and short is where the deep shot shows up. Throws from here go for fifteen or more about one time in seven.",
-      "example_fill": { "team": "Green Bay", "distance": 2, "pass_rate": 36, "run_rate": 64 }
+      "concepts": [
+        "safety"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Are the safeties creeping up? Call it: throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If the safeties came down and the throw went over the top, the creep gave it away."
+      },
+      "ask_priority": 62,
+      "explain_hint": "Second and short is where the deep shot shows up. Throws from here gain fifteen or more about one time in seven.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BUF",
+        "down": 2,
+        "distance": 1,
+        "yards_to_goal": 36,
+        "bucket": "d2_short_opp",
+        "sample_size": 50,
+        "attributed": true,
+        "words": 21,
+        "pass_rate": 30,
+        "run_rate": 70
+      }
     },
     {
       "id": "d2_medium_motion",
       "priority": 15,
-      "applies": { "down": [2], "distance_band": ["medium"] },
+      "prints_number": true,
+      "applies": {
+        "down": [2],
+        "distance_band": [
+          "medium"
+        ]
+      },
       "prime": {
         "situation": "Second and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch anyone jogging sideways before the snap. A defender following him means man coverage.",
-        "watch_short": "Watch whether a defender travels with the man in motion."
+        "watch": "Watch for motion, a player jogging sideways before the snap.",
+        "watch_short": "Watch for a man in motion before the snap."
       },
-      "concepts": ["man_coverage", "motion"],
-      "explain_hint": "One defender traveling with the motion is man coverage. Nobody moving is zone, where each defender guards an area instead.",
-      "example_fill": { "team": "Miami", "distance": 6, "pass_rate": 53, "run_rate": 47 }
+      "concepts": [
+        "motion",
+        "snap"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Somebody may go in motion. Watch it, then call it.",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "The quarterback's hands settle it. A handoff is a run, dropping back is a throw."
+      },
+      "ask_priority": 46,
+      "explain_hint": "If one defender travels across with the man in motion, that is man coverage, one defender on one man. Nobody moving means zone.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 2,
+        "distance": 7,
+        "yards_to_goal": 67,
+        "bucket": "d2_medium_own",
+        "sample_size": 38,
+        "attributed": true,
+        "words": 20,
+        "pass_rate": 60,
+        "run_rate": 40
+      }
     },
     {
       "id": "d2_long_zone_drop",
       "priority": 15,
-      "applies": { "down": [2], "distance_band": ["long"] },
+      "prints_number": true,
+      "applies": {
+        "down": [2],
+        "distance_band": [
+          "long"
+        ]
+      },
       "prime": {
         "situation": "Second and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the second row of defenders at the snap. Backpedaling means zone, guarding space.",
-        "watch_short": "Watch the linebackers backpedal into their zones."
+        "watch": "Watch the linebackers, the second row, each guarding an area in zone coverage.",
+        "watch_short": "Watch how deep the linebackers set up in zone coverage."
       },
-      "concepts": ["zone_coverage", "linebacker"],
-      "explain_hint": "In zone nobody chases one receiver. Each defender sits in an area and hands him off to the next one.",
-      "example_fill": { "team": "Michigan", "distance": 12, "pass_rate": 69, "run_rate": 31 }
+      "concepts": [
+        "linebacker",
+        "zone_coverage"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at how deep the linebackers set up. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "The quarterback's hands settle it. Then check whether the linebackers had backed off."
+      },
+      "ask_priority": 50,
+      "explain_hint": "In zone nobody chases one man. Each defender sits in an area and hands him off to the next one.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BAL",
+        "down": 2,
+        "distance": 13,
+        "yards_to_goal": 73,
+        "bucket": "d2_long_own",
+        "sample_size": 59,
+        "attributed": true,
+        "words": 23,
+        "pass_rate": 60,
+        "run_rate": 41
+      }
+    },
+    {
+      "id": "d1_short_rare",
+      "priority": 14,
+      "prints_number": false,
+      "applies": {
+        "down": [1],
+        "distance_band": [
+          "short"
+        ]
+      },
+      "prime": {
+        "situation": "First and {distance}.",
+        "tendency": "No number for this one. It is rare.",
+        "tendency_low": "No number for this one. It is rare.",
+        "watch": "Watch the box, the defenders crowded near the ball.",
+        "watch_short": "Watch how crowded the box is."
+      },
+      "concepts": [
+        "box"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Read the box, not the odds. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "A crowded box that still gave up a run tells you the picture is only ever a hint."
+      },
+      "ask_priority": 50,
+      "explain_hint": "First down with a short distance almost always follows a penalty, and it is rare enough that there is no honest number to give you.",
+      "example_fill": {
+        "league": "cfb",
+        "team": "Florida International",
+        "down": 1,
+        "distance": 3,
+        "yards_to_goal": 21,
+        "bucket": "d1_short_opp",
+        "sample_size": 13,
+        "attributed": false,
+        "words": 20
+      }
     },
     {
       "id": "d1_run_lean_play_action",
       "priority": 12,
-      "applies": { "down": [1], "field_zone": ["own", "mid", "opp"], "max_pass_rate": 0.42 },
+      "prints_number": true,
+      "applies": {
+        "down": [1],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "field_zone": [
+          "own",
+          "mid",
+          "opp"
+        ],
+        "max_pass_rate": 0.44
+      },
       "prime": {
         "situation": "First and {distance}.",
         "tendency": "They run here {run_rate}% of the time.",
         "tendency_low": "Offenses run here {run_rate}% of the time.",
-        "watch": "Play action is a fake handoff. Watch the second row of defenders step forward.",
-        "watch_short": "Watch the linebackers step forward on the fake."
+        "watch": "Watch the runner beside the quarterback. A fake to him is play action.",
+        "watch_short": "Watch the runner beside the quarterback for play action."
       },
-      "concepts": ["play_action", "linebacker"],
-      "explain_hint": "A fake only works when the run is believable, which is why run-leaning teams get the most out of play action.",
-      "example_fill": { "team": "Georgia", "distance": 10, "pass_rate": 38, "run_rate": 62 }
+      "concepts": [
+        "quarterback",
+        "play_action"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at who is standing beside the quarterback. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If he faked to the runner and kept the ball, it was a throw all along."
+      },
+      "ask_priority": 44,
+      "explain_hint": "The fake is the point. If a defender bites on it, somebody behind that defender is suddenly open.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 1,
+        "distance": 10,
+        "yards_to_goal": 34,
+        "bucket": "d1_long_opp",
+        "sample_size": 95,
+        "attributed": true,
+        "words": 23,
+        "pass_rate": 42,
+        "run_rate": 58
+      }
     },
     {
       "id": "d1_pass_lean_cushion",
       "priority": 12,
-      "applies": { "down": [1], "field_zone": ["own", "mid", "opp"], "min_pass_rate": 0.52 },
+      "prints_number": true,
+      "applies": {
+        "down": [1],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "field_zone": [
+          "own",
+          "mid",
+          "opp"
+        ],
+        "min_pass_rate": 0.53
+      },
       "prime": {
         "situation": "First and {distance}.",
         "tendency": "They throw here {pass_rate}% of the time.",
         "tendency_low": "Offenses throw here {pass_rate}% of the time.",
-        "watch": "Watch the space between the widest player outside and his defender. That space is cushion.",
-        "watch_short": "Watch the cushion on the widest receiver."
+        "watch": "Watch the cushion, the space a defender leaves in front of a receiver.",
+        "watch_short": "Watch the cushion on the receivers."
       },
-      "concepts": ["cushion"],
-      "explain_hint": "A big cushion means the short throw is there for the taking. A small one means they are daring him to go deep.",
-      "example_fill": { "team": "Cincinnati", "distance": 10, "pass_rate": 60, "run_rate": 40 }
+      "concepts": [
+        "cushion",
+        "receiver"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Look at the cushion before you answer. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "If the cushion was big and the throw went underneath it, your read was the right one."
+      },
+      "ask_priority": 44,
+      "explain_hint": "A big cushion means the short throw is there for the taking. A small one dares him to go deep instead.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "ARI",
+        "down": 1,
+        "distance": 10,
+        "yards_to_goal": 70,
+        "bucket": "d1_long_own",
+        "sample_size": 146,
+        "attributed": true,
+        "words": 23,
+        "pass_rate": 56,
+        "run_rate": 44
+      }
     },
     {
       "id": "d1_box_count",
       "priority": 10,
-      "applies": { "down": [1], "field_zone": ["own", "mid", "opp"] },
+      "prints_number": true,
+      "applies": {
+        "down": [1],
+        "distance_band": [
+          "medium",
+          "long"
+        ],
+        "field_zone": [
+          "own",
+          "mid",
+          "opp"
+        ]
+      },
       "prime": {
         "situation": "First and {distance}.",
         "tendency": "They run here {run_rate}% of the time.",
         "tendency_low": "Offenses run here {run_rate}% of the time.",
-        "watch": "Count the defenders within five yards of the ball. That group is the box.",
-        "watch_short": "Count the defenders in the box."
+        "watch": "Watch the box, the defenders crowded near the ball. Thin or stacked?",
+        "watch_short": "Watch whether the box is thin or stacked."
       },
-      "concepts": ["box"],
-      "explain_hint": "Six or fewer in the box is light and invites a run. Eight is loaded and dares them to throw instead.",
-      "example_fill": { "team": "Michigan", "distance": 10, "pass_rate": 47, "run_rate": 53 }
+      "concepts": [
+        "box"
+      ],
+      "ask": {
+        "kind": "passrun",
+        "q": "Count the box, then call it. Throw or run?",
+        "opts": [
+          {
+            "v": "pass",
+            "label": "Throw"
+          },
+          {
+            "v": "run",
+            "label": "Run"
+          }
+        ],
+        "resolve": "The quarterback's hands settle it. Then look back at the box and see whether it matched."
+      },
+      "ask_priority": 42,
+      "explain_hint": "A thin box invites the run. A crowded one dares them to throw over the top of it.",
+      "example_fill": {
+        "league": "nfl",
+        "team": "BUF",
+        "down": 1,
+        "distance": 10,
+        "yards_to_goal": 64,
+        "bucket": "d1_long_own",
+        "sample_size": 157,
+        "attributed": true,
+        "words": 22,
+        "pass_rate": 44,
+        "run_rate": 56
+      }
     }
   ]
 }
