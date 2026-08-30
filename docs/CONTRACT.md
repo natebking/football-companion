@@ -153,18 +153,73 @@ Team-clustered paired bootstrap, 2000 reps, against the situation baseline: CFB 
 
 ## Shipped tendency JSON
 
-`web/tendency-cfb.json`, `web/tendency-nfl.json`. Target under 400KB each uncompressed so the phone loads them once.
+`web/tendency-cfb.json`, `web/tendency-nfl.json`. Written by `engine/export_tables.py`, read by the browser once at load.
+
+The size gate is the **gzipped** bytes, because that is what crosses the wire and what the phone waits on: under 100KB each. CFB ships 74,008 gzipped over 920,201 raw, NFL 12,160 over 149,409 (the exporter reports both on every run). Uncompressed size is a parse cost of a few milliseconds and no transfer cost, so it is reported and not budgeted. Rates round to 3 decimals, `shrink_weight` to the engine's 4 so the two never disagree about a confidence cut.
 
 ```json
 {
   "generated": "2026-08-29",
+  "league": "cfb",
   "seasons": [2023, 2024, 2025],
-  "league_baseline": { "d3_medium_mid": { "pass_rate": 0.71, "...": 0 } },
-  "teams": { "USC": { "d3_medium_mid": { "pass_rate": 0.78, "sample_size": 47, "rung": 1 } } }
+  "rules": {"shrink_k": 60.0, "min_sample": 30,
+            "confidence_cuts": {"high": 0.5, "medium": 0.35},
+            "attribute_min_diff": 0.03},
+  "league_overall": {"pass_rate": 0.495, "success_rate": 0.43,
+                     "explosive_rate": 0.154, "sample_size": 360592},
+  "league_baseline": {
+    "d3_long_own": {"pass_rate": 0.809, "success_rate": 0.253,
+                    "explosive_rate": 0.197, "sample_size": 10320}},
+  "teams": {
+    "Ohio State": {
+      "d3_long_own": {"pass_rate": 0.851, "pass_rate_raw": 0.903, "sample_size": 49,
+                      "shrink_weight": 0.4495, "rung": 1, "can_attribute": true}}}
 }
 ```
 
-Teams carry only buckets that reached rung 1 or 2. Everything else falls back to `league_baseline` client-side, which is what keeps the file small.
+Teams carry every bucket that reached rung 1, 2 or 3. Rung 3 ships now that confidence is a function of `shrink_weight` rather than of the rung: a rung-3 cell on 200 plays is exactly as trustworthy as a rung-1 cell on 200 plays, and the same two conditions gate it. It costs 1,405 CFB cells and buys an exact match to the engine on every snap, so the client read and `tendency.query` now agree on all 360,592 CFB and 34,902 NFL eligible plays. Rung 4 cannot appear because the engine no longer has it; the ordinal stays retired. Rung 5 is the league line, which is `league_baseline`, not a team cell.
+
+`rules` carries the constants the file was built under so the client holds no magic numbers. `league_overall` is the last-resort league line for the handful of buckets the league itself never filled (four in the NFL, every one of them 1st and short, in all four zones outside the red zone); a team can still reach rung 2 or 3 there through a widened filter, and the engine shrinks toward the overall rate, so the client must fall back to the same thing.
+
+### `can_attribute`
+
+The one field the copy hangs on. Precomputed per cell, true only when **both** hold:
+
+| condition | test | meaning |
+|---|---|---|
+| the number is mostly the team's | confidence is not `low`, i.e. `shrink_weight >= 0.35` | at least a third of it is their own history |
+| the team differs from everyone | `abs(pass_rate - league bucket rate) >= 0.03` | naming them says something the league line does not |
+
+Both, never one. 92.2% of CFB snaps clear the confidence gate and only 56.8% of those also clear the difference gate; the NFL runs 90.7% and 51.2%. Gating on confidence alone would print "USC throws here 78%" on nine snaps in ten while printing the league's own number on nearly half of them.
+
+It is computed once at export, from the rounded numbers that actually ship, comparing whole thousandths rather than floats (`abs(0.68 - 0.65) >= 0.03` is False in binary floating point). A reader can reproduce every value from the file alone, and the client applies no rule of its own.
+
+Shipping at 3 decimals rather than the engine's 4 moves the boolean on 36 of 7,110 CFB cells (all promotions) and 8 of 1,120 NFL cells (7 promotions, 1 demotion), every one of them within 0.0008 of the 0.03 cut. Both rates round independently, each by at most half a thousandth, so the shipped gap can land up to 0.001 either side of the true one; promotions dominate because a gap of 0.0296 needs only one of the two roundings to clear the cut while a demotion needs both to move the other way from an exact half. Net effect on the headline share is +0.6 points on CFB (52.4% shipped against 51.8% at full precision) and +0.1 on the NFL (46.5% against 46.3%). A 2.96-point separation and a 3.00-point separation are not a distinction this product can defend, so the cheaper file wins.
+
+One residual the rule does not catch. A rung-2 or rung-3 cell's raw rate was measured over a wider filter than the bucket it ships under, while the difference gate compares the result to the league's rate for the *exact* bucket. A team that is perfectly ordinary at the filter that actually measured them can therefore clear the gate on the widening alone. Checked against the league's rate at each cell's own matched filter, that is 229 of 3,589 attributable CFB cells (6.4%, 5.4% of attributable cell-snaps) and 12 of 493 NFL cells (2.4%, 2.8%). Closing it would mean shipping league rates at every widened filter too, which this file does not carry and which would cost more than the error does. Logged, not fixed.
+
+Measured by reading the shipped files over every eligible play in the parquet:
+
+| | CFB | NFL |
+|---|---|---|
+| snaps a team cell answers | 95.9% | 95.4% |
+| snaps that may name the team | **52.4%** | **46.5%** |
+| snaps that must say "offenses" | 47.6% | 53.5% |
+
+Call it half. This is the governing fact for card copy: half the time the card says "Ohio State throws here 85%", and the other half it says "offenses throw here 81%".
+
+### Client read
+
+`export_tables.lookup()` is the reference implementation; `web/app.js` ports it.
+
+| state | card says | number comes from |
+|---|---|---|
+| team cell, `can_attribute` true | name the team | the cell's `pass_rate` |
+| team cell, `can_attribute` false | "offenses" | `league_baseline[key].pass_rate` |
+| no team cell | "offenses" | `league_baseline[key].pass_rate` |
+| no baseline row either | "offenses" | `league_overall.pass_rate` |
+
+A cell whose `can_attribute` is false is never read by copy, because the card prints the league line over that situation either way. It ships as a diagnostic and is the first thing dropped if the file ever exceeds its budget: `_fit()` drops non-attributable cells first, then team cells bucket by bucket, least-used bucket first, leaving `league_baseline` whole so every dropped cell still has a fallback. Neither stage has run. Both files fit as built.
 
 ## Card library
 
