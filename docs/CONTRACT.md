@@ -64,38 +64,92 @@ def bucket(down: int, distance: int, yards_to_goal: int) -> str
 ## Tendency query and fallback ladder
 
 ```python
-def query(team: str, league: str, down: int, distance: int, yards_to_goal: int) -> TendencyBlock
+def build(df, seasons=None, half_life=1.0, shrink_k=60.0) -> tables
+def query(tables, team, down, distance, yards_to_goal) -> TendencyBlock
 ```
 
-Widen until a rung has `sample_size >= 30`. Rung drives confidence, and card copy softens as confidence drops.
+Widen until a rung has `sample_size >= 30`, then shrink the team's rates toward the league's rates for the same situation.
 
-| rung | filter | confidence |
-|---|---|---|
-| 1 | team, recent seasons, exact bucket | high |
-| 2 | team, recent seasons, drop `field_zone` | high |
-| 3 | team, recent seasons, `down` + `distance_band` only | medium |
-| 4 | team, all seasons, `down` only | medium |
-| 5 | league average, exact bucket | low |
+| rung | filter |
+|---|---|
+| 1 | team, recent seasons, exact bucket |
+| 2 | team, recent seasons, field zone pooled with its neighbours |
+| 3 | team, recent seasons, `down` + `distance_band` only |
+| 5 | league average, exact bucket, no team attribution |
 
-Recency weighting inside a rung: exponential decay by season, half-life one season. Current season weight 1.0, prior 0.5, and so on.
+Rung 4 (team, all seasons, `down` only) is **removed**, and 4 is retired rather than reused so rung ordinals already written to disk keep their meaning. It was the worst thing in the engine: on 7,577 held-out CFB plays it scored 0.2395 Brier against the league's 0.1907 for the same situations, and -0.0700 skill in the NFL. Its error is bias, not variance, so shrinkage cannot rescue it -- pooling every distance and field position behind one down gives it the largest samples in the engine, so `n / (n + k)` would hand it the *most* trust of any rung. Fitting `k` on rung 4 alone returns `k = inf`: the estimator's own optimum is to delete it. Removing it is worth -0.0030 Brier on CFB with no fitted parameter (0.23337 to 0.23035 unshrunk, same held-out plays). Blocks that used to land there now fall to the league rung.
+
+Recency weighting inside a rung: exponential decay by season, half-life one season. Current season weight 1.0, prior 0.5, and so on. The weights move the rates; `sample_size` stays the raw play count.
+
+### Shrinkage
+
+Rates computed on 30 to 50 plays carry a standard error near 0.08, so extreme buckets are mostly noise. Unshrunk, the engine's 0.9-1.0 CFB bin predicted 0.9331 and observed 0.8037, its 0.0-0.1 bin predicted 0.0522 and observed 0.1628, and the engine lost to a baseline carrying no team information at all. Every rate in the block is corrected by one constant:
+
+```
+shrunk = (n * team_rate + k * league_rate) / (n + k)
+       = w * team_rate + (1 - w) * league_rate,   w = n / (n + k)
+```
+
+`k` is the number of plays at which a team's own history and the league's rate for that exact bucket deserve equal say. `league_rate` is the league's rate for the same bucket, falling back to its overall rate for the few buckets the league itself has never filled.
+
+**`SHRINK_K = 60`**, fitted in `engine/calibrate.py` on a nested split: `k` is chosen on the last quarter of the training frame and scored on a holdout it never saw. Per-league honest picks are 49.9 (CFB) and 68.8 (NFL); the constant minimising summed validation regret is 58.6, and the pooled curve is within 0.0002 of its minimum for `k` in [38.2, 90], so the constant is identified to about a factor of two, not to three digits.
+
+`k` is a property of *this* ladder. Fitted against the old five-rung ladder the same procedure returned `k` near 138; rung 4's large samples and bad predictions were what pulled it up, and deleting the rung more than halved it. **Any change to the ladder invalidates the constant.** Section 8 of `calibrate.py` re-fits on the ladder as it stands and prints whether the shipped constant is still inside the plateau.
+
+The half-life stays at 1.0. Fitting `k` separately at each half-life and scoring the holdout frozen, the whole axis [0.5, inf] spans 0.00012 Brier on the CFB holdout against 0.00092 unshrunk. The decay knob was measuring the variance shrinkage now removes directly.
+
+### Confidence
+
+Confidence is a function of `shrink_weight` alone, never of the rung. The rung says which filter answered, which is a different question: rung 1 on 34 plays is a precise filter over a sample too thin to trust.
+
+| flag | cut | at k=60 | meaning |
+|---|---|---|---|
+| `high` | `w >= 0.50` | `n >= 60` | at least half the printed number is the team's own history |
+| `medium` | `w >= 0.35` | `n >= 32` | the block cleared the sample floor with room |
+| `low` | `w < 0.35` | `n < 32` | the number is two thirds league or more |
+
+`high` is not a free parameter: `w >= 0.50` is exactly `n >= k`, read off the constant already fitted. The `medium` cut is forced from below. The sample floor of 30 produces `w = 0.333` at k=60, so any medium cut at or under that weight makes every team rung medium or better and `low` becomes an exact synonym for "rung 5" -- the flag collapses back into the rung. Measured on the CFB holdout, cuts of (0.50, 0.25) put 8.3% of snaps in `low` and every one is the league rung. 0.35 is the smallest round weight strictly above the floor's.
+
+The league rung is always `low`: it carries no team at all. At `low` the card must not attribute the number to the team; it says what offenses generally do.
 
 `TendencyBlock` (also the shipped JSON row shape):
 
+A real block, USC on 1st and 10 from their own 25, CFB tables over 2023-2025:
+
 ```json
 {
-  "bucket": "d3_medium_mid",
+  "bucket": "d1_long_own",
   "team": "USC",
   "rung": 1,
   "confidence": "high",
-  "sample_size": 47,
-  "pass_rate": 0.78,
-  "league_pass_rate": 0.71,
-  "success_rate": 0.52,
-  "explosive_rate": 0.14
+  "sample_size": 374,
+  "shrink_weight": 0.8618,
+  "pass_rate": 0.5417,
+  "pass_rate_raw": 0.5559,
+  "league_pass_rate": 0.4531,
+  "success_rate": 0.4966,
+  "explosive_rate": 0.192,
+  "matched_key": "d1_long_own"
 }
 ```
 
-At `low` confidence the card must not attribute the number to the team; it says what offenses generally do.
+- `pass_rate` is the number to print, already shrunk. `pass_rate == w * pass_rate_raw + (1 - w) * league_pass_rate` holds to the stored precision.
+- `pass_rate_raw` is the team's own unshrunk rate, `None` on the league rung. It is a diagnostic. Nothing user-facing prints it, because it is the number measured to be wrong.
+- `shrink_weight` is `w`. It decides whether copy may attribute the number to the team, and it is the only honest basis for that call.
+- `success_rate` and `explosive_rate` are shrunk toward their own league counterparts with the same `k`.
+
+### Measured against the bar
+
+Out of sample, against the league's rate for the identical situation bucket (`engine/backtest.py`, unchanged):
+
+| | before | after | situation baseline | league average |
+|---|---|---|---|---|
+| CFB Brier | 0.23337 FAIL | **0.22740 PASS** | 0.22880 | 0.24997 |
+| NFL Brier | 0.22136 FAIL | **0.21918 PASS** | 0.22134 | 0.24550 |
+| CFB ECE | 0.0278 | **0.0092** | 0.0033 | |
+| NFL ECE | 0.0217 | **0.0126** | 0.0075 | |
+
+Team-clustered paired bootstrap, 2000 reps, against the situation baseline: CFB -0.00140, 95% CI [-0.00309, -0.00007]; NFL -0.00217, 95% CI [-0.00388, -0.00048]. Both exclude zero. Team attribution now earns its place, having previously lost to a model with no team in it.
 
 ## Shipped tendency JSON
 
