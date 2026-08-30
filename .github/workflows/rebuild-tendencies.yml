@@ -1,0 +1,128 @@
+> Weekly in-season tendency refresh.
+>
+> College plays Saturday, the NFL Sunday and Monday night, so Tuesday morning is
+> the first hour of the week when every game is final and nflverse has cut its
+> overnight rebuild. The job ingests the season in progress, rebuilds the tables
+> at the calibrated shrinkage, re-exports web/tendency-*.json, and commits only
+> when the numbers actually moved.
+>
+> engine/refresh.py owns every decision about what to fetch and what to write.
+> This file supplies a clock, a key, and a commit.
+
+name: rebuild-tendencies
+
+on:
+  schedule:
+    # 12:00 UTC Tuesday = 05:00 Pacific, 08:00 Eastern. Months are the season,
+    # August through February; cron month ranges cannot wrap the year, so the
+    # two halves are listed rather than written 8-2.
+    - cron: "0 12 * 1,2,8,9,10,11,12 2"
+  workflow_dispatch:
+    inputs:
+      league:
+        description: Which league to refresh
+        type: choice
+        options: [both, cfb, nfl]
+        default: both
+      seasons:
+        description: 'Override the rolling window, space separated, e.g. "2024 2025 2026"'
+        type: string
+        default: ""
+      dry_run:
+        description: Ingest and rebuild but write nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# One refresh at a time. Two runs committing to main would race, and the second
+# would push over a tree it did not build.
+concurrency:
+  group: rebuild-tendencies
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No venv in CI. Three packages, pinned by major so a pandas 4 release
+      # cannot quietly change the numbers on a Tuesday morning.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pandas>=3,<4" "pyarrow" "requests"
+
+      # data/ is gitignored, so this starts cold and refetches the window from
+      # CFBD every run. That is roughly 66 calls, about 286 a month against a
+      # free tier of 5000. refresh.py prints the count and the projection.
+      - name: Refresh tendency tables
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          INPUT_LEAGUE: ${{ github.event.inputs.league || 'both' }}
+          INPUT_SEASONS: ${{ github.event.inputs.seasons }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          args=(--league "$INPUT_LEAGUE")
+          if [ -n "${INPUT_SEASONS:-}" ]; then
+            if ! printf '%s' "$INPUT_SEASONS" | grep -Eq '^[0-9]{4}( [0-9]{4})*$'; then
+              echo "seasons input must be four-digit years separated by spaces" >&2
+              exit 1
+            fi
+            # Deliberately unquoted: the regex above has already established that
+            # this is nothing but years and single spaces.
+            args+=(--seasons $INPUT_SEASONS)
+          fi
+          if [ "${INPUT_DRY_RUN:-false}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          echo "engine/refresh.py ${args[*]}"
+          python engine/refresh.py "${args[@]}" 2>&1 | tee refresh.log
+
+      - name: Write the run summary
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "### Tendency refresh"
+            echo
+            if [ -f refresh.log ]; then
+              echo '```'
+              grep -E '^(refresh at|  (cfb|nfl) 20|  tendency-|    (CHANGED|unchanged|wrote|teams shipped)|CFBD API calls|  (calendar|weeks|in-progress)|  (this run|cold every|fits)|RESULT)' refresh.log || tail -n 40 refresh.log
+              echo '```'
+            else
+              echo "The refresh step produced no log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # refresh.py leaves a file untouched when only its `generated` date would
+      # change, so a dirty tree here means the rates themselves moved. git is the
+      # whole test; nothing needs to be passed between steps.
+      - name: Commit refreshed tables
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          set -euo pipefail
+          files="web/tendency-cfb.json web/tendency-nfl.json"
+          if git diff --quiet -- $files; then
+            echo "Rates are identical to what is already on main. Nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $files
+          git commit \
+            -m "tendencies: weekly refresh $(date -u +%F)" \
+            -m "$(grep -E '^(  (cfb|nfl) 20|CFBD API calls this run|RESULT)' refresh.log || true)"
+          git push origin HEAD:main
+          echo "Pushed $(git rev-parse --short HEAD) to main."
