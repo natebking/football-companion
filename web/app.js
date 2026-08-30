@@ -2,28 +2,52 @@
 /*
  * Football Companion, live page.
  *
- * Two data paths, kept physically apart:
+ * THREE SCOPES. The walls between them are the design, not decoration.
  *
- *   PRIME PATH   summary -> readSituation() -> tendency lookup -> card
- *                readSituation() is a whitelist. It copies a fixed list of
- *                pre-snap fields and nothing else, so no play result can
- *                reach the card pipeline. CONTRACT.md, "Prime cards receive
- *                pre-snap information only."
+ *   SHELL   Config, storage, tendency tables, card library, both settings
+ *           sheets. Holds no ESPN object of any kind, ever.
  *
- *   FEED PATH    summary -> plays -> plain language rows
- *                This path is allowed to know what happened. It never calls
- *                anything the prime path calls.
+ *   LIVE    Everything ESPN: scoreboard, summary, plays, the recent-plays
+ *           feed, the score in the header. This scope is allowed to know what
+ *           happened. It reaches the rest of the app through `bus` and through
+ *           nothing else.
  *
- * No backend. The browser talks to ESPN directly (ESPN 403s datacenter IPs
- * but serves access-control-allow-origin: *). No LLM calls anywhere.
+ *   PRIME   The card. Situation, tendency, watch instruction, the ask. It is a
+ *           sibling scope of LIVE, so no ESPN variable is in its lexical scope
+ *           at all. It receives exactly two records:
+ *             bus 'snap'    a frozen pre-snap whitelist, built in LIVE by
+ *                           copying a fixed list of keys. No play text, yards
+ *                           gained, scoring flag or turnover flag exists on it.
+ *             bus 'result'  four scalars describing a play that has ALREADY
+ *                           been released to his screen, used only to resolve
+ *                           a call he already committed to. It arrives after
+ *                           the reveal, never before it.
+ *
+ * DELAY QUEUE, in LIVE. Nothing reaches the screen, card or feed or score,
+ * before observed_at + the user's broadcast delay. The delay is a setting,
+ * 0 to 60 seconds, default 0, persisted, changeable mid-game. Raising it
+ * re-bases everything still waiting.
+ *
+ * THE ASK, in PRIME. Temporal occlusion: commit before the reveal. Rationed to
+ * roughly one snap in six to eight, never two in a row, higher ask_priority
+ * cards get first call on the budget. Answer and latency are both persisted,
+ * and the concept ledger sequences on speed-of-correct-call, not on how many
+ * times a word has been printed.
+ *
+ * No backend. The browser talks to ESPN directly (ESPN 403s datacenter IPs but
+ * serves access-control-allow-origin: *). No LLM calls. No login, ever.
  */
 (function () {
 
-// ------------------------------------------------------------------ config
+// ==================================================================== shell
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
+var TICK_MS = 250;           // delay queue pump
 var FEED_MAX = 25;
+var MAX_DELAY = 60;
+var FAST_MS = 4000;          // a call this quick, and right, counts as mastery
+var ASK_LOG_MAX = 400;
 
 var LEAGUES = {
   cfb: { path: 'college-football', label: 'College', table: 'tendency-cfb.json' },
@@ -31,69 +55,152 @@ var LEAGUES = {
 };
 var API = 'https://site.api.espn.com/apis/site/v2/sports/football/';
 
-// nflverse abbreviations the tendency tables use, where ESPN differs
-var NFL_ALIAS = { LAR: 'LA', WSH: 'WAS', JAC: 'JAX', SD: 'LAC', OAK: 'LV', STL: 'LA' };
+// ESPN abbreviations that differ from the nflverse keys the tables use.
+var NFL_ALIAS = { LAR: 'LA', WSH: 'WAS', JAC: 'JAX' };
 
-var LS = { league: 'fc_league', game: 'fc_game_', ledger: 'fc_ledger' };
-
-// ------------------------------------------------------------------ state
-var state = {
-  league: 'cfb',
-  gameId: null,
-  games: [],
-  gameLabel: '',
-  gameState: '',    // 'pre' | 'in' | 'post', from the summary header
-  sit: null,          // frozen pre-snap situation, or null
-  sitKey: '',
-  card: null,
-  feed: [],
-  lastOk: 0,
-  err: '',
-  sheet: false,
-  openConcept: null
+var LS = {
+  league: 'fc_league', game: 'fc_game_',
+  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay'
 };
-var TEND = null;        // tendency table for state.league
-var NAMEIX = null;      // normalised team name -> tendency key
-var CARDS = null;       // cards.json
-var ledger = { concepts: {} };
 
 var $ = function (id) { return document.getElementById(id); };
 
-// ------------------------------------------------------------------ storage
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function jget(url) {
+  return fetch(url, { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function makeBus() {
+  var subs = {};
+  return {
+    on: function (t, fn) { (subs[t] || (subs[t] = [])).push(fn); },
+    emit: function (t, p) {
+      var a = subs[t] || [];
+      for (var i = 0; i < a.length; i++) a[i](p);
+    }
+  };
+}
+var bus = makeBus();
+
+// ---------------------------------------------------------------- settings
+var league = lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
+var delaySec = (function () {
+  var n = parseInt(lsGet(LS.delay), 10);
+  return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : 0;
+})();
+var TEND = null;    // tendency table for the current league
+var CARDS = null;   // cards.json
+
+function delayMs() { return delaySec * 1000; }
+function seasonsLabel() {
+  var s = (TEND && TEND.seasons) || [];
+  if (!s.length) return '';
+  return s.length === 1 ? String(s[0]) : s[0] + '–' + s[s.length - 1];
+}
+function showErr(m) {
+  var el = $('err');
+  el.className = m ? 'on' : '';
+  el.textContent = m || '';
+}
+function footPad() {
+  var f = document.querySelector('footer');
+  if (f) document.documentElement.style.setProperty('--foot', (f.offsetHeight + 16) + 'px');
+}
+
+// ---------------------------------------------------------------- ledger
+// One record per concept. Exposure is kept because the card library needs to
+// know a word has been printed, but it is the weakest signal here: a concept
+// only reaches `familiar` on two consecutive correct calls made inside
+// FAST_MS, and a concept he has attempted and missed is held at `introduced`
+// no matter how often he has seen it.
+var ledger = { concepts: {} };
 function loadLedger() {
   try {
-    var raw = localStorage.getItem(LS.ledger);
-    if (raw) {
-      var d = JSON.parse(raw);
-      if (d && d.concepts) ledger = d;
-    }
+    var d = JSON.parse(lsGet(LS.ledger) || 'null');
+    if (d && d.concepts) ledger = d;
   } catch (e) { ledger = { concepts: {} }; }
 }
-function saveLedger() {
-  try { localStorage.setItem(LS.ledger, JSON.stringify(ledger)); } catch (e) {}
+function saveLedger() { lsSet(LS.ledger, JSON.stringify(ledger)); }
+function rec(c) {
+  var r = ledger.concepts[c];
+  if (!r) r = ledger.concepts[c] = {};
+  r.exposures = r.exposures || 0;
+  r.attempts = r.attempts || 0;
+  r.correct = r.correct || 0;
+  r.streak = r.streak || 0;
+  r.fast_ms = r.fast_ms || 0;
+  return r;
 }
-function conceptState(n) {
-  if (n >= 5) return 'familiar';
-  if (n >= 2) return 'learning';
-  if (n >= 1) return 'introduced';
-  return 'unknown';
+function conceptState(c) {
+  var r = ledger.concepts[c];
+  if (!r || !r.exposures) return 'unknown';
+  if (r.correct >= 1 && r.streak >= 2 && r.fast_ms > 0 && r.fast_ms <= FAST_MS) return 'familiar';
+  if (r.correct >= 1) return 'learning';
+  if ((r.attempts || 0) >= 2) return 'introduced';   // tried, not right yet
+  if (r.exposures >= 2) return 'learning';
+  return 'introduced';
 }
-function exposures(c) {
-  var e = ledger.concepts[c];
-  return e && typeof e.exposures === 'number' ? e.exposures : 0;
+function knows(c) {
+  var s = conceptState(c);
+  return s === 'learning' || s === 'familiar';
 }
-function bumpConcepts(list) {
+function bumpExposure(list) {
   if (!list || !list.length) return;
   var now = new Date().toISOString();
   for (var i = 0; i < list.length; i++) {
-    var c = list[i];
-    var n = exposures(c) + 1;
-    ledger.concepts[c] = { exposures: n, last_seen: now, state: conceptState(n) };
+    var r = rec(list[i]);
+    r.exposures += 1;
+    r.last_seen = now;
+    r.state = conceptState(list[i]);
+  }
+  saveLedger();
+}
+// Kellman: sequence on accuracy AND response time.
+function recordCall(list, ok, latencyMs) {
+  if (!list || !list.length) return;
+  var now = new Date().toISOString();
+  for (var i = 0; i < list.length; i++) {
+    var c = list[i], r = rec(c);
+    r.attempts += 1;
+    r.last_seen = now;
+    if (ok) {
+      r.correct += 1;
+      r.streak += 1;
+      // exponential moving average over correct calls only
+      r.fast_ms = r.fast_ms ? Math.round(0.6 * r.fast_ms + 0.4 * latencyMs) : latencyMs;
+    } else {
+      r.streak = 0;
+    }
+    r.state = conceptState(c);
   }
   saveLedger();
 }
 
-// ------------------------------------------------------------------ buckets
+// ---------------------------------------------------------------- ask log
+// Every ask, answer and latency, forever, in the browser. Nothing leaves it.
+var askLog = [];
+function loadAsks() {
+  try {
+    var d = JSON.parse(lsGet(LS.asks) || 'null');
+    if (d && d.length) askLog = d;
+  } catch (e) { askLog = []; }
+}
+function logAsk(row) {
+  askLog.push(row);
+  if (askLog.length > ASK_LOG_MAX) askLog = askLog.slice(-ASK_LOG_MAX);
+  lsSet(LS.asks, JSON.stringify(askLog));
+}
+
+// ---------------------------------------------------------------- buckets
 // mirrors engine/buckets.py, per CONTRACT.md
 function distanceBand(d) { return d <= 3 ? 'short' : d <= 7 ? 'medium' : 'long'; }
 function fieldZone(y) {
@@ -103,7 +210,86 @@ function bucketKey(down, dist, ytg) {
   return 'd' + down + '_' + distanceBand(dist) + '_' + fieldZone(ytg);
 }
 
-// ------------------------------------------------------------------ teams
+var shell = {
+  bus: bus, esc: esc, $: $, jget: jget, lsGet: lsGet, lsSet: lsSet,
+  LS: LS, LEAGUES: LEAGUES, API: API, NFL_ALIAS: NFL_ALIAS,
+  POLL_MS: POLL_MS, SB_MS: SB_MS, STALE_MS: STALE_MS, TICK_MS: TICK_MS,
+  FEED_MAX: FEED_MAX, FAST_MS: FAST_MS,
+  showErr: showErr, footPad: footPad, seasonsLabel: seasonsLabel,
+  distanceBand: distanceBand, fieldZone: fieldZone, bucketKey: bucketKey,
+  delayMs: delayMs,
+  league: function () { return league; },
+  tend: function () { return TEND; },
+  cards: function () { return CARDS; },
+  conceptState: conceptState, knows: knows,
+  bumpExposure: bumpExposure, recordCall: recordCall, logAsk: logAsk,
+  ledger: function () { return ledger; },
+  resetLedger: function () {
+    ledger = { concepts: {} }; askLog = [];
+    saveLedger(); lsSet(LS.asks, '[]');
+  }
+};
+
+// ================================================================== PRIME
+// Pre-snap only. Nothing in this scope can see an ESPN object.
+(function initPrime(sh) {
+
+var st = {
+  sit: null, sitKey: '', card: null, ten: null,
+  sitLine: '', tendLine: '', watchLine: '', attributed: false, rate: null,
+  ask: null,          // {id, kind, q, opts, priority}
+  askAt: 0,
+  pending: null,      // {sitKey, cardId, askId, kind, concepts, answer, latency}
+  res: null,          // resolution strip
+  sinceAsk: 99,       // start high so the mechanic shows itself on the first card
+  gap: 7,
+  saidWrongOnce: false,
+  quiet: 'Pick a game to start.',
+  hold: '',
+  openConcept: null,
+  sig: '', asig: ''
+};
+
+// ---------------------------------------------------------------- tendency
+// Client port of the reference lookup() in engine/export_tables.py.
+// `can_attribute` is read from the file. The client computes no rule of its own.
+function leagueRate(key) {
+  var row = TENDBASE()[key];
+  return row ? row.pass_rate : sh.tend().league_overall.pass_rate;
+}
+function TENDBASE() { return sh.tend().league_baseline; }
+
+function lookupTendency(teamKey, down, dist, ytg) {
+  var T = sh.tend();
+  if (!T) return null;
+  var key = sh.bucketKey(down, dist, ytg);
+  var base = T.league_baseline[key] || null;
+  var lr = leagueRate(key);
+  var te = teamKey && T.teams[teamKey] ? T.teams[teamKey][key] : null;
+  if (te) {
+    return {
+      bucket: key, team: teamKey, rung: te.rung,
+      sample_size: te.sample_size, shrink_weight: te.shrink_weight,
+      pass_rate: te.pass_rate, league_pass_rate: lr,
+      can_attribute: !!te.can_attribute
+    };
+  }
+  return {
+    bucket: key, team: null, rung: 5,
+    sample_size: base ? base.sample_size : T.league_overall.sample_size,
+    shrink_weight: 0,
+    pass_rate: base ? base.pass_rate : null, league_pass_rate: lr,
+    can_attribute: false
+  };
+}
+// CONTRACT.md "Client read": a cell whose can_attribute is false is never read
+// by copy. The league line for that situation is printed instead.
+function printedRate(ten) {
+  if (!ten) return null;
+  return ten.can_attribute ? ten.pass_rate : ten.league_pass_rate;
+}
+
+var NAMEIX = null;
 function normName(s) {
   return (s || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -115,20 +301,22 @@ function normName(s) {
 }
 function buildNameIndex() {
   NAMEIX = {};
-  if (!TEND) return;
-  for (var k in TEND.teams) {
+  var T = sh.tend();
+  if (!T) return;
+  for (var k in T.teams) {
     var n = normName(k);
     if (!(n in NAMEIX)) NAMEIX[n] = k;
   }
 }
-// team: the trimmed team descriptor from readSituation
 function resolveTeam(team) {
-  if (!TEND || !team) return null;
-  if (state.league === 'nfl') {
+  var T = sh.tend();
+  if (!T || !team) return null;
+  if (sh.league() === 'nfl') {
     var a = (team.abbreviation || '').toUpperCase();
-    var k = NFL_ALIAS[a] || a;
-    return TEND.teams[k] ? k : null;
+    var k = sh.NFL_ALIAS[a] || a;
+    return T.teams[k] ? k : null;
   }
+  if (!NAMEIX) buildNameIndex();
   var cands = [team.location, team.shortDisplayName, team.displayName, team.name];
   for (var i = 0; i < cands.length; i++) {
     var hit = NAMEIX[normName(cands[i])];
@@ -136,41 +324,14 @@ function resolveTeam(team) {
   }
   return null;
 }
+sh.bus.on('tables', function () { NAMEIX = null; st.sig = ''; st.asig = ''; });
 
-// ------------------------------------------------------------------ tendency
-// Client port of the reference lookup() in engine/export_tables.py.
-// Three states: team entry (rung 1 or 2, high, attribute), league baseline
-// (rung 5, low, never attribute), nothing at all (say nothing).
-function lookupTendency(teamKey, down, dist, ytg) {
-  if (!TEND) return null;
-  var key = bucketKey(down, dist, ytg);
-  var base = TEND.league_baseline[key] || null;
-  var te = teamKey && TEND.teams[teamKey] ? TEND.teams[teamKey][key] : null;
-  if (te) {
-    return {
-      bucket: key, team: teamKey, rung: te.rung, confidence: 'high',
-      sample_size: te.sample_size, pass_rate: te.pass_rate,
-      league_pass_rate: base ? base.pass_rate : null,
-      success_rate: null, explosive_rate: null
-    };
-  }
-  if (base) {
-    return {
-      bucket: key, team: null, rung: 5, confidence: 'low',
-      sample_size: base.sample_size, pass_rate: base.pass_rate,
-      league_pass_rate: base.pass_rate,
-      success_rate: base.success_rate, explosive_rate: base.explosive_rate
-    };
-  }
-  return null;
-}
-
-// ------------------------------------------------------------------ cards
-function cardApplies(c, sit, ten) {
+// ---------------------------------------------------------------- cards
+function cardApplies(c, sit, rate) {
   var a = c.applies || {};
   if (a.down && a.down.indexOf(sit.down) < 0) return false;
-  if (a.distance_band && a.distance_band.indexOf(distanceBand(sit.distance)) < 0) return false;
-  if (a.field_zone && a.field_zone.indexOf(fieldZone(sit.yardsToGoal)) < 0) return false;
+  if (a.distance_band && a.distance_band.indexOf(sh.distanceBand(sit.distance)) < 0) return false;
+  if (a.field_zone && a.field_zone.indexOf(sh.fieldZone(sit.yardsToGoal)) < 0) return false;
   if (typeof a.min_yards_to_goal === 'number' && sit.yardsToGoal < a.min_yards_to_goal) return false;
   if (typeof a.max_yards_to_goal === 'number' && sit.yardsToGoal > a.max_yards_to_goal) return false;
   if (a.period && a.period.indexOf(sit.period) < 0) return false;
@@ -179,65 +340,489 @@ function cardApplies(c, sit, ten) {
   }
   if (typeof a.min_score_diff === 'number' && sit.scoreDiff < a.min_score_diff) return false;
   if (typeof a.max_score_diff === 'number' && sit.scoreDiff > a.max_score_diff) return false;
+  // Rate gates read the number the card will actually print, which after
+  // shrinkage is the shrunk team rate only when the cell may be attributed.
   if (typeof a.min_pass_rate === 'number') {
-    if (!ten || ten.pass_rate === null) return false;
-    if (ten.pass_rate < a.min_pass_rate) return false;
+    if (rate === null || rate < a.min_pass_rate) return false;
   }
   if (typeof a.max_pass_rate === 'number') {
-    if (!ten || ten.pass_rate === null) return false;
-    if (ten.pass_rate > a.max_pass_rate) return false;
+    if (rate === null || rate > a.max_pass_rate) return false;
   }
   return true;
 }
-function pickCard(sit, ten) {
-  if (!CARDS) return null;
+function pickCard(sit, rate) {
+  var C = sh.cards();
+  if (!C) return null;
   var best = null;
-  for (var i = 0; i < CARDS.cards.length; i++) {
-    var c = CARDS.cards[i];
-    if (!cardApplies(c, sit, ten)) continue;
+  for (var i = 0; i < C.cards.length; i++) {
+    var c = C.cards[i];
+    if (!cardApplies(c, sit, rate)) continue;
     if (!best || (c.priority || 0) > (best.priority || 0)) best = c;
   }
   return best;
 }
-function fill(tpl, sit, ten) {
-  return (tpl || '')
+function pct(x) { return String(Math.round(100 * x)); }
+function fill(tpl, sit, rate) {
+  var s = (tpl || '')
     .replace(/\{distance\}/g, String(sit.distance))
     .replace(/\{yards_to_goal\}/g, String(sit.yardsToGoal))
     .replace(/\{lead\}/g, String(Math.abs(sit.scoreDiff)))
-    .replace(/\{pass_rate\}/g, ten && ten.pass_rate !== null ? String(Math.round(100 * ten.pass_rate)) : '?')
-    .replace(/\{run_rate\}/g, ten && ten.pass_rate !== null ? String(Math.round(100 * (1 - ten.pass_rate))) : '?');
+    .replace(/\{pass_rate\}/g, rate === null ? '' : pct(rate))
+    .replace(/\{run_rate\}/g, rate === null ? '' : pct(1 - rate));
+  return s.replace(/\b1 yards\b/g, '1 yard');
 }
-// Contract: definitions drop once every concept on the card reaches learning.
-// Read the ledger before this exposure is counted, so the definition is shown
-// on the first two sightings and dropped from the third.
 function useShortWatch(card) {
   var cs = card.concepts || [];
   if (!cs.length) return false;
-  for (var i = 0; i < cs.length; i++) {
-    if (exposures(cs[i]) < 2) return false;
-  }
+  for (var i = 0; i < cs.length; i++) if (!sh.knows(cs[i])) return false;
   return true;
 }
 
-// ------------------------------------------------------------------ ESPN feed
-function jget(url) {
-  return fetch(url, { cache: 'no-store' }).then(function (r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+// ---------------------------------------------------------------- the ask
+// Every ask is gradeable from the play feed alone. A question the feed cannot
+// settle is a question this app has no business asking.
+var ASK_KINDS = {
+  passrun: {
+    q: 'Call it now: throw or run?',
+    opts: [{ v: 'pass', label: 'Throw' }, { v: 'run', label: 'Run' }]
+  },
+  gokick: {
+    q: 'Call it now: kick it away, or go for it?',
+    opts: [{ v: 'kick', label: 'Kick' }, { v: 'go', label: 'Go for it' }]
+  },
+  kickrunpass: {
+    q: 'Call it now: kick, run, or throw?',
+    opts: [{ v: 'kick', label: 'Kick' }, { v: 'run', label: 'Run' }, { v: 'pass', label: 'Throw' }]
+  },
+  sticks: {
+    q: 'Call it now: does this one get past the yellow line?',
+    opts: [{ v: 'past', label: 'Past it' }, { v: 'short', label: 'Lands short' }]
+  }
+};
+// Fallback ask table, keyed by card id. `cards.json` may ship its own `ask`
+// and `ask_priority` per card; when it does, the file wins and this is unused.
+var ASKS = {
+  lead_late_clock:          { kind: 'passrun', priority: 78 },
+  trail_late_deep_safeties: { kind: 'passrun', priority: 78 },
+  d4_short_go:              { kind: 'kickrunpass', priority: 85 },
+  d4_kick_likely:           { kind: 'gokick', priority: 85 },
+  d3_medium_sticks:         { kind: 'sticks', priority: 80 },
+  d3_long_safeties:         { kind: 'sticks', priority: 80 },
+  d3_short_line:            { kind: 'passrun', priority: 72 },
+  d1_run_lean_play_action:  { kind: 'passrun', priority: 72 },
+  d1_pass_lean_cushion:     { kind: 'passrun', priority: 70 },
+  d2_short_safety_creep:    { kind: 'passrun', priority: 66 },
+  goal_line_bodies:         { kind: 'passrun', priority: 62 },
+  d3_own_half_blitz:        { kind: 'passrun', priority: 60 },
+  two_minute_sideline:      { kind: 'passrun', priority: 56 },
+  red_zone_slot:            { kind: 'passrun', priority: 56 },
+  d2_long_zone_drop:        { kind: 'passrun', priority: 54 },
+  backed_up_pocket:         { kind: 'passrun', priority: 50 },
+  d2_medium_motion:         { kind: 'passrun', priority: 46 },
+  d1_box_count:             { kind: 'passrun', priority: 40 }
+};
+function askFor(card) {
+  var spec = card.ask || ASKS[card.id] || null;
+  if (!spec) return null;
+  var kind = ASK_KINDS[spec.kind];
+  if (!kind) return null;
+  return {
+    id: card.id + ':' + spec.kind,
+    kind: spec.kind,
+    q: spec.q || kind.q,
+    opts: kind.opts,
+    priority: typeof card.ask_priority === 'number' ? card.ask_priority
+            : typeof spec.priority === 'number' ? spec.priority : 50
+  };
+}
+function drawGap() { return 6 + Math.floor(Math.random() * 3); }   // 6, 7 or 8
+// Ration: sharp cards get first call on the budget, flat ones wait longer, and
+// nothing waits more than gap + 4. Long-run rate lands near one in six to eight.
+function askEligible(a) {
+  if (!a) return false;
+  var g = st.gap;
+  var need = a.priority >= 75 ? g - 2 : a.priority >= 50 ? g : g + 2;
+  if (need > g + 4) need = g + 4;
+  return st.sinceAsk >= need;
+}
+
+// ---------------------------------------------------------------- grading
+function grade(kind, answer, r) {
+  // r: {kind:'pass'|'run'|'kick'|'other', gained, need}
+  var K = r.kind;
+  if (K === 'other') return { voided: 'That one does not count. No play was actually run.' };
+  if (kind === 'sticks') {
+    if (K === 'kick') return { voided: 'They kicked it, so that call does not count.' };
+    if (K === 'run') return { voided: 'They ran it, so that call does not count.' };
+    if (typeof r.gained !== 'number' || typeof r.need !== 'number') {
+      return { voided: 'No yardage on that one, so the call does not count.' };
+    }
+    var truth = r.gained >= r.need ? 'past' : 'short';
+    return {
+      ok: answer === truth,
+      truth: truth === 'past' ? 'It got past the yellow line.' : 'It landed short of the yellow line.'
+    };
+  }
+  if (kind === 'gokick') {
+    var t2 = K === 'kick' ? 'kick' : 'go';
+    return { ok: answer === t2, truth: t2 === 'kick' ? 'They kicked it.' : 'They went for it.' };
+  }
+  if (kind === 'kickrunpass' || kind === 'passrun') {
+    if (kind === 'passrun' && K === 'kick') {
+      return { voided: 'They kicked it, so that call does not count.' };
+    }
+    return {
+      ok: answer === K,
+      truth: K === 'pass' ? 'They threw it.' : K === 'run' ? 'They ran it.' : 'They kicked it.'
+    };
+  }
+  return { voided: 'That one does not count.' };
+}
+
+// ---------------------------------------------------------------- events
+sh.bus.on('quiet', function (msg) {
+  st.quiet = msg || '';
+  if (!st.sit) render();
+});
+// The countdown ticks four times a second. It writes one text node and nothing
+// else, so it can never rebuild a button under a finger that is mid-tap.
+sh.bus.on('hold', function (n) {
+  var s = n > 0 ? 'Next card in ' + n + 's, so your TV stays ahead.' : '';
+  if (s !== st.hold) { st.hold = s; $('pHold').textContent = s; }
+});
+// The drive ended: touchdown, made kick, end of period. There is no legal next
+// snap, so the card comes down rather than describing a down already played.
+sh.bus.on('nosnap', function (msg) {
+  st.quiet = msg || '';
+  st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
+  st.ask = null; st.openConcept = null;
+  render();
+});
+sh.bus.on('clear', function () {
+  st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
+  st.ask = null; st.pending = null; st.res = null; st.openConcept = null;
+  st.sinceAsk = 99; st.sig = ''; st.asig = '';
+  render();
+});
+
+// A play that has already been shown to him. Only ever used to settle a call
+// he committed to before it happened.
+sh.bus.on('result', function (r) {
+  var p = st.pending;
+  if (!p || p.sitKey !== r.sitKey) return;
+  if (p.answer === null) {
+    // He let it go. Take the buttons away rather than leave him able to call a
+    // play he has already watched, and say nothing about it.
+    logAskRow(p, null, false);
+    st.pending = null;
+    st.ask = null;
+    render();
+    return;
+  }
+  st.pending = null;
+  var g = grade(p.kind, p.answer, r);
+  if (g.voided) {
+    st.res = { cls: 'void', head: '', body: g.voided, why: '' };
+    logAskRow(p, null, true);
+  } else {
+    st.res = {
+      cls: g.ok ? 'ok' : 'no',
+      head: g.ok ? 'Right.' : 'Not this time.',
+      body: g.truth,
+      why: g.ok ? (p.explain || '')
+                : (st.saidWrongOnce ? (p.explain || '')
+                   : 'Being wrong here is normal. Defenses are built to hide what they are doing.')
+    };
+    if (!g.ok) st.saidWrongOnce = true;
+    sh.recordCall(p.concepts, g.ok, p.latency);
+    logAskRow(p, g.ok, false);
+  }
+  render();
+});
+
+function logAskRow(p, ok, voided) {
+  sh.logAsk({
+    t: new Date().toISOString(),
+    lg: sh.league(), game: p.game || '',
+    card: p.cardId, ask: p.kind, bucket: p.bucket,
+    down: p.down, distance: p.distance, yards_to_goal: p.ytg,
+    answer: p.answer, correct: ok, voided: !!voided,
+    latency_ms: p.answer === null ? null : p.latency
   });
 }
+
+sh.bus.on('snap', function (sit) {
+  // An ask he ignored closes out silently. No nag, no second chance.
+  if (st.pending) {
+    if (st.pending.answer === null) logAskRow(st.pending, null, false);
+    st.pending = null;
+  }
+
+  st.sit = sit;
+  st.sitKey = sit.sitKey;
+  st.sinceAsk += 1;
+
+  var teamKey = resolveTeam(sit.offenseTeam);
+  var ten = lookupTendency(teamKey, sit.down, sit.distance, sit.yardsToGoal);
+  var rate = printedRate(ten);
+  var card = pickCard(sit, rate);
+
+  st.ten = ten;
+  st.card = card;
+  st.rate = rate;
+  st.ask = null;
+
+  if (card) {
+    // Copy register and variant are frozen here, once, for this snap. Nothing
+    // may rewrite the sentence he is halfway through reading.
+    st.attributed = !!(ten && ten.can_attribute);
+    var pr = card.prime;
+    var tendTpl = st.attributed ? pr.tendency : (pr.tendency_low || pr.tendency);
+    var watchTpl = useShortWatch(card) ? (pr.watch_short || pr.watch) : pr.watch;
+    st.sitLine = fill(pr.situation, sit, rate);
+    st.tendLine = fill(tendTpl, sit, rate);
+    st.watchLine = fill(watchTpl, sit, rate);
+
+    var a = askFor(card);
+    if (a && askEligible(a)) {
+      st.ask = a;
+      st.askAt = Date.now();
+      st.sinceAsk = 0;
+      st.gap = drawGap();
+      st.res = null;                       // the new ask replaces the old result
+      st.pending = {
+        sitKey: sit.sitKey, cardId: card.id, kind: a.kind,
+        concepts: (card.concepts || []).slice(),
+        explain: card.explain_hint || '',
+        bucket: ten ? ten.bucket : '', game: sit.gameId || '',
+        down: sit.down, distance: sit.distance, ytg: sit.yardsToGoal,
+        answer: null, latency: 0
+      };
+    }
+    sh.bumpExposure(card.concepts);
+  }
+  render();
+  flash();
+});
+
+// ---------------------------------------------------------------- render
+function flash() {
+  var p = $('prime');
+  p.classList.add('fresh');
+  setTimeout(function () { p.classList.remove('fresh'); }, 60);
+}
+function quietPrime(msg) {
+  $('prime').className = '';
+  $('pQuiet').hidden = false;
+  $('pQuiet').textContent = msg;
+  document.querySelector('.pTop').hidden = true;
+  $('pDD').textContent = '';
+  $('pSpot').textContent = '';
+  $('pSit').textContent = '';
+  $('pTen').textContent = '';
+  $('pWatch').textContent = '';
+  $('pFoot').innerHTML = '';
+  $('pDef').className = '';
+  $('pDef').textContent = '';
+}
+// Two signatures, two redraws, deliberately separate. The card above and the
+// ask below are torn down only when their own content changed, so a poll, a
+// countdown tick or a concept bump can never rebuild a tap target under a
+// thumb that is already on its way down.
+function cardSig() {
+  return [
+    st.sitKey, st.card ? st.card.id : '', st.attributed ? 1 : 0, st.rate,
+    st.sitLine, st.tendLine, st.watchLine, st.quiet, st.openConcept || ''
+  ].join('|');
+}
+function askSig() {
+  return [
+    st.ask ? st.ask.id : '', st.pending && st.pending.answer ? st.pending.answer : '',
+    st.res ? st.res.cls + '|' + st.res.head + '|' + st.res.body + '|' + st.res.why : ''
+  ].join('~');
+}
+function render() {
+  renderAsk();
+  var sig = cardSig();
+  if (sig === st.sig) return;      // nothing on the card changed, do not redraw
+  st.sig = sig;
+
+  var sit = st.sit;
+  if (!sit) {
+    quietPrime(st.quiet);
+    $('pHold').textContent = st.hold;
+    return;
+  }
+
+  $('pQuiet').hidden = true;
+  document.querySelector('.pTop').hidden = false;
+  $('pDD').textContent = sit.ddText || (sit.down + ' & ' + sit.distance);
+  $('pSpot').textContent = (sit.spotText ? 'at ' + sit.spotText + ' · ' : '') +
+    sit.yardsToGoal + ' to the end zone';
+  $('pHold').textContent = st.hold;
+
+  if (!st.card) {
+    $('pSit').textContent = '';
+    $('pTen').textContent = '';
+    $('pWatch').textContent = '';
+    $('pQuiet').hidden = false;
+    $('pQuiet').textContent = 'No read written for this one. Just watch.';
+    $('pFoot').innerHTML = '';
+    $('pDef').className = '';
+    $('prime').className = '';
+    return;
+  }
+
+  $('pSit').textContent = st.sitLine;
+  $('pTen').textContent = st.tendLine;
+  $('pWatch').textContent = st.watchLine;
+  $('prime').className = st.attributed ? '' : 'low';
+
+  // The source chip is attribution too. It carries the team name on exactly
+  // the snaps the copy is allowed to, and never on the rest.
+  var chips = [];
+  var ten = st.ten;
+  if (ten && ten.can_attribute) {
+    chips.push('<span class="chip src">' + esc(ten.team) + ' · ' + sh.seasonsLabel() +
+      ' · n=' + ten.sample_size + '</span>');
+  } else {
+    chips.push('<span class="chip srcl">All offenses · ' + sh.seasonsLabel() + '</span>');
+  }
+  var cs = st.card.concepts || [];
+  for (var i = 0; i < cs.length; i++) {
+    var s = sh.conceptState(cs[i]);
+    chips.push('<button class="chip' + (s === 'familiar' ? ' known' : '') +
+      '" data-c="' + esc(cs[i]) + '">' + esc(cs[i].replace(/_/g, ' ')) + '</button>');
+  }
+  $('pFoot').innerHTML = chips.join('');
+
+  var def = $('pDef');
+  var C = sh.cards();
+  if (st.openConcept && C && C.concepts[st.openConcept] && cs.indexOf(st.openConcept) >= 0) {
+    def.className = 'on';
+    def.textContent = st.openConcept.replace(/_/g, ' ') + ': ' + C.concepts[st.openConcept];
+  } else {
+    def.className = '';
+    def.textContent = '';
+  }
+}
+function renderAsk() {
+  var sig = askSig();
+  if (sig === st.asig) return;
+  st.asig = sig;
+  var res = $('pRes'), ask = $('pAsk'), lock = $('askLock'), btns = $('askBtns');
+  if (st.res) {
+    res.className = 'on ' + st.res.cls;
+    res.innerHTML = (st.res.head ? '<b>' + esc(st.res.head) + '</b> ' : '') + esc(st.res.body) +
+      (st.res.why ? '<span class="why">' + esc(st.res.why) + '</span>' : '');
+  } else {
+    res.className = '';
+    res.innerHTML = '';
+  }
+  if (st.ask && st.pending) {
+    ask.className = 'on';
+    $('askQ').textContent = st.ask.q;
+    if (st.pending.answer === null) {
+      var h = '';
+      for (var i = 0; i < st.ask.opts.length; i++) {
+        var o = st.ask.opts[i];
+        h += '<button class="ansb" data-v="' + esc(o.v) + '">' + esc(o.label) + '</button>';
+      }
+      btns.innerHTML = h;
+      btns.hidden = false;
+      lock.hidden = true;
+    } else {
+      btns.innerHTML = '';
+      btns.hidden = true;
+      lock.hidden = false;
+      lock.innerHTML = 'You said <b>' + esc(labelOf(st.ask, st.pending.answer)) +
+        '</b>. Eyes up, watch it happen.';
+    }
+  } else {
+    ask.className = '';
+    $('askQ').textContent = '';
+    btns.innerHTML = '';
+    btns.hidden = false;
+    lock.hidden = true;
+  }
+  sh.footPad();
+}
+function labelOf(a, v) {
+  for (var i = 0; i < a.opts.length; i++) if (a.opts[i].v === v) return a.opts[i].label;
+  return v;
+}
+
+$('askBtns').addEventListener('click', function (ev) {
+  var b = ev.target.closest('button[data-v]');
+  if (!b || !st.pending || st.pending.answer !== null) return;
+  st.pending.answer = b.dataset.v;
+  st.pending.latency = Math.max(0, Date.now() - st.askAt);
+  render();
+});
+$('pFoot').addEventListener('click', function (ev) {
+  var b = ev.target.closest('button[data-c]');
+  if (!b) return;
+  st.openConcept = st.openConcept === b.dataset.c ? null : b.dataset.c;
+  render();
+});
+
+// ---------------------------------------------------------------- ledger view
+function renderLedger() {
+  var L = sh.ledger().concepts;
+  var names = Object.keys(L);
+  var order = { unknown: 0, introduced: 1, learning: 2, familiar: 3 };
+  names.sort(function (a, b) {
+    var d = order[sh.conceptState(a)] - order[sh.conceptState(b)];
+    if (d) return d;
+    return (L[b].exposures || 0) - (L[a].exposures || 0);
+  });
+  var h = '';
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i], r = L[n], s = sh.conceptState(n);
+    var score = r.attempts
+      ? r.correct + ' of ' + r.attempts + ' right' +
+        (r.fast_ms ? ', ' + (r.fast_ms / 1000).toFixed(1) + 's' : '')
+      : 'seen ' + (r.exposures || 0) + '×, not called yet';
+    h += '<div class="lrow"><span class="nm">' + esc(n.replace(/_/g, ' ')) + '</span>' +
+      '<span class="stt ' + s + '">' + s + '</span>' +
+      '<span class="sc">' + esc(score) + '</span></div>';
+  }
+  $('ledgerView').innerHTML = h ||
+    '<div class="lrow"><span class="nm">nothing yet</span></div>';
+  var fam = names.filter(function (n) { return sh.conceptState(n) === 'familiar'; }).length;
+  $('ledgerNote').textContent = names.length
+    ? fam + ' of ' + names.length + ' you now call fast and right. Those drop their ' +
+      'definition and the card gets shorter.'
+    : 'Terms the cards use are tracked here. A term counts as learned when you call ' +
+      'it right twice running, in under four seconds.';
+}
+sh.bus.on('sheet', renderLedger);
+sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedger(); });
+
+})(shell);
+
+// =================================================================== LIVE
+// Everything ESPN. Allowed to know what happened.
+(function initLive(sh) {
+
+var st = {
+  gameId: null, games: [], gameLabel: '', gameState: '',
+  sum: null,                 // latest raw summary, this scope only
+  seen: {}, queue: [], rows: [], shownPlay: null,
+  lastQueuedSit: '', primed: false, lastOk: 0, sheet: false
+};
+
 function etDate(offsetDays) {
   var d = new Date(Date.now() + (offsetDays || 0) * 86400000);
-  var p = new Intl.DateTimeFormat('en-CA', {
+  return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).format(d);
-  return p.replace(/-/g, '');
+  }).format(d).replace(/-/g, '');
 }
 function scoreboardUrl(lg, day) {
-  return API + LEAGUES[lg].path + '/scoreboard?dates=' + day + '&_=' + Date.now();
+  return sh.API + sh.LEAGUES[lg].path + '/scoreboard?dates=' + day + '&_=' + Date.now();
 }
 function summaryUrl(lg, id) {
-  return API + LEAGUES[lg].path + '/summary?event=' + id + '&_=' + Date.now();
+  return sh.API + sh.LEAGUES[lg].path + '/summary?event=' + id + '&_=' + Date.now();
 }
 function eventRow(e) {
   var c = (e.competitions && e.competitions[0]) || {};
@@ -246,71 +831,166 @@ function eventRow(e) {
   for (var i = 0; i < cs.length; i++) {
     if (cs[i].homeAway === 'home') h = cs[i]; else a = cs[i];
   }
-  var st = (e.status && e.status.type) || {};
+  var t = (e.status && e.status.type) || {};
   return {
-    id: String(e.id),
-    name: e.shortName || e.name || '?',
-    state: st.state || '?',
-    detail: st.detail || st.shortDetail || '',
+    id: String(e.id), name: e.shortName || e.name || '?',
+    state: t.state || '?', detail: t.detail || t.shortDetail || '',
     away: a && a.team ? (a.team.shortDisplayName || a.team.abbreviation || '') : '',
     home: h && h.team ? (h.team.shortDisplayName || h.team.abbreviation || '') : '',
     awayScore: a ? Number(a.score || 0) : 0,
     homeScore: h ? Number(h.score || 0) : 0
   };
 }
+// A CFB game that starts Saturday night and runs past midnight ET is on
+// yesterday's date while it is still being played. Today's slate is never
+// empty on a Saturday, so a "only look back when today is empty" rule never
+// fires. Look back whenever nothing is live today.
 function fetchGames(lg) {
-  return jget(scoreboardUrl(lg, etDate(0)))
-    .then(function (sb) {
-      var rows = (sb.events || []).map(eventRow);
-      var anyLive = rows.some(function (r) { return r.state === 'in'; });
-      if (anyLive || rows.length) return rows;
-      // very late night: today in ET may be empty while last night runs on
-      return jget(scoreboardUrl(lg, etDate(-1))).then(function (sb2) {
-        return (sb2.events || []).map(eventRow);
-      });
-    });
+  return sh.jget(scoreboardUrl(lg, etDate(0))).then(function (sb) {
+    var rows = (sb.events || []).map(eventRow);
+    if (rows.some(function (r) { return r.state === 'in'; })) return rows;
+    return sh.jget(scoreboardUrl(lg, etDate(-1))).then(function (sb2) {
+      var y = (sb2.events || []).map(eventRow);
+      var live = y.filter(function (r) { return r.state === 'in'; });
+      return live.length ? live.concat(rows) : (rows.length ? rows : y);
+    }).catch(function () { return rows; });
+  });
 }
 
-// ================================================================
-// PRIME PATH BOUNDARY
-//
-// Everything below this comment until the marked end reads ESPN data.
-// readSituation copies an explicit list of pre-snap keys into a frozen
-// object and returns it. No play text, yards gained, scoring flag or
-// turnover flag is ever copied, so the prime pipeline has no result
-// available to leak, and needs no filter of its own.
-// ================================================================
+// ---------------------------------------------------------------- plays
+function collectPlays(sum) {
+  var dr = (sum && sum.drives) || {};
+  var drives = (dr.previous || []).slice();
+  if (dr.current) drives.push(dr.current);
+  var seen = {}, out = [];
+  for (var i = 0; i < drives.length; i++) {
+    var ps = drives[i].plays || [];
+    for (var j = 0; j < ps.length; j++) {
+      var p = ps[j], id = String(p.id);
+      if (seen[id] !== undefined) { out[seen[id]] = p; continue; }
+      seen[id] = out.length;
+      out.push(p);
+    }
+  }
+  return out;
+}
+// pass / run / kick / other, matching how engine/ingest_*.py classify. A sack
+// or a scramble is a pass, because the call was a pass. Kneels, spikes,
+// penalties, timeouts and period markers are `other` and void any call.
+function classify(p) {
+  var t = ((p.type && p.type.text) || '').toLowerCase();
+  var raw = (p.text || '').toLowerCase();
+  if (p.isPenalty) return 'other';
+  if (/\bkneel|\bspike|kneel down/.test(raw)) return 'other';
+  if (t.indexOf('penalt') >= 0 || t.indexOf('timeout') >= 0 ||
+      t.indexOf('end ') === 0 || t.indexOf('end of') === 0 ||
+      t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0 ||
+      t.indexOf('official') >= 0 || t.indexOf('coin toss') >= 0 ||
+      t.indexOf('safety') === 0) return 'other';
+  if (t.indexOf('kickoff') >= 0 || t.indexOf('punt') >= 0 ||
+      t.indexOf('field goal') >= 0 || t.indexOf('extra point') >= 0 ||
+      t.indexOf('kick') >= 0) return 'kick';
+  if (t.indexOf('pass') >= 0 || t.indexOf('sack') >= 0 ||
+      t.indexOf('interception') >= 0 || t.indexOf('scramble') >= 0) return 'pass';
+  if (t.indexOf('rush') >= 0 || t.indexOf('run') >= 0) return 'run';
+  if (t.indexOf('fumble') >= 0) return 'other';
+  return 'other';
+}
+function gainPhrase(y, need, down) {
+  var s = y > 0 ? 'Gained ' + y + '.' : y < 0 ? 'Lost ' + (-y) + '.' : 'No gain.';
+  if (typeof need !== 'number' || !down) return s;
+  if (y >= need) return s + ' First down.';
+  if (down >= 4) return s;
+  return s + ' ' + (need - y) + ' short of the marker.';
+}
+// Deterministic. No generation, no model.
+function plainPlay(p) {
+  var t = ((p.type && p.type.text) || '').toLowerCase();
+  var raw = p.text || '';
+  var y = typeof p.statYardage === 'number' ? p.statYardage : null;
+  var start = p.start || {};
+  var need = typeof start.distance === 'number' ? start.distance : null;
+  var down = start.down;
+  var g = y === null ? '' : gainPhrase(y, need, down);
+
+  if (/kneel down|\bkneels\b/i.test(raw)) return { s: 'He took a knee to burn clock.', k: '' };
+  if (t === 'rush') return { s: 'Ran the ball. ' + g, k: '' };
+  if (t === 'rushing touchdown') return { s: 'Ran it in. Touchdown, six points.', k: 'score' };
+  if (t === 'passing touchdown') return { s: 'Threw it, caught in the end zone. Touchdown, six points.', k: 'score' };
+  if (t === 'pass reception') return { s: 'Threw it, caught. ' + g, k: '' };
+  if (t === 'pass incompletion') return { s: 'Threw it, nobody caught it. No gain, and the clock stops.', k: '' };
+  if (t === 'sack') {
+    return { s: 'The defense tackled the quarterback before he could throw' +
+      (y !== null && y < 0 ? ', ' + (-y) + ' yards back.' : '.'), k: '' };
+  }
+  if (t.indexOf('interception') >= 0) return { s: 'Threw it, a defender caught it. The other team has the ball now.', k: 'turn' };
+  if (t === 'fumble recovery (opponent)') return { s: 'The ball came loose and the other team fell on it.', k: 'turn' };
+  if (t === 'fumble recovery (own)') return { s: 'The ball came loose and they got it back.', k: '' };
+  if (t === 'punt' || t === 'punt return') return { s: 'Gave the ball away on a kick rather than risk a fourth down.', k: '' };
+  if (t === 'field goal good') return { s: 'Kicked it through the uprights. Three points.', k: 'score' };
+  if (t === 'field goal missed' || t === 'blocked field goal') return { s: 'The kick missed. The other team takes over.', k: 'turn' };
+  if (t === 'kickoff' || t === 'kickoff return (offense)') return { s: 'Kickoff. New drive starting.', k: '' };
+  if (t === 'safety') return { s: 'Tackled in their own end zone. Two points to the defense.', k: 'score' };
+  if (t === 'penalty') return { s: 'Penalty. The ball moves and the down may be replayed.', k: '' };
+  if (t === 'timeout') return { s: 'Timeout.', k: '' };
+  if (t.indexOf('end ') === 0 || t.indexOf('end of') === 0) return { s: raw || 'Period over.', k: '' };
+  if (t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0) return { s: 'Two minute warning.', k: '' };
+  return { s: (p.type && p.type.text) || 'Play.', k: '' };
+}
+function teamAbbrs(sum) {
+  var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
+  var by = {}, cs = (comp && comp.competitors) || [];
+  for (var i = 0; i < cs.length; i++) {
+    if (cs[i].team) by[String(cs[i].team.id)] = cs[i].team.abbreviation || cs[i].team.shortDisplayName || '';
+  }
+  return by;
+}
+function feedRow(p, abbr) {
+  var s = p.start || {};
+  var pl = plainPlay(p);
+  return {
+    id: String(p.id),
+    dd: s.downDistanceText || '',
+    off: s.team && s.team.id ? (abbr[String(s.team.id)] || '') : '',
+    when: (p.period && p.period.number ? 'Q' + p.period.number + ' ' : '') +
+          ((p.clock && p.clock.displayValue) || ''),
+    plain: pl.s, kind: pl.k, raw: p.text || '',
+    awayScore: typeof p.awayScore === 'number' ? p.awayScore : null,
+    homeScore: typeof p.homeScore === 'number' ? p.homeScore : null,
+    period: p.period && p.period.number ? p.period.number : null,
+    clock: (p.clock && p.clock.displayValue) || ''
+  };
+}
+
+// ---------------------------------------------------- pre-snap whitelist
 function clockToSeconds(s) {
   if (!s) return null;
   var m = /^(\d+):(\d{2})$/.exec(String(s).trim());
-  if (!m) return null;
-  return Number(m[1]) * 60 + Number(m[2]);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 function trimTeam(t) {
   if (!t) return null;
   return {
-    id: String(t.id || ''),
-    abbreviation: t.abbreviation || '',
-    location: t.location || '',
-    shortDisplayName: t.shortDisplayName || '',
-    displayName: t.displayName || '',
-    name: t.name || ''
+    id: String(t.id || ''), abbreviation: t.abbreviation || '',
+    location: t.location || '', shortDisplayName: t.shortDisplayName || '',
+    displayName: t.displayName || '', name: t.name || ''
   };
 }
-// plays: the ordered play list. Only the `end` position block of the LAST
-// play is read, and only when it describes a legal upcoming snap.
+// Reads strictly the LAST play's `end` block. ESPN writes `down: -1` on the
+// `end` of a play that ended the drive (made field goal, touchdown, end of
+// period). Walking backwards past one of those finds the situation of a snap
+// that has already happened, and the card would prime him for a play he just
+// watched. When the last play has no legal next snap the honest answer is no
+// card; the following kickoff supplies the real one a few seconds later.
 //
-// Reading strictly the last play matters. ESPN writes `down: -1` on the `end`
-// of a play that ended the drive (made field goal, touchdown, end of period).
-// Walking backwards past one of those finds the situation of a snap that has
-// already happened, and the card would prime him for a play he just watched.
-// When the last play has no legal next snap the honest answer is no card;
-// the following kickoff supplies the real one a few seconds later.
-function readSituation(sum, plays) {
+// This is the only function that writes the object PRIME receives. It copies a
+// fixed list of keys. No play text, yardage, scoring flag or turnover flag has
+// a path onto the result, so the card pipeline has no outcome to leak.
+function preSnap(sum, plays) {
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   if (!comp) return null;
-  var st = comp.status;
-  if (!st || !st.type || st.type.state !== 'in') return null;
+  var status = comp.status;
+  if (!status || !status.type || status.type.state !== 'in') return null;
   if (!plays.length) return null;
 
   var end = plays[plays.length - 1].end;
@@ -333,126 +1013,123 @@ function readSituation(sum, plays) {
     down: end.down,
     distance: Math.max(1, end.distance),
     yardsToGoal: end.yardsToEndzone,
-    period: Number(st.period || 0),
-    clockSeconds: clockToSeconds(st.displayClock),
+    period: Number(status.period || 0),
+    clockSeconds: clockToSeconds(status.displayClock),
     offenseScore: os,
     defenseScore: ds,
     scoreDiff: os - ds,
     offenseTeam: trimTeam(off.team),
     defenseTeam: trimTeam(def.team),
     spotText: end.possessionText || '',
-    ddText: end.shortDownDistanceText || ''
+    ddText: end.shortDownDistanceText || '',
+    gameId: String(st.gameId || ''),
+    sitKey: [end.down, end.distance, end.yardsToEndzone, offId].join('|')
   });
 }
-// ================================================================
-// END PRIME PATH BOUNDARY
-// ================================================================
+// The key a released play is matched against, so a call is only ever settled
+// by the snap it was made about.
+function playSitKey(p) {
+  var s = p.start || {};
+  if (!s.team || !s.team.id) return '';
+  return [s.down, s.distance, s.yardsToEndzone, String(s.team.id)].join('|');
+}
 
-// ------------------------------------------------------------------ feed path
-function collectPlays(sum) {
-  var dr = (sum && sum.drives) || {};
-  var drives = (dr.previous || []).slice();
-  if (dr.current) drives.push(dr.current);
-  var seen = {}, out = [];
-  for (var i = 0; i < drives.length; i++) {
-    var ps = drives[i].plays || [];
-    for (var j = 0; j < ps.length; j++) {
-      var p = ps[j], id = String(p.id);
-      if (seen[id] !== undefined) { out[seen[id]] = p; continue; }
-      seen[id] = out.length;
-      out.push(p);
+// ---------------------------------------------------------------- delay queue
+function due(item) { return item.at === 0 ? 0 : item.at + sh.delayMs(); }
+function pump() {
+  var now = Date.now(), moved = false;
+  while (st.queue.length && due(st.queue[0]) <= now) {
+    var it = st.queue.shift();
+    moved = true;
+    if (it.kind === 'play') {
+      st.rows.unshift(it.row);
+      if (st.rows.length > sh.FEED_MAX) st.rows.length = sh.FEED_MAX;
+      st.shownPlay = it.row;
+      if (!it.silent) {
+        sh.bus.emit('result', {
+          sitKey: it.sitKey, kind: it.cls,
+          gained: it.gained, need: it.need
+        });
+      }
+    } else if (it.kind === 'snap') {
+      sh.bus.emit('snap', it.sit);
+    } else if (it.kind === 'nosnap') {
+      sh.bus.emit('nosnap', it.msg);
     }
   }
-  return out;
+  if (moved) { renderFeed(); renderHeader(); }
+  // countdown for whatever is still waiting
+  var head = st.queue.length ? Math.ceil((due(st.queue[0]) - now) / 1000) : 0;
+  sh.bus.emit('hold', head > 0 ? head : 0);
 }
-function gainPhrase(y, need, down) {
-  var s = y > 0 ? 'Gained ' + y + '.' : y < 0 ? 'Lost ' + (-y) + '.' : 'No gain.';
-  if (typeof need !== 'number' || !down) return s;
-  if (y >= need) return s + ' First down.';
-  if (down >= 4) return s;
-  return s + ' ' + (need - y) + ' short of the marker.';
-}
-// Deterministic. No generation, no model, no outcome hidden from him.
-function plainPlay(p) {
-  var t = ((p.type && p.type.text) || '').toLowerCase();
-  var raw = p.text || '';
-  var y = typeof p.statYardage === 'number' ? p.statYardage : null;
-  var start = p.start || {};
-  var need = typeof start.distance === 'number' ? start.distance : null;
-  var down = start.down;
-  var g = y === null ? '' : gainPhrase(y, need, down);
 
-  if (t === 'rush') return { s: 'Ran the ball. ' + g, k: '' };
-  if (t === 'rushing touchdown') return { s: 'Ran it in. Touchdown, six points.', k: 'score' };
-  if (t === 'passing touchdown') return { s: 'Threw it, caught in the end zone. Touchdown, six points.', k: 'score' };
-  if (t === 'pass reception') return { s: 'Threw it, caught. ' + g, k: '' };
-  if (t === 'pass incompletion') return { s: 'Threw it, nobody caught it. No gain, and the clock stops.', k: '' };
-  if (t === 'sack') {
-    return { s: 'The defense tackled the quarterback before he could throw' +
-      (y !== null && y < 0 ? ', ' + (-y) + ' yards back.' : '.'), k: '' };
-  }
-  if (t.indexOf('interception') === 0) return { s: 'Threw it, a defender caught it. The other team has the ball now.', k: 'turn' };
-  if (t === 'fumble recovery (opponent)') return { s: 'The ball came loose and the other team fell on it.', k: 'turn' };
-  if (t === 'fumble recovery (own)') return { s: 'The ball came loose and they got it back.', k: '' };
-  if (t === 'punt' || t === 'punt return') return { s: 'Gave the ball away on a kick rather than risk a fourth down.', k: '' };
-  if (t === 'field goal good') return { s: 'Kicked it through the uprights. Three points.', k: 'score' };
-  if (t === 'field goal missed' || t === 'blocked field goal') return { s: 'The kick missed. The other team takes over.', k: 'turn' };
-  if (t === 'kickoff' || t === 'kickoff return (offense)') return { s: 'Kickoff. New drive starting.', k: '' };
-  if (t === 'safety') return { s: 'Tackled in their own end zone. Two points to the defense.', k: 'score' };
-  if (t === 'penalty') return { s: 'Penalty. The ball moves and the down may be replayed.', k: '' };
-  if (t === 'timeout') return { s: 'Timeout.', k: '' };
-  if (t.indexOf('end ') === 0 || t.indexOf('end of') === 0) return { s: raw || 'Period over.', k: '' };
-  if (t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0) return { s: 'Two minute warning.', k: '' };
-  return { s: (p.type && p.type.text) || 'Play.', k: '' };
-}
-function buildFeed(sum, plays) {
+function applySummary(sum) {
+  st.sum = sum;
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
-  var byId = {};
-  var cs = (comp && comp.competitors) || [];
-  for (var i = 0; i < cs.length; i++) {
-    if (cs[i].team) byId[String(cs[i].team.id)] = cs[i].team.abbreviation || cs[i].team.shortDisplayName || '';
-  }
-  var rows = [];
-  var take = plays.slice(-FEED_MAX);
-  for (var j = take.length - 1; j >= 0; j--) {
-    var p = take[j];
-    var st = p.start || {};
-    var off = st.team && st.team.id ? byId[String(st.team.id)] : '';
-    var pl = plainPlay(p);
-    rows.push({
-      id: String(p.id),
-      dd: st.downDistanceText || '',
-      off: off,
-      when: (p.period && p.period.number ? 'Q' + p.period.number + ' ' : '') + ((p.clock && p.clock.displayValue) || ''),
-      plain: pl.s,
-      kind: pl.k,
-      raw: p.text || ''
+  var status = comp && comp.status;
+  st.gameState = (status && status.type && status.type.state) || '';
+
+  var plays = collectPlays(sum);
+  var abbr = teamAbbrs(sum);
+  var first = !st.primed;
+  var now = Date.now();
+  var last = plays.length - 1;
+
+  // On the first poll of a game the backlog is history he has already watched,
+  // so it goes up at once. The exception is the play at the end of it: on his
+  // TV that one is probably still in the air, so it waits the full delay like
+  // every play after it. Failing late is invisible, failing early ruins it.
+  var startAt = first ? Math.max(0, plays.length - sh.FEED_MAX) : 0;
+  for (var i = startAt; i < plays.length; i++) {
+    var p = plays[i], id = String(p.id);
+    if (st.seen[id]) continue;
+    st.seen[id] = 1;
+    var backlog = first && i < last;
+    st.queue.push({
+      kind: 'play', at: backlog ? 0 : now, silent: backlog,
+      row: feedRow(p, abbr),
+      cls: classify(p),
+      sitKey: playSitKey(p),
+      gained: typeof p.statYardage === 'number' ? p.statYardage : null,
+      need: typeof (p.start || {}).distance === 'number' ? p.start.distance : null
     });
   }
-  return rows;
+  // plays already seen but not yet released stay queued; mark the rest seen so
+  // a first-poll backlog older than FEED_MAX never appears later
+  for (var k = 0; k < startAt; k++) st.seen[String(plays[k].id)] = 1;
+
+  var sit = preSnap(sum, plays);
+  if (sit) {
+    if (sit.sitKey !== st.lastQueuedSit) {
+      st.lastQueuedSit = sit.sitKey;
+      st.queue.push({ kind: 'snap', at: now, sit: sit });
+    }
+  } else if (st.lastQueuedSit !== '') {
+    // the drive ended: touchdown, made kick, end of period. Take the card down
+    // on the same delay, so it does not vanish before he has seen the play.
+    st.lastQueuedSit = '';
+    st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage() });
+  } else {
+    sh.bus.emit('quiet', waitingMessage());
+  }
+  st.primed = true;
+
+  pump();
+  renderHeader();
+}
+function waitingMessage() {
+  if (!st.gameId) return 'Pick a game to start.';
+  if (st.gameState === 'pre') return 'Kickoff has not happened yet.';
+  if (st.gameState === 'post') return 'Game over.';
+  return 'Between plays. The last one is in the feed below.';
 }
 
-// ------------------------------------------------------------------ render
-function seasonsLabel() {
-  var s = (TEND && TEND.seasons) || [];
-  if (!s.length) return '';
-  return s.length === 1 ? String(s[0]) : s[0] + '–' + s[s.length - 1];
-}
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-  });
-}
-function showErr(m) {
-  state.err = m || '';
-  var el = $('err');
-  el.className = m ? 'on' : '';
-  el.textContent = m || '';
-}
-function renderHeader(sum) {
+// ---------------------------------------------------------------- render
+function renderHeader() {
+  var sum = st.sum;
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   if (!comp) {
-    $('score').textContent = state.gameId ? 'loading game…' : 'No game selected';
+    $('score').textContent = st.gameId ? 'loading game…' : 'No game selected';
     $('hmeta').textContent = '';
   } else {
     var cs = comp.competitors || [];
@@ -460,147 +1137,55 @@ function renderHeader(sum) {
     for (var i = 0; i < cs.length; i++) { if (cs[i].homeAway === 'home') h = cs[i]; else a = cs[i]; }
     var an = a && a.team ? (a.team.abbreviation || a.team.shortDisplayName) : '?';
     var hn = h && h.team ? (h.team.abbreviation || h.team.shortDisplayName) : '?';
-    $('score').innerHTML = esc(an) + ' <span class="num">' + esc(a ? a.score : '') + '</span>' +
-      '<span class="sep">at</span>' + esc(hn) + ' <span class="num">' + esc(h ? h.score : '') + '</span>';
-    var st = comp.status || {};
-    var bits = [(st.type && (st.type.shortDetail || st.type.detail)) || ''];
-    if (state.sit && state.sit.offenseTeam) {
-      bits.push('<span class="ball">' + esc(state.sit.offenseTeam.abbreviation ||
-        state.sit.offenseTeam.shortDisplayName) + ' ball</span>');
-    }
-    $('hmeta').innerHTML = bits.filter(Boolean).join(' &middot; ');
-    state.gameLabel = an + ' at ' + hn;
+    // With a delay set, the score bug would otherwise spoil a touchdown he has
+    // not watched yet. Show the game as of the last play released to him.
+    var held = sh.delayMs() > 0 && st.shownPlay && st.shownPlay.awayScore !== null;
+    var as = held ? st.shownPlay.awayScore : (a ? a.score : '');
+    var hs = held ? st.shownPlay.homeScore : (h ? h.score : '');
+    $('score').innerHTML = sh.esc(an) + ' <span class="num">' + sh.esc(as) + '</span>' +
+      '<span class="sep">at</span>' + sh.esc(hn) + ' <span class="num">' + sh.esc(hs) + '</span>';
+    var status = comp.status || {};
+    var detail = held
+      ? (st.shownPlay.period ? 'Q' + st.shownPlay.period + ' ' + st.shownPlay.clock : '')
+      : ((status.type && (status.type.shortDetail || status.type.detail)) || '');
+    $('hmeta').textContent = detail;
+    st.gameLabel = an + ' at ' + hn;
   }
-  $('dot').className = 'dot' + (Date.now() - state.lastOk < STALE_MS ? ' ok' : '');
-}
-// The between-plays message is chosen from game state alone. It never
-// consults what happened on the last play, so it cannot leak either.
-function waitingMessage() {
-  if (!state.gameId) return 'Pick a game to start.';
-  if (state.gameState === 'pre') return 'Kickoff has not happened yet.';
-  if (state.gameState === 'post') return 'Game over.';
-  return 'Between plays. The last one is in the feed below.';
-}
-function quietPrime(msg) {
-  var p = $('prime');
-  p.className = '';
-  $('pQuiet').hidden = false;
-  $('pQuiet').textContent = msg;
-  document.querySelector('.pTop').hidden = true;
-  $('pDD').textContent = '';
-  $('pSpot').textContent = '';
-  $('pSit').textContent = '';
-  $('pTen').textContent = '';
-  $('pWatch').textContent = '';
-  $('pFoot').innerHTML = '';
-  $('pDef').className = '';
-  $('pDef').textContent = '';
-}
-function renderPrime() {
-  var sit = state.sit;
-  if (!sit) {
-    quietPrime(waitingMessage());
-    return;
-  }
-  var teamKey = resolveTeam(sit.offenseTeam);
-  var ten = lookupTendency(teamKey, sit.down, sit.distance, sit.yardsToGoal);
-  var card = pickCard(sit, ten);
-
-  $('pQuiet').hidden = true;
-  document.querySelector('.pTop').hidden = false;
-  $('pDD').textContent = sit.ddText || (sit.down + ' & ' + sit.distance);
-  $('pSpot').textContent = (sit.spotText ? 'at ' + sit.spotText + ' · ' : '') + sit.yardsToGoal + ' to the end zone';
-
-  if (!card) {
-    $('pSit').textContent = '';
-    $('pTen').textContent = '';
-    $('pWatch').textContent = '';
-    $('pQuiet').hidden = false;
-    $('pQuiet').textContent = 'No read written for this one. Just watch.';
-    $('pFoot').innerHTML = '';
-    $('pDef').className = '';
-    state.card = null;
-    return;
-  }
-
-  var low = !ten || ten.confidence === 'low';
-  var shortWatch = useShortWatch(card);
-  var pr = card.prime;
-  var tendLine = low ? (pr.tendency_low || pr.tendency) : pr.tendency;
-  var watchLine = shortWatch ? (pr.watch_short || pr.watch) : pr.watch;
-
-  $('pSit').textContent = fill(pr.situation, sit, ten);
-  $('pTen').textContent = fill(tendLine, sit, ten);
-  $('pWatch').textContent = fill(watchLine, sit, ten);
-
-  var p = $('prime');
-  p.className = low ? 'low' : '';
-
-  // source chip: at low confidence the number is never attributed to the team
-  var chips = [];
-  if (ten) {
-    if (ten.team) {
-      chips.push('<span class="chip src">' + esc(ten.team) + ' · ' + seasonsLabel() +
-        ' · n=' + ten.sample_size + '</span>');
-    } else {
-      chips.push('<span class="chip srcl">All offenses · n=' + ten.sample_size + '</span>');
-    }
-  } else {
-    chips.push('<span class="chip srcl">no history for this spot</span>');
-  }
-  var cs = card.concepts || [];
-  for (var i = 0; i < cs.length; i++) {
-    var n = exposures(cs[i]);
-    var known = n >= 2;
-    chips.push('<button class="chip' + (known ? ' known' : '') + '" data-c="' + esc(cs[i]) + '">' +
-      esc(cs[i].replace(/_/g, ' ')) + '<span class="st">' + n + '</span></button>');
-  }
-  $('pFoot').innerHTML = chips.join('');
-
-  var def = $('pDef');
-  if (state.openConcept && CARDS.concepts[state.openConcept] && cs.indexOf(state.openConcept) >= 0) {
-    def.className = 'on';
-    def.textContent = state.openConcept.replace(/_/g, ' ') + ': ' + CARDS.concepts[state.openConcept];
-  } else {
-    def.className = '';
-    def.textContent = '';
-  }
-  state.card = card;
+  $('dot').className = 'dot' + (Date.now() - st.lastOk < sh.STALE_MS ? ' ok' : '');
 }
 function renderFeed() {
   var el = $('feed');
-  if (!state.feed.length) {
+  if (!st.rows.length) {
     el.innerHTML = '<div class="empty">Nothing yet.</div>';
     return;
   }
   var h = '';
-  for (var i = 0; i < state.feed.length; i++) {
-    var r = state.feed[i];
+  for (var i = 0; i < st.rows.length; i++) {
+    var r = st.rows[i];
     h += '<div class="play">' +
-      '<div class="pl1">' + (r.off ? '<b>' + esc(r.off) + '</b>' : '') +
-      '<span>' + esc(r.dd) + '</span>' +
-      '<span class="t num">' + esc(r.when) + '</span></div>' +
-      '<div class="pl2 ' + r.kind + '">' + esc(r.plain) + '</div>' +
-      (r.raw ? '<div class="pl3">' + esc(r.raw) + '</div>' : '') +
+      '<div class="pl1">' + (r.off ? '<b>' + sh.esc(r.off) + '</b>' : '') +
+      '<span>' + sh.esc(r.dd) + '</span>' +
+      '<span class="t num">' + sh.esc(r.when) + '</span></div>' +
+      '<div class="pl2 ' + r.kind + '">' + sh.esc(r.plain) + '</div>' +
+      (r.raw ? '<div class="pl3">' + sh.esc(r.raw) + '</div>' : '') +
       '</div>';
   }
   el.innerHTML = h;
 }
 function renderPicker() {
-  $('pickLbl').textContent = state.gameLabel || 'Pick a game';
-  var live = state.games.filter(function (g) { return g.state === 'in'; }).length;
-  $('pickSub').textContent = LEAGUES[state.league].label + ' · ' +
+  $('pickLbl').textContent = st.gameLabel || 'Pick a game';
+  var live = st.games.filter(function (g) { return g.state === 'in'; }).length;
+  $('pickSub').textContent = sh.LEAGUES[sh.league()].label + ' · ' +
     (live ? live + ' live now' : 'nothing live right now');
 
   var segs = document.querySelectorAll('.seg button');
   for (var i = 0; i < segs.length; i++) {
-    segs[i].className = segs[i].dataset.lg === state.league ? 'on' : '';
+    segs[i].className = segs[i].dataset.lg === sh.league() ? 'on' : '';
   }
-
   var groups = [
-    ['Live now', state.games.filter(function (g) { return g.state === 'in'; })],
-    ['Coming up', state.games.filter(function (g) { return g.state === 'pre'; })],
-    ['Final', state.games.filter(function (g) { return g.state === 'post'; })]
+    ['Live now', st.games.filter(function (g) { return g.state === 'in'; })],
+    ['Coming up', st.games.filter(function (g) { return g.state === 'pre'; })],
+    ['Final', st.games.filter(function (g) { return g.state === 'post'; })]
   ];
   var h = '';
   for (var gi = 0; gi < groups.length; gi++) {
@@ -611,208 +1196,201 @@ function renderPicker() {
       var g = rows[j];
       var sub = g.state === 'pre' ? g.detail
         : g.away + ' ' + g.awayScore + '  ·  ' + g.home + ' ' + g.homeScore + '  ·  ' + g.detail;
-      h += '<button class="gbtn' + (g.id === state.gameId ? ' sel' : '') + '" data-g="' + esc(g.id) + '">' +
-        '<b>' + esc(g.name) + '</b><small>' + esc(sub) + '</small></button>';
+      h += '<button class="gbtn' + (g.id === st.gameId ? ' sel' : '') + '" data-g="' + sh.esc(g.id) + '">' +
+        '<b>' + sh.esc(g.name) + '</b><small>' + sh.esc(sub) + '</small></button>';
     }
   }
   $('games').innerHTML = h || '<div class="empty">No games on the schedule today.</div>';
-
-  var names = Object.keys(ledger.concepts).sort(function (a, b) {
-    return exposures(b) - exposures(a);
-  });
-  var lh = '';
-  for (var k = 0; k < names.length; k++) {
-    lh += '<span class="chip">' + esc(names[k].replace(/_/g, ' ')) +
-      '<span class="st"> ' + exposures(names[k]) + '</span></span>';
-  }
-  $('ledgerView').innerHTML = lh || '<span class="chip">nothing yet</span>';
-  var learning = names.filter(function (n) { return exposures(n) >= 2; }).length;
-  $('ledgerNote').textContent = names.length
-    ? learning + ' of ' + names.length + ' past two sightings. Those cards drop the definition and get shorter.'
-    : 'Terms you see on cards are counted here. After two sightings the card stops defining them.';
 }
 
-// ------------------------------------------------------------------ loop
+// ---------------------------------------------------------------- loop
 var pollTimer = null, sbTimer = null;
-
-function applySummary(sum) {
-  var plays = collectPlays(sum);
-  var hs = sum && sum.header && sum.header.competitions && sum.header.competitions[0] &&
-           sum.header.competitions[0].status;
-  state.gameState = (hs && hs.type && hs.type.state) || '';
-
-  // FEED PATH
-  state.feed = buildFeed(sum, plays);
-
-  // PRIME PATH
-  var sit = readSituation(sum, plays);
-  var key = sit ? [sit.down, sit.distance, sit.yardsToGoal, sit.offenseTeam.id].join('|') : '';
-  var isNew = key !== state.sitKey;
-  state.sit = sit;
-  state.sitKey = key;
-
-  renderHeader(sum);
-  renderPrime();
-  renderFeed();
-
-  if (isNew && sit && state.card) {
-    bumpConcepts(state.card.concepts);   // counted after the card is built
-    var p = $('prime');
-    p.classList.add('fresh');
-    setTimeout(function () { p.classList.remove('fresh'); }, 60);
-  }
-}
-
 function pollGame() {
   clearTimeout(pollTimer);
-  if (!state.gameId) { pollTimer = setTimeout(pollGame, POLL_MS); return; }
-  jget(summaryUrl(state.league, state.gameId)).then(function (sum) {
-    state.lastOk = Date.now();
-    showErr('');
+  if (!st.gameId) { pollTimer = setTimeout(pollGame, sh.POLL_MS); return; }
+  sh.jget(summaryUrl(sh.league(), st.gameId)).then(function (sum) {
+    st.lastOk = Date.now();
+    sh.showErr('');
     applySummary(sum);
   }).catch(function (e) {
-    showErr('feed: ' + e.message);
+    sh.showErr('feed: ' + e.message);
     $('dot').className = 'dot';
   }).then(function () {
-    pollTimer = setTimeout(pollGame, POLL_MS);
+    pollTimer = setTimeout(pollGame, sh.POLL_MS);
   });
 }
-
 function pollScoreboard(force) {
   clearTimeout(sbTimer);
-  var needed = force || state.sheet || !state.gameId;
-  if (!needed) { sbTimer = setTimeout(function () { pollScoreboard(false); }, SB_MS); return; }
-  fetchGames(state.league).then(function (rows) {
-    state.games = rows;
-    if (!state.gameId) {
+  if (!(force || st.sheet || !st.gameId)) {
+    sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
+    return;
+  }
+  fetchGames(sh.league()).then(function (rows) {
+    st.games = rows;
+    if (!st.gameId) {
       var live = rows.filter(function (g) { return g.state === 'in'; });
       if (live.length) selectGame(live[0].id);
     }
     renderPicker();
   }).catch(function (e) {
-    showErr('scoreboard: ' + e.message);
+    sh.showErr('scoreboard: ' + e.message);
   }).then(function () {
-    sbTimer = setTimeout(function () { pollScoreboard(false); }, SB_MS);
+    sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
   });
 }
-
+function resetGame() {
+  st.sum = null; st.seen = {}; st.queue = []; st.rows = [];
+  st.shownPlay = null; st.lastQueuedSit = ''; st.primed = false;
+  sh.bus.emit('clear');
+}
 function selectGame(id) {
-  state.gameId = String(id);
-  state.sit = null; state.sitKey = ''; state.card = null; state.feed = [];
-  state.openConcept = null;
-  try { localStorage.setItem(LS.game + state.league, state.gameId); } catch (e) {}
-  var g = state.games.filter(function (x) { return x.id === state.gameId; })[0];
-  if (g) state.gameLabel = g.name;
+  st.gameId = String(id);
+  resetGame();
+  sh.lsSet(sh.LS.game + sh.league(), st.gameId);
+  var g = st.games.filter(function (x) { return x.id === st.gameId; })[0];
+  if (g) st.gameLabel = g.name;
   renderPicker();
-  quietPrime(waitingMessage());
+  sh.bus.emit('quiet', waitingMessage());
   renderFeed();
   pollGame();
 }
 
-function loadTables() {
-  return jget(LEAGUES[state.league].table).then(function (t) {
-    TEND = t;
-    buildNameIndex();
-  });
-}
-function switchLeague(lg) {
-  if (lg === state.league) return;
-  state.league = lg;
-  try { localStorage.setItem(LS.league, lg); } catch (e) {}
-  state.gameId = null; state.games = []; state.gameLabel = '';
-  state.sit = null; state.sitKey = ''; state.feed = [];
-  TEND = null; NAMEIX = null;
-  renderPicker(); quietPrime('Pick a game to start.'); renderFeed();
-  loadTables().then(function () {
-    var saved = null;
-    try { saved = localStorage.getItem(LS.game + lg); } catch (e) {}
-    return fetchGames(lg).then(function (rows) {
-      state.games = rows;
-      var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
-                 rows.filter(function (g) { return g.state === 'in'; })[0];
-      renderPicker();
-      if (pick) selectGame(pick.id);
-    });
-  }).catch(function (e) { showErr('load: ' + e.message); });
-}
-
-// ------------------------------------------------------------------ wiring
+// ---------------------------------------------------------------- wiring
 $('pickBtn').addEventListener('click', function () {
-  state.sheet = true;
-  $('sheet').className = 'on';
+  st.sheet = true;
+  $('sheet').className = 'sheet on';
   renderPicker();
+  sh.bus.emit('sheet');
   pollScoreboard(true);
 });
-$('closeSheet').addEventListener('click', function () {
-  state.sheet = false;
-  $('sheet').className = '';
-});
-$('sheet').addEventListener('click', function (ev) {
-  if (ev.target === $('sheet')) { state.sheet = false; $('sheet').className = ''; }
-});
+function closeSheet() { st.sheet = false; $('sheet').className = 'sheet'; }
+$('closeSheet').addEventListener('click', closeSheet);
+$('sheet').addEventListener('click', function (ev) { if (ev.target === $('sheet')) closeSheet(); });
 $('games').addEventListener('click', function (ev) {
   var b = ev.target.closest('button[data-g]');
   if (!b) return;
   selectGame(b.dataset.g);
-  state.sheet = false;
-  $('sheet').className = '';
+  closeSheet();
+});
+sh.bus.on('leagueChanged', function () {
+  st.gameId = null; st.games = []; st.gameLabel = '';
+  resetGame();
+  renderPicker(); renderFeed();
+  var saved = sh.lsGet(sh.LS.game + sh.league());
+  fetchGames(sh.league()).then(function (rows) {
+    st.games = rows;
+    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
+               rows.filter(function (g) { return g.state === 'in'; })[0];
+    renderPicker();
+    if (pick) selectGame(pick.id);
+    else sh.bus.emit('quiet', 'Nothing live. Tap the button below to pick a game.');
+  }).catch(function (e) { sh.showErr('load: ' + e.message); });
+});
+sh.bus.on('delay', function () { pump(); renderHeader(); });
+
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') pollGame();
+});
+setInterval(pump, sh.TICK_MS);
+setInterval(function () {
+  $('dot').className = 'dot' + (Date.now() - st.lastOk < sh.STALE_MS ? ' ok' : '');
+}, 1000);
+
+sh.bus.on('boot', function () {
+  renderPicker();
+  var saved = sh.lsGet(sh.LS.game + sh.league());
+  fetchGames(sh.league()).then(function (rows) {
+    st.games = rows;
+    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
+               rows.filter(function (g) { return g.state === 'in'; })[0];
+    renderPicker();
+    if (pick) selectGame(pick.id);
+    else sh.bus.emit('quiet', 'Nothing live. Tap the button below to pick a game.');
+  }).catch(function (e) {
+    sh.showErr('startup: ' + e.message);
+  }).then(function () {
+    pollGame();
+    pollScoreboard(false);
+  });
+});
+
+})(shell);
+
+// ================================================================= shell wiring
+function paintDelay() {
+  $('dVal').textContent = delaySec + 's';
+  $('dSlide').value = String(delaySec);
+  $('delayBtn').textContent = 'TV +' + delaySec + 's';
+  $('delayBtn').className = delaySec > 0 ? 'on' : '';
+  $('dNote').textContent = delaySec === 0
+    ? 'Off. Cards appear the moment the feed has them, which on most TVs is ' +
+      'before you see the play.'
+    : 'Every card, play and score waits ' + delaySec + ' second' +
+      (delaySec === 1 ? '' : 's') + ' after the feed has it.';
+  footPad();
+}
+function setDelay(n) {
+  n = Math.max(0, Math.min(MAX_DELAY, Math.round(n)));
+  if (n === delaySec) return;
+  delaySec = n;
+  lsSet(LS.delay, String(n));
+  paintDelay();
+  bus.emit('delay', n);
+}
+$('delayBtn').addEventListener('click', function () { $('dsheet').className = 'sheet on'; });
+$('closeDelay').addEventListener('click', function () { $('dsheet').className = 'sheet'; });
+$('dsheet').addEventListener('click', function (ev) {
+  if (ev.target === $('dsheet')) $('dsheet').className = 'sheet';
+});
+$('dSlide').addEventListener('input', function () { setDelay(Number(this.value)); });
+$('dMinus').addEventListener('click', function () { setDelay(delaySec - 1); });
+$('dPlus').addEventListener('click', function () { setDelay(delaySec + 1); });
+
+$('resetLedger').addEventListener('click', function () {
+  shell.resetLedger();
+  bus.emit('reset');
 });
 document.querySelector('.seg').addEventListener('click', function (ev) {
   var b = ev.target.closest('button[data-lg]');
-  if (b) switchLeague(b.dataset.lg);
-});
-$('resetLedger').addEventListener('click', function () {
-  ledger = { concepts: {} };
-  saveLedger();
-  renderPicker();
-  renderPrime();
-});
-$('pFoot').addEventListener('click', function (ev) {
-  var b = ev.target.closest('button[data-c]');
-  if (!b) return;
-  state.openConcept = state.openConcept === b.dataset.c ? null : b.dataset.c;
-  renderPrime();
+  if (!b || b.dataset.lg === league) return;
+  league = b.dataset.lg;
+  lsSet(LS.league, league);
+  TEND = null;
+  bus.emit('tables');
+  loadTables().then(function () {
+    bus.emit('tables');
+    bus.emit('leagueChanged', league);
+  }).catch(function (e) { showErr('load: ' + e.message); });
 });
 
 // keep the screen awake; harmless where unsupported
-var wl = null;
 function keepAwake() {
   if (!navigator.wakeLock) return;
-  navigator.wakeLock.request('screen').then(function (s) { wl = s; }).catch(function () {});
+  navigator.wakeLock.request('screen').then(function () {}).catch(function () {});
 }
 document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible') { keepAwake(); pollGame(); }
+  if (document.visibilityState === 'visible') keepAwake();
 });
 
-setInterval(function () {
-  $('dot').className = 'dot' + (Date.now() - state.lastOk < STALE_MS ? ' ok' : '');
-}, 1000);
+function loadTables() {
+  return jget(LEAGUES[league].table).then(function (t) { TEND = t; });
+}
 
-// ------------------------------------------------------------------ boot
 loadLedger();
-try { state.league = localStorage.getItem(LS.league) === 'nfl' ? 'nfl' : 'cfb'; } catch (e) {}
+loadAsks();
+paintDelay();
+footPad();
 
 Promise.all([
   jget('cards.json').then(function (c) { CARDS = c; }),
   loadTables()
 ]).then(function () {
-  renderPicker();
-  var saved = null;
-  try { saved = localStorage.getItem(LS.game + state.league); } catch (e) {}
-  return fetchGames(state.league).then(function (rows) {
-    state.games = rows;
-    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
-               rows.filter(function (g) { return g.state === 'in'; })[0];
-    renderPicker();
-    if (pick) selectGame(pick.id);
-    else quietPrime('Nothing live. Tap the button below to pick a game.');
-  });
+  bus.emit('tables');
+  bus.emit('boot');
+  keepAwake();
 }).catch(function (e) {
   showErr('startup: ' + e.message);
-}).then(function () {
-  keepAwake();
-  pollGame();
-  pollScoreboard(false);
+  bus.emit('boot');
 });
 
 })();
