@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "rm -rf .vercel-build && mkdir .vercel-build && cp -R web/. .vercel-build/ && cp index.html .vercel-build/stopwatch.html && ls -la .vercel-build",
+  "outputDirectory": ".vercel-build",
+  "installCommand": "echo no dependencies",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" }
+      ]
+    }
+  ]
+}

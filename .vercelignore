@@ -1,0 +1,16 @@
+# What the build container is allowed to see. This file replaces .gitignore for
+# uploads, so every secret and every large local artefact is named again here.
+.env
+.venv/
+data/
+__pycache__/
+.DS_Store
+.git/
+.vercel-build/
+
+# Nothing outside web/ and the frozen root index.html is served or needed to
+# build. The engine runs on a laptop and in the weekly Action, never here.
+engine/
+docs/
+.github/
+README.md
