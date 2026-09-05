@@ -214,6 +214,15 @@ test('an incomplete target adds no catch or receiving yards and missing names lo
   assert.match(team.summaries.join(' '), /0 catches/);
 });
 
+test('an unresolved kick or a blocked punt retained by the offense does not prove the drive ended', () => {
+  const p = run('1');
+  for (const [type, text] of [['Field Goal', 'Field goal attempt'], ['Blocked Punt', 'Punt blocked and recovered by the offense']]) {
+    const kick = { id: 'kick', driveId: p.driveId, type: { text: type }, text,
+      start: spot(73, 4, 8), end: spot(73, 1, 10) };
+    assert.equal(inspect([p, kick]).drive.complete, false);
+  }
+});
+
 test('a named runner with one unverified gain has no fabricated total yardage', () => {
   const known = run('known'), unknown = run('unknown');
   unknown.statYardage = 0; delete unknown.end;

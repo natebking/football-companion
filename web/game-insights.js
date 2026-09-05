@@ -88,11 +88,11 @@
     if (team.receivers.length) {
       var receiver = team.receivers[0];
       team.summaries.push(receiver.name + ': ' + count(receiver.targets, 'reported target') + ', ' + count(receiver.catches, 'catch') +
-        (receiver.yards === null ? '.' : ' for ' + count(receiver.yards, 'yard') + '.'));
+        (receiver.yards === null ? '. Yardage is incomplete.' : ' for ' + count(receiver.yards, 'yard') + '.'));
     }
     if (team.runners.length) {
       var runner = team.runners[0];
-      team.summaries.push(runner.name + ': ' + count(runner.carries, 'reported carry').replace(/carrys\b/, 'carries') +
+      team.summaries.push(runner.name + ': ' + runner.carries + ' reported ' + (runner.carries === 1 ? 'carry' : 'carries') +
         (runner.yards === null ? '. Yardage is incomplete.' : ' for ' + count(runner.yards, 'yard') + '.'));
     }
     c.text = 'From ' + count(c.observedPlays, 'reported offensive play') + '. Penalties, clock-stopping plays and special teams are excluded. ' +
@@ -103,8 +103,10 @@
   function ending(r) {
     if (r.f.turnover) return /^Turnover on downs\./.test(r.f.consequence) ? 'Turnover on downs.' : 'Ended with a turnover.';
     if (r.f.kind === 'score') return /touchdown/i.test(r.f.summary) ? 'Touchdown.' : r.f.summary;
-    if (/punt/i.test((r.p.type || {}).text || '') && !r.penalty) return 'Ended with a punt.';
-    if (/field goal/i.test((r.p.type || {}).text || '') && !r.penalty) return r.f.summary;
+    var nextTeam = r.p.end && r.p.end.team && String(r.p.end.team.id || '');
+    var changed = r.teamId && nextTeam && r.teamId !== nextTeam;
+    if (/punt/i.test((r.p.type || {}).text || '') && !r.penalty && changed) return 'Ended with a punt.';
+    if (/field goal/i.test((r.p.type || {}).text || '') && !r.penalty && changed) return r.f.summary;
     if (/^end (?:of )?(?:half|game)/i.test((r.p.type || {}).text || '')) return 'The period of play ended.';
     return '';
   }
