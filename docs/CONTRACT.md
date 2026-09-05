@@ -277,13 +277,29 @@ Rules, non-negotiable:
 The companion has light and dark themes, with System as the default. `web/theme.js`
 applies the saved `fc_theme` preference before the stylesheet loads; this preference
 is local to the device and independent of the game, delay, and learning ledger.
-`web/styles.css` owns the responsive layout. `web/ui.js` measures the fixed controls
+`web/styles.css` owns the responsive layout. `web/ui.js` measures the sticky header
 and manages dialog focus and keyboard dismissal without accessing feed state.
+
+Predictions and their results sit below the teaching card in normal page flow.
+There is no fixed bottom bar. The Games button lives in the header. Team logos
+use the URLs supplied by ESPN in scoreboard and summary records; names remain
+visible if a logo is missing or fails to load. Logos stay in LIVE and do not
+expand PRIME's input whitelist.
 
 The field-position diagram in PRIME reads only the existing pre-snap whitelist.
 Offense always moves left to right, with the ball and first-down or goal line shown.
 The raw play description remains available under each play's disclosure. No card
 copy, attribution rule, grading rule, or broadcast-delay rule changes with the theme.
+
+### UX voice
+
+Write like a knowledgeable person watching alongside the reader: direct, calm,
+and specific. Give the observation or next action without slogans, pep talks,
+or generic reassurance. Use “Your pick: Run” for a submitted answer and “413
+plays” for a sample count. Do not repeat the down and distance under its heading.
+Prompts suggest what to look for; they must not claim to have seen a formation
+or infer a coach's intent from the play feed. Practice history records exposure
+and answers, not demonstrated mastery of football concepts.
 
 ## File ownership
 

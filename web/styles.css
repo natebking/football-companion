@@ -10,7 +10,7 @@
   --warn: #85520b; --warn-bg: #fff2da; --bad: #b64232; --bad-bg: #fcece7;
   --field: #203b32; --field-ink: #e8f2e6; --overlay: #09152199;
   --shadow: 0 10px 35px #17334809, 0 1px 2px #17334805;
-  --hdr: calc(137px + env(safe-area-inset-top)); --foot: 108px;
+  --hdr: calc(137px + env(safe-area-inset-top));
   --heading: "Barlow Condensed", "Arial Narrow", sans-serif;
   --icon-swap-dur: 250ms; --icon-swap-blur: 2px;
   --icon-swap-start-scale: 0.25; --icon-swap-ease: ease-in-out;
@@ -53,6 +53,7 @@ svg { display: block; }
 .hgrow { display: flex; align-items: center; flex: 1; min-width: 0; gap: 30px; }
 #score { display: flex; align-items: center; gap: 18px; font-size: 1rem; font-weight: 600; }
 .score-team { display: flex; align-items: center; gap: 12px; }
+.team-logo { width: 32px; height: 32px; object-fit: contain; padding: 3px; background: #fff; border-radius: 7px; flex: none; }
 .team-abbr { font-size: 1rem; letter-spacing: .05em; }
 .team-score { font: 700 2.125rem/1 var(--heading); font-variant-numeric: tabular-nums; }
 #score .sep { color: var(--faint); font-size: .75rem; font-weight: 400; }
@@ -64,7 +65,7 @@ svg { display: block; }
 #err.on { display: block; }
 
 /* Two equal priorities: make the next read, then revisit the last play. */
-.workspace { max-width: 1184px; margin: 0 auto; padding: 32px 32px calc(var(--foot) + 40px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.workspace { max-width: 1184px; margin: 0 auto; padding: 32px 32px calc(40px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
 .read-column { top: calc(var(--hdr) + 28px); min-width: 0; }
 html[data-read-fits="true"] .read-column { position: sticky; }
 #prime { border-radius: 18px; background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--accent); padding: 25px 28px 24px; box-shadow: var(--shadow); transition: border-top-color 700ms ease-out; }
@@ -98,7 +99,6 @@ button.chip.known { color: var(--accent); }
 .pQuiet { font-size: 1.5rem; font-weight: 600; letter-spacing: -.03em; padding: 22px 0 30px; text-wrap: pretty; }
 .pHold { color: var(--dim); font-size: .75rem; margin-top: 16px; }
 .pHold:empty { display: none; }
-.reading-note { text-align: center; margin: 15px 0 0; font-size: .75rem; color: var(--faint); }
 .field-position { margin: 22px -28px -24px; padding: 16px 22px 15px; border-radius: 0 0 17px 17px; background: var(--field); color: var(--field-ink); }
 .field-caption, .field-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .6875rem; }
 .field-caption { margin-bottom: 10px; font-size: .75rem; }
@@ -132,10 +132,8 @@ button.chip.known { color: var(--accent); }
 .pl3 { font-size: .8125rem; color: var(--dim); margin-top: 5px; line-height: 1.6; }
 .empty { padding: 35px 20px; color: var(--dim); font-size: 1rem; text-align: center; text-wrap: pretty; }
 
-/* The call controls stay reachable, without rebuilding buttons on a poll. */
-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--header); border-top: 1px solid var(--line); backdrop-filter: blur(16px); padding: 15px 32px calc(15px + env(safe-area-inset-bottom)); }
-.footer-inner { display: flex; max-width: 1120px; margin: auto; gap: 32px; align-items: center; }
-#askz { flex: 1; min-width: 0; }
+/* Predictions follow the card in page flow, so they never cover the field. */
+#askz { min-width: 0; margin-top: 16px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
 #askz:not(:has(.on)) { display: none; }
 #pAsk, #pRes { display: none; }
 #pAsk.on, #pRes.on { display: block; }
@@ -153,15 +151,7 @@ footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: 
 #pRes.no b { color: var(--bad); }
 #pRes .why { display: block; margin-top: 5px; font-size: .8125rem; color: var(--dim); }
 #pRes.on + #pAsk.on { margin-top: 10px; }
-#pickBtn { display: flex; align-items: center; gap: 13px; padding: 13px 16px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 12px; width: 340px; max-width: 100%; text-align: left; flex: none; }
-.picker-icon { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 9px; background: var(--accent-bg); color: var(--accent); flex: none; }
-.picker-icon svg { width: 21px; height: 21px; }
-.picker-copy { min-width: 0; flex: 1; }
-#pickBtn b { display: block; font-size: .9375rem; font-weight: 600; }
-#pickBtn small { display: block; font-size: .75rem; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.picker-arrow { color: var(--dim); font-size: .9375rem; letter-spacing: -.2em; }
-.footer-inner:not(:has(#askz .on)) { justify-content: center; }
-.footer-inner:not(:has(#askz .on)) #pickBtn { width: 460px; }
+#pickBtn { display: flex; align-items: center; gap: 8px; padding: 9px 12px; min-height: 44px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 9px; font-size: .8125rem; font-weight: 600; flex: none; }
 
 /* Game and delay sheets are keyboard-accessible dialogs in both themes. */
 .sheet { position: fixed; inset: 0; z-index: 9; background: var(--overlay); display: flex; align-items: flex-end; justify-content: center; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 160ms ease-out, visibility 160ms; }
@@ -176,6 +166,10 @@ footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: 
 .grouphead { color: var(--faint); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; padding: 22px 0 10px; }
 .gbtn { display: block; position: relative; width: 100%; padding: 14px 38px 14px 15px; text-align: left; border: 1px solid var(--line); border-radius: 11px; margin-bottom: 8px; background: var(--card); }
 .gbtn b { display: block; font-size: 1rem; font-weight: 600; }
+.game-teams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.game-versus { color: var(--dim); font-size: .75rem; }
+.game-team { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.game-team b { font-size: .875rem; overflow-wrap: anywhere; }
 .gbtn small { display: block; margin-top: 4px; color: var(--dim); font-size: .8125rem; }
 .gbtn.sel { background: var(--accent-bg); border-color: var(--accent); }
 .gbtn.sel::after { content: "✓"; position: absolute; right: 15px; top: 18px; color: var(--accent); }
@@ -238,27 +232,27 @@ footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: 
   .field-position { margin-left: -22px; margin-right: -22px; }
   .hgrow { gap: 18px; }
   .hmeta { padding-left: 18px; }
-  .footer-inner { gap: 24px; }
-  #pickBtn { width: 300px; }
 }
 @media (max-width: 759px) {
   :root { --hdr: calc(125px + env(safe-area-inset-top)); }
   .header-inner { padding: 0 18px; }
   .masthead { min-height: 56px; }
-  .brand { font-size: 1rem; gap: 8px; }
+  .brand { font-size: .9375rem; gap: 8px; line-height: 1.15; }
+  .brand strong { display: block; }
   .brand-mark { width: 27px; height: 27px; }
-  .mast-actions { gap: 12px; }
-  .connection { font-size: .6875rem; }
+  .mast-actions { gap: 8px; }
+  .connection { display: none; }
   .icon-button { width: 38px; height: 38px; }
   .scorebar { min-height: 68px; gap: 14px; }
   .hgrow { display: block; }
-  #score { gap: 13px; }
-  .score-team { gap: 8px; }
-  .team-abbr { font-size: .875rem; }
+  #score { gap: 8px; }
+  .score-team { gap: 5px; }
+  .team-logo { width: 26px; height: 26px; padding: 2px; border-radius: 5px; }
+  .team-abbr { font-size: .8125rem; }
   .team-score { font-size: 1.75rem; }
   .hmeta { padding-left: 0; border: 0; margin-top: 3px; font-size: .6875rem; }
   #delayBtn { font-size: .75rem; padding: 9px 10px; }
-  .workspace { display: block; padding: 20px 16px calc(var(--foot) + 26px + env(safe-area-inset-bottom)); }
+  .workspace { display: block; padding: 20px 16px calc(26px + env(safe-area-inset-bottom)); }
   .read-column, html[data-read-fits="true"] .read-column { position: static; }
   #prime { padding: 18px 20px 19px; border-radius: 15px; }
   .card-heading { margin-bottom: 11px; }
@@ -276,28 +270,22 @@ footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: 
   .field-position { margin: 17px -20px -19px; padding: 12px 17px; border-radius: 0 0 14px 14px; }
   .field-caption { font-size: .6875rem; margin-bottom: 7px; }
   .field-legend { font-size: .5625rem; margin-top: 7px; }
-  .reading-note { margin-top: 12px; font-size: .6875rem; }
   .plays-panel { margin-top: 30px; }
   .feedhead { padding-bottom: 13px; }
   .feedhead h1 { font-size: 1.4375rem; }
   .feedhead > span { font-size: .6875rem; }
   .play { margin-bottom: 17px; padding-bottom: 17px; }
   .pl2 { font-size: .9375rem; }
-  footer { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
-  .footer-inner { display: block; }
-  #askz:has(.on) { padding: 1px 0 12px; }
-  .ask-overline { display: none; }
+  #askz { padding: 16px 18px; }
   #askQ { font-size: .875rem; margin-bottom: 8px; }
   #pRes { font-size: .875rem; }
-  #pickBtn, .footer-inner:not(:has(#askz .on)) #pickBtn { width: 100%; padding: 9px 12px; gap: 10px; }
-  #pickBtn b { font-size: .875rem; }
-  #pickBtn small { font-size: .6875rem; }
-  .picker-icon { width: 33px; height: 33px; }
   .sheetInner { padding-left: 18px; padding-right: 18px; }
 }
 @media (max-width: 370px) {
-  .connection > span:last-child { display: none; }
   .brand { font-size: .9375rem; }
+  .scorebar { flex-wrap: wrap; gap: 8px; }
+  .hgrow { flex-basis: 100%; }
+  #delayBtn { margin-bottom: 3px; padding: 5px 9px; }
   .field-key { display: none; }
   #pDD { font-size: 2.125rem; }
 }

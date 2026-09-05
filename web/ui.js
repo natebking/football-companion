@@ -3,22 +3,19 @@
   'use strict';
   var root = document.documentElement;
   var header = document.querySelector('.app-header');
-  var footer = document.querySelector('footer');
   var readColumn = document.querySelector('.read-column');
   var active = null;
   var restoreFocus = null;
 
   function measure() {
     root.style.setProperty('--hdr', header.offsetHeight + 'px');
-    root.style.setProperty('--foot', (footer.offsetHeight + 16) + 'px');
-    // A tall card must scroll naturally rather than get trapped behind the
-    // fixed call controls on a short window or with enlarged text.
+    // Keep the card and its prediction in normal flow when they exceed the
+    // available height, including at larger text sizes.
     root.dataset.readFits = String(readColumn.offsetHeight <=
-      window.innerHeight - header.offsetHeight - footer.offsetHeight - 56);
+      window.innerHeight - header.offsetHeight - 56);
   }
   var observer = new ResizeObserver(measure);
   observer.observe(header);
-  observer.observe(footer);
   observer.observe(readColumn);
   window.addEventListener('resize', measure);
   measure();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f1f4f5">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Learn to read football, one play at a time. Live tendencies, guided observation, and calls you make before the snap.">
+<meta name="description" content="Follow the game, learn what to watch, and make your own calls before the snap.">
 <title>Football Companion</title>
 <script src="theme.js"></script>
 <link rel="stylesheet" href="styles.css">
@@ -22,6 +22,7 @@
       </div>
       <div class="mast-actions">
         <span class="connection"><span class="dot" id="dot"></span><span id="connectionLabel">Connecting</span></span>
+        <button id="pickBtn" type="button" aria-haspopup="dialog" aria-label="Choose a game">Games <span aria-hidden="true">⌄</span></button>
         <button id="themeToggle" class="icon-button" type="button" aria-label="Switch to dark mode">
           <span class="t-icon-swap" data-state="b" aria-hidden="true">
             <svg class="t-icon" data-icon="a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
@@ -31,7 +32,7 @@
       </div>
     </div>
     <div class="scorebar">
-      <div class="hgrow"><div id="score">Loading your game…</div><div class="hmeta" id="hmeta"></div></div>
+      <div class="hgrow"><div id="score">Loading game…</div><div class="hmeta" id="hmeta"></div></div>
       <button id="delayBtn" aria-label="TV delay">TV +0s</button>
     </div>
   </div>
@@ -65,33 +66,22 @@
       </div>
       <div class="pHold" id="pHold"></div>
     </section>
-    <p class="reading-note">Make your read. Then look up.</p>
-  </div>
-
-  <section class="plays-panel" aria-labelledby="feedTitle">
-    <div class="feedhead"><h1 id="feedTitle">The last plays</h1><span>Most recent first</span></div>
-    <div id="feed"><div class="empty">Plays will appear here once your game gets going.</div></div>
-  </section>
-</main>
-
-<footer>
-  <div class="footer-inner">
-    <div id="askz">
+    <section id="askz" aria-label="Make a prediction">
       <div id="pRes" role="status"></div>
       <div id="pAsk">
-        <div class="ask-overline">Your read</div>
+        <div class="ask-overline">Your call</div>
         <div id="askQ"></div>
         <div id="askBtns"></div>
         <div id="askLock" hidden></div>
       </div>
-    </div>
-    <button id="pickBtn" aria-haspopup="dialog">
-      <span class="picker-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 2v4m8-4v4M8 13h3m2 0h3m-8 3h3"/></svg></span>
-      <span class="picker-copy"><b id="pickLbl">Pick a game</b><small id="pickSub">College and pro football</small></span>
-      <span class="picker-arrow" aria-hidden="true">↑↓</span>
-    </button>
+    </section>
   </div>
-</footer>
+
+  <section class="plays-panel" aria-labelledby="feedTitle">
+    <div class="feedhead"><h1 id="feedTitle">Recent plays</h1><span>Latest first</span></div>
+    <div id="feed"><div class="empty">Waiting for the first play.</div></div>
+  </section>
+</main>
 
 <div id="sheet" class="sheet" role="dialog" aria-modal="true" aria-label="Choose a game" inert>
   <div class="sheetInner">
@@ -111,12 +101,12 @@
         <button data-theme-choice="dark" aria-pressed="false">Dark</button>
       </div>
     </div>
-    <div class="grouphead">What you are learning</div>
+    <div class="grouphead">Practice history</div>
     <div class="ledger" id="ledgerView"></div>
     <p class="note" id="ledgerNote"></p>
     <div class="btnRow">
       <button id="copyDiag" class="ghost">Copy diagnostics</button>
-      <button id="resetLedger" class="ghost">Reset what I have learned</button>
+      <button id="resetLedger" class="ghost">Reset practice history</button>
     </div>
     <p class="note" id="buildNote"></p>
   </div>
@@ -125,13 +115,11 @@
 <div id="dsheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="delayTitle" inert>
   <div class="sheetInner">
     <div class="sheetTop">
-      <span class="ttl" id="delayTitle">In sync with your TV</span>
+      <span class="ttl" id="delayTitle">TV delay</span>
       <button id="closeDelay" class="closex">Close</button>
     </div>
-    <p class="note">Your TV is behind the live feed. Set how far behind, and every card,
-       play and score waits that long before it appears here. Start at 0, and if a card
-       ever shows up before you see the play, raise it. Change it any time, including
-       at halftime.</p>
+    <p class="note">Seeing results here before they happen on TV? Add a delay.
+       Cards, plays, and scores will wait the number of seconds you choose.</p>
     <div class="dRow">
       <button id="dMinus" aria-label="one second less">&minus;</button>
       <div id="dVal">0s</div>

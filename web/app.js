@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-design';
+var VERSION = '2026-09-05-ux';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -112,10 +112,6 @@ function showErr(m) {
   var el = $('err');
   el.className = m ? 'on' : '';
   el.textContent = m || '';
-}
-function footPad() {
-  var f = document.querySelector('footer');
-  if (f) document.documentElement.style.setProperty('--foot', (f.offsetHeight + 16) + 'px');
 }
 
 // ---------------------------------------------------------------- ledger
@@ -267,7 +263,7 @@ var shell = {
   LS: LS, LEAGUES: LEAGUES, API: API, NFL_ALIAS: NFL_ALIAS,
   POLL_MS: POLL_MS, SB_MS: SB_MS, STALE_MS: STALE_MS, TICK_MS: TICK_MS,
   FEED_MAX: FEED_MAX, FAST_MS: FAST_MS,
-  showErr: showErr, footPad: footPad, seasonsLabel: seasonsLabel,
+  showErr: showErr, seasonsLabel: seasonsLabel,
   distanceBand: distanceBand, fieldZone: fieldZone, bucketKey: bucketKey,
   sameSnap: sameSnap, delayMs: delayMs,
   league: function () { return league; },
@@ -296,7 +292,6 @@ var st = {
   res: null,          // resolution strip
   sinceAsk: 99,       // start high so the mechanic shows itself on the first card
   gap: 7,
-  saidWrongOnce: false,
   quiet: 'Pick a game to start.',
   hold: '',
   openConcept: null,
@@ -449,7 +444,7 @@ var ASK_KINDS = {
   },
   sticks: {
     q: 'Call it now: does this one get past the yellow line?',
-    opts: [{ v: 'past', label: 'Past it' }, { v: 'short', label: 'Lands short' }]
+    opts: [{ v: 'past', label: 'Past it' }, { v: 'short', label: 'Short' }]
   }
 };
 // Fallback ask table, keyed by card id. `cards.json` may ship its own `ask`
@@ -503,17 +498,17 @@ function askEligible(a) {
 function grade(kind, answer, r) {
   // r: {kind:'pass'|'run'|'kick'|'other', gained, need}
   var K = r.kind;
-  if (K === 'other') return { voided: 'That one does not count. No play was actually run.' };
+  if (K === 'other') return { voided: 'This play could not be graded. Your pick does not count.' };
   if (kind === 'sticks') {
-    if (K === 'kick') return { voided: 'They kicked it, so that call does not count.' };
-    if (K === 'run') return { voided: 'They ran it, so that call does not count.' };
+    if (K === 'kick') return { voided: 'They kicked. This question only counts on a pass.' };
+    if (K === 'run') return { voided: 'They ran. This question only counts on a pass.' };
     if (typeof r.gained !== 'number' || typeof r.need !== 'number') {
-      return { voided: 'No yardage on that one, so the call does not count.' };
+      return { voided: 'The feed is missing the yardage. Your pick does not count.' };
     }
     var truth = r.gained >= r.need ? 'past' : 'short';
     return {
       ok: answer === truth,
-      truth: truth === 'past' ? 'It got past the yellow line.' : 'It landed short of the yellow line.'
+      truth: truth === 'past' ? 'It reached the yellow line.' : 'It came up short of the yellow line.'
     };
   }
   if (kind === 'gokick') {
@@ -522,14 +517,14 @@ function grade(kind, answer, r) {
   }
   if (kind === 'kickrunpass' || kind === 'passrun') {
     if (kind === 'passrun' && K === 'kick') {
-      return { voided: 'They kicked it, so that call does not count.' };
+      return { voided: 'They kicked. Your pick does not count.' };
     }
     return {
       ok: answer === K,
       truth: K === 'pass' ? 'They threw it.' : K === 'run' ? 'They ran it.' : 'They kicked it.'
     };
   }
-  return { voided: 'That one does not count.' };
+  return { voided: 'This play could not be graded. Your pick does not count.' };
 }
 
 // ---------------------------------------------------------------- events
@@ -540,7 +535,7 @@ sh.bus.on('quiet', function (msg) {
 // The countdown ticks four times a second. It writes one text node and nothing
 // else, so it can never rebuild a button under a finger that is mid-tap.
 sh.bus.on('hold', function (n) {
-  var s = n > 0 ? 'Next card in ' + n + 's, so your TV stays ahead.' : '';
+  var s = n > 0 ? 'TV delay: next update in ' + n + 's.' : '';
   if (s !== st.hold) { st.hold = s; $('pHold').textContent = s; }
 });
 // The drive ended: touchdown, made kick, end of period. There is no legal next
@@ -582,13 +577,10 @@ sh.bus.on('result', function (r) {
   } else {
     st.res = {
       cls: g.ok ? 'ok' : 'no',
-      head: g.ok ? 'Right.' : 'Not this time.',
+      head: g.ok ? 'Good call.' : 'Not this time.',
       body: g.truth,
-      why: g.ok ? (p.explain || '')
-                : (st.saidWrongOnce ? (p.explain || '')
-                   : 'Being wrong here is normal. Defenses are built to hide what they are doing.')
+      why: p.explain || ''
     };
-    if (!g.ok) st.saidWrongOnce = true;
     sh.recordCall(p.concepts, g.ok, p.latency);
     logAskRow(p, g.ok, false);
   }
@@ -752,14 +744,15 @@ function render() {
     $('pTen').textContent = '';
     $('pWatch').textContent = '';
     $('pQuiet').hidden = false;
-    $('pQuiet').textContent = 'No read written for this one. Just watch.';
+    $('pQuiet').textContent = 'Waiting for the next situation.';
     $('pFoot').innerHTML = '';
     $('pDef').className = '';
     $('prime').className = '';
     return;
   }
 
-  $('pSit').textContent = st.sitLine;
+  // The down and distance already have their own heading.
+  $('pSit').textContent = /^(First|Second|Third|Fourth) and \d+\.$/.test(st.sitLine) ? '' : st.sitLine;
   $('pTen').textContent = st.tendLine;
   $('pWatch').textContent = st.watchLine;
   $('prime').className = st.attributed ? '' : 'low';
@@ -770,7 +763,7 @@ function render() {
   var ten = st.ten;
   if (st.attributed && ten) {
     chips.push('<span class="chip src">' + esc(ten.team) + ' · ' + sh.seasonsLabel() +
-      ' · n=' + ten.sample_size + '</span>');
+      ' · ' + ten.sample_size + ' plays</span>');
   } else {
     chips.push('<span class="chip srcl">All offenses · ' + sh.seasonsLabel() + '</span>');
   }
@@ -821,8 +814,7 @@ function renderAsk() {
       btns.innerHTML = '';
       btns.hidden = true;
       lock.hidden = false;
-      lock.innerHTML = 'You said <b>' + esc(labelOf(st.ask, st.pending.answer)) +
-        '</b>. Eyes up, watch it happen.';
+      lock.innerHTML = 'Your pick: <b>' + esc(labelOf(st.ask, st.pending.answer)) + '</b>';
     }
   } else {
     ask.className = '';
@@ -831,7 +823,6 @@ function renderAsk() {
     btns.hidden = false;
     lock.hidden = true;
   }
-  sh.footPad();
 }
 function labelOf(a, v) {
   for (var i = 0; i < a.opts.length; i++) if (a.opts[i].v === v) return a.opts[i].label;
@@ -868,19 +859,16 @@ function renderLedger() {
     var score = r.attempts
       ? r.correct + ' of ' + r.attempts + ' right' +
         (r.fast_ms ? ', ' + (r.fast_ms / 1000).toFixed(1) + 's' : '')
-      : 'seen ' + (r.exposures || 0) + '×, not called yet';
+      : 'Seen ' + (r.exposures || 0) + ' times';
     h += '<div class="lrow"><span class="nm">' + esc(n.replace(/_/g, ' ')) + '</span>' +
-      '<span class="stt ' + s + '">' + s + '</span>' +
+      '<span class="stt ' + s + '">' + ({ unknown: 'New', introduced: 'Seen', learning: 'Practicing', familiar: 'Familiar' })[s] + '</span>' +
       '<span class="sc">' + esc(score) + '</span></div>';
   }
   $('ledgerView').innerHTML = h ||
-    '<div class="lrow"><span class="nm">nothing yet</span></div>';
-  var fam = names.filter(function (n) { return sh.conceptState(n) === 'familiar'; }).length;
+    '<div class="lrow"><span class="nm">Terms appear here as you watch.</span></div>';
   $('ledgerNote').textContent = names.length
-    ? fam + ' of ' + names.length + ' you now call fast and right. Those drop their ' +
-      'definition and the card gets shorter.'
-    : 'Terms the cards use are tracked here. A term counts as learned when you call ' +
-      'it right twice running, in under four seconds.';
+    ? 'Your answers and the terms you have seen help decide when to shorten definitions.'
+    : 'Make a few calls during a game to start your practice history.';
 }
 sh.bus.on('sheet', renderLedger);
 sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedger(); });
@@ -910,6 +898,27 @@ function scoreboardUrl(lg, day) {
 function summaryUrl(lg, id) {
   return sh.API + sh.LEAGUES[lg].path + '/summary?event=' + id + '&_=' + Date.now();
 }
+// Scoreboard teams use `logo`; summary teams use a `logos` array.
+// Keep the supplied ESPN asset URL instead of guessing from an abbreviation.
+function teamLogo(team) {
+  if (!team) return '';
+  var logos = team.logos || [];
+  var primary = logos.filter(function (logo) { return (logo.rel || []).indexOf('default') >= 0; })[0];
+  var url = team.logo || (primary && primary.href) || (logos[0] && logos[0].href) || '';
+  return /^https:\/\/a\.espncdn\.com\//.test(url) ? url : '';
+}
+var unavailableLogos = new Set();
+function logoImage(url) {
+  if (!url || unavailableLogos.has(url)) return '';
+  return '<img class="team-logo" src="' + sh.esc(url) + '" width="32" height="32" alt="" aria-hidden="true" loading="lazy" decoding="async">';
+}
+document.addEventListener('error', function (event) {
+  var img = event.target;
+  if (img instanceof HTMLImageElement && img.classList.contains('team-logo')) {
+    unavailableLogos.add(img.getAttribute('src'));
+    img.hidden = true;
+  }
+}, true);
 function eventRow(e) {
   var c = (e.competitions && e.competitions[0]) || {};
   var cs = c.competitors || [];
@@ -923,6 +932,7 @@ function eventRow(e) {
     state: t.state || '?', detail: t.detail || t.shortDetail || '',
     away: a && a.team ? (a.team.shortDisplayName || a.team.abbreviation || '') : '',
     home: h && h.team ? (h.team.shortDisplayName || h.team.abbreviation || '') : '',
+    awayLogo: teamLogo(a && a.team), homeLogo: teamLogo(h && h.team),
     awayScore: a ? Number(a.score || 0) : 0,
     homeScore: h ? Number(h.score || 0) : 0
   };
@@ -1039,7 +1049,8 @@ function sitKeyOf(fx, teamId) {
   return [fx.down, fx.distance, fx.yardsToGoal, String(teamId)].join('|');
 }
 function gainPhrase(y, need, down) {
-  var s = y > 0 ? 'Gained ' + y + '.' : y < 0 ? 'Lost ' + (-y) + '.' : 'No gain.';
+  var s = y > 0 ? 'Gained ' + y + ' yard' + (y === 1 ? '' : 's') + '.'
+    : y < 0 ? 'Lost ' + (-y) + ' yard' + (y === -1 ? '' : 's') + '.' : 'No gain.';
   if (typeof need !== 'number' || !down) return s;
   if (y >= need) return s + ' First down.';
   if (down >= 4) return s;
@@ -1055,31 +1066,32 @@ function plainPlay(p) {
   var down = start.down;
   var g = y === null ? '' : gainPhrase(y, need, down);
 
-  if (/kneel down|\bkneels\b/i.test(raw)) return { s: 'He took a knee to burn clock.', k: '' };
-  if (t === 'rush') return { s: 'Ran the ball. ' + g, k: '' };
-  if (t === 'rushing touchdown') return { s: 'Ran it in. Touchdown, six points.', k: 'score' };
-  if (t === 'passing touchdown') return { s: 'Threw it, caught in the end zone. Touchdown, six points.', k: 'score' };
-  if (t === 'pass reception') return { s: 'Threw it, caught. ' + g, k: '' };
-  if (t === 'pass incompletion') return { s: 'Threw it, nobody caught it. No gain, and the clock stops.', k: '' };
+  if (/kneel down|\bkneels\b/i.test(raw)) return { s: 'Took a knee to run down the clock.', k: '' };
+  if (t === 'rush') return { s: 'Run. ' + g, k: '' };
+  if (t === 'rushing touchdown') return { s: 'Run for a touchdown. Six points.', k: 'score' };
+  if (t === 'passing touchdown') return { s: 'Touchdown pass. Six points.', k: 'score' };
+  if (t === 'pass reception') return { s: 'Pass complete. ' + g, k: '' };
+  if (t === 'pass incompletion') return { s: 'Incomplete pass. No gain; the clock stops.', k: '' };
   if (t === 'sack') {
     return { s: 'The defense tackled the quarterback before he could throw' +
       (y !== null && y < 0 ? ', ' + (-y) + ' yards back.' : '.'), k: '' };
   }
   if (t.indexOf('interception') >= 0 && t.indexOf('touchdown') >= 0) {
-    return { s: 'Threw it, a defender caught it and ran it all the way back. Touchdown for the defense.', k: 'score' };
+    return { s: 'Interception returned for a touchdown. Six points for the defense.', k: 'score' };
   }
-  if (t.indexOf('interception') >= 0) return { s: 'Threw it, a defender caught it. The other team has the ball now.', k: 'turn' };
+  if (t.indexOf('interception') >= 0) return { s: 'Interception. A defender caught the pass, so possession changes.', k: 'turn' };
   if (t === 'fumble recovery (opponent)') return { s: 'The ball came loose and the other team fell on it.', k: 'turn' };
   if (t === 'fumble recovery (own)') return { s: 'The ball came loose and they got it back.', k: '' };
-  if (t === 'punt' || t === 'punt return') return { s: 'Gave the ball away on a kick rather than risk a fourth down.', k: '' };
-  if (t === 'field goal good') return { s: 'Kicked it through the uprights. Three points.', k: 'score' };
-  if (t === 'field goal missed' || t === 'blocked field goal') return { s: 'The kick missed. The other team takes over.', k: 'turn' };
+  if (t === 'punt' || t === 'punt return') return { s: 'Punt. Kicked the ball downfield to the other team.', k: '' };
+  if (t === 'field goal good') return { s: 'Field goal good. Three points.', k: 'score' };
+  if (t === 'field goal missed') return { s: 'Field goal missed. No points.', k: 'turn' };
+  if (t === 'blocked field goal') return { s: 'Field goal blocked. No points from the kick.', k: 'turn' };
   if (t === 'kickoff' || t === 'kickoff return (offense)') return { s: 'Kickoff. New drive starting.', k: '' };
-  if (t === 'safety') return { s: 'Tackled in their own end zone. Two points to the defense.', k: 'score' };
+  if (t === 'safety') return { s: 'Safety. Two points to the defense.', k: 'score' };
   if (t === 'penalty') return { s: 'Penalty. The ball moves and the down may be replayed.', k: '' };
   if (t === 'timeout') return { s: 'Timeout.', k: '' };
   if (t.indexOf('end ') === 0 || t.indexOf('end of') === 0) return { s: raw || 'Period over.', k: '' };
-  if (t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0) return { s: 'Two minute warning.', k: '' };
+  if (t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0) return { s: 'Two-minute timeout.', k: '' };
   return { s: (p.type && p.type.text) || 'Play.', k: '' };
 }
 function teamAbbrs(sum) {
@@ -1290,11 +1302,11 @@ function applySummary(sum) {
 }
 function waitingMessage() {
   if (!st.gameId) return 'Pick a game to start.';
-  if (st.gameState === 'pre') return 'Kickoff has not happened yet.';
-  if (st.gameState === 'post') return 'Game over.';
-  if (st.statusName === 'STATUS_HALFTIME') return 'Halftime. Cards come back with the kickoff.';
-  if (st.statusName === 'STATUS_DELAYED') return 'Game delayed. Cards come back when play does.';
-  return 'Between plays. The last one is in the feed below.';
+  if (st.gameState === 'pre') return 'Waiting for kickoff.';
+  if (st.gameState === 'post') return 'Final. See the last plays below.';
+  if (st.statusName === 'STATUS_HALFTIME') return 'Halftime. Waiting for the second half.';
+  if (st.statusName === 'STATUS_DELAYED') return 'Game delayed.';
+  return 'Waiting for the next play.';
 }
 
 // ---------------------------------------------------------------- render
@@ -1302,7 +1314,7 @@ function renderHeader() {
   var sum = st.sum;
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   if (!comp) {
-    $('score').textContent = st.gameId ? 'loading game…' : 'No game selected';
+    $('score').textContent = st.gameId ? 'Loading game…' : 'Choose a game';
     $('hmeta').textContent = '';
   } else {
     var cs = comp.competitors || [];
@@ -1315,9 +1327,9 @@ function renderHeader() {
     var held = sh.delayMs() > 0 && st.shownPlay && st.shownPlay.awayScore !== null;
     var as = held ? st.shownPlay.awayScore : (a ? a.score : '');
     var hs = held ? st.shownPlay.homeScore : (h ? h.score : '');
-    $('score').innerHTML = '<span class="score-team"><span class="team-abbr">' + sh.esc(an) +
+    $('score').innerHTML = '<span class="score-team">' + logoImage(teamLogo(a && a.team)) + '<span class="team-abbr">' + sh.esc(an) +
       '</span><span class="team-score">' + sh.esc(as) + '</span></span>' +
-      '<span class="sep">AT</span><span class="score-team"><span class="team-abbr">' +
+      '<span class="sep">AT</span><span class="score-team">' + logoImage(teamLogo(h && h.team)) + '<span class="team-abbr">' +
       sh.esc(hn) + '</span><span class="team-score">' + sh.esc(hs) + '</span></span>';
     var status = comp.status || {};
     var detail = held
@@ -1336,7 +1348,7 @@ function paintConnection() {
 function renderFeed() {
   var el = $('feed');
   if (!st.rows.length) {
-    el.innerHTML = '<div class="empty">Plays will appear here once your game gets going.</div>';
+    el.innerHTML = '<div class="empty">Waiting for the first play.</div>';
     return;
   }
   var expanded = {};
@@ -1357,10 +1369,8 @@ function renderFeed() {
   el.innerHTML = h;
 }
 function renderPicker() {
-  $('pickLbl').textContent = st.gameLabel || 'Pick a game';
-  var live = st.games.filter(function (g) { return g.state === 'in'; }).length;
-  $('pickSub').textContent = sh.LEAGUES[sh.league()].label + ' · ' +
-    (live ? live + ' live now' : 'nothing live right now');
+  $('pickBtn').dataset.gameLabel = st.gameLabel;
+  $('pickBtn').setAttribute('aria-label', st.gameLabel ? 'Change game, currently ' + st.gameLabel : 'Choose a game');
 
   var segs = document.querySelectorAll('.seg button');
   for (var i = 0; i < segs.length; i++) {
@@ -1382,7 +1392,9 @@ function renderPicker() {
       var sub = g.state === 'pre' ? g.detail
         : g.away + ' ' + g.awayScore + '  ·  ' + g.home + ' ' + g.homeScore + '  ·  ' + g.detail;
       h += '<button class="gbtn' + (g.id === st.gameId ? ' sel' : '') + '" data-g="' + sh.esc(g.id) + '">' +
-        '<b>' + sh.esc(g.name) + '</b><small>' + sh.esc(sub) + '</small></button>';
+        '<span class="game-teams"><span class="game-team">' + logoImage(g.awayLogo) + '<b>' + sh.esc(g.away) +
+        '</b></span><span class="game-versus">at</span><span class="game-team">' + logoImage(g.homeLogo) + '<b>' + sh.esc(g.home) +
+        '</b></span></span><small>' + sh.esc(sub) + '</small></button>';
     }
   }
   $('games').innerHTML = h || '<div class="empty">No games on the schedule today.</div>';
@@ -1400,7 +1412,7 @@ function pollGame() {
     applySummary(sum);
   }).catch(function (e) {
     sh.diag('err', { where: 'feed', msg: e.message, ms: Date.now() - t0 });
-    sh.showErr('feed: ' + e.message);
+    sh.showErr('Game feed unavailable. Retrying…');
     $('dot').className = 'dot';
   }).then(function () {
     pollTimer = setTimeout(pollGame, sh.POLL_MS);
@@ -1420,7 +1432,7 @@ function pollScoreboard(force) {
     }
     renderPicker();
   }).catch(function (e) {
-    sh.showErr('scoreboard: ' + e.message);
+    sh.showErr('Games could not be updated. Retrying…');
   }).then(function () {
     sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
   });
@@ -1471,8 +1483,8 @@ sh.bus.on('leagueChanged', function () {
                rows.filter(function (g) { return g.state === 'in'; })[0];
     renderPicker();
     if (pick) selectGame(pick.id);
-    else sh.bus.emit('quiet', 'Nothing live. Tap the button below to pick a game.');
-  }).catch(function (e) { sh.showErr('load: ' + e.message); });
+    else sh.bus.emit('quiet', 'No live games. Open Games to see the schedule.');
+  }).catch(function (e) { sh.showErr('Games could not be loaded. Open Games to try again.'); });
 });
 sh.bus.on('delay', function () { pump(); renderHeader(); });
 
@@ -1491,9 +1503,9 @@ sh.bus.on('boot', function () {
                rows.filter(function (g) { return g.state === 'in'; })[0];
     renderPicker();
     if (pick) selectGame(pick.id);
-    else sh.bus.emit('quiet', 'Nothing live. Tap the button below to pick a game.');
+    else sh.bus.emit('quiet', 'No live games. Open Games to see the schedule.');
   }).catch(function (e) {
-    sh.showErr('startup: ' + e.message);
+    sh.showErr('Games could not be loaded. Open Games to try again.');
   }).then(function () {
     pollGame();
     pollScoreboard(false);
@@ -1509,11 +1521,8 @@ function paintDelay() {
   $('delayBtn').textContent = 'TV +' + delaySec + 's';
   $('delayBtn').className = delaySec > 0 ? 'on' : '';
   $('dNote').textContent = delaySec === 0
-    ? 'Off. Cards appear the moment the feed has them, which on most TVs is ' +
-      'before you see the play.'
-    : 'Every card, play and score waits ' + delaySec + ' second' +
-      (delaySec === 1 ? '' : 's') + ' after the feed has it.';
-  footPad();
+    ? 'No delay. Updates appear as they arrive.'
+    : 'Updates wait ' + delaySec + ' second' + (delaySec === 1 ? '' : 's') + '.';
 }
 function setDelay(n) {
   n = Math.max(0, Math.min(MAX_DELAY, Math.round(n)));
@@ -1540,7 +1549,7 @@ $('resetLedger').addEventListener('click', function () {
 // share sheet as the fallback, and either way nothing leaves the phone until
 // he decides where to paste it.
 $('copyDiag').addEventListener('click', function () {
-  var text = diagPayload({ game_label: $('pickLbl').textContent });
+  var text = diagPayload({ game_label: $('pickBtn').dataset.gameLabel || '' });
   var btn = $('copyDiag');
   function done(msg) {
     btn.textContent = msg;
@@ -1548,7 +1557,7 @@ $('copyDiag').addEventListener('click', function () {
   }
   var p = (navigator.clipboard && navigator.clipboard.writeText)
     ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
-  p.then(function () { done('Copied. Paste it to Claude.'); }).catch(function () {
+  p.then(function () { done('Copied.'); }).catch(function () {
     if (navigator.share) {
       navigator.share({ title: 'Football Companion diagnostics', text: text })
         .then(function () { done('Shared.'); }).catch(function () { done('Could not copy.'); });
@@ -1566,7 +1575,7 @@ document.querySelector('.seg').addEventListener('click', function (ev) {
   loadTables().then(function () {
     bus.emit('tables');
     bus.emit('leagueChanged', league);
-  }).catch(function (e) { showErr('load: ' + e.message); });
+  }).catch(function (e) { showErr('Football stats could not be loaded. Refresh to try again.'); });
 });
 
 // keep the screen awake; harmless where unsupported
@@ -1587,7 +1596,6 @@ loadAsks();
 loadDiag();
 diag('boot', { version: VERSION, league: league, delay: delaySec });
 paintDelay();
-footPad();
 
 Promise.all([
   jget('cards.json').then(function (c) { CARDS = c; }),
@@ -1598,7 +1606,7 @@ Promise.all([
   keepAwake();
 }).catch(function (e) {
   diag('err', { where: 'startup', msg: e.message });
-  showErr('startup: ' + e.message);
+  showErr('Football stats could not be loaded. Refresh to try again.');
   bus.emit('boot');
 });
 
