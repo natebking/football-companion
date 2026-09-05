@@ -11,6 +11,8 @@
     var dark = preference === 'dark' || (preference === 'system' && media.matches);
     root.dataset.theme = dark ? 'dark' : 'light';
     root.style.colorScheme = dark ? 'dark' : 'light';
+    var favicon = document.getElementById('favicon');
+    if (favicon) favicon.setAttribute('href', dark ? 'favicon-dark.svg' : 'favicon.svg');
     document.querySelector('meta[name="theme-color"]').content = dark ? '#0c1722' : '#f1f4f5';
     var toggle = document.getElementById('themeToggle');
     if (toggle) {

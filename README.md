@@ -1,8 +1,8 @@
 # Fluent in Football
 
-A second screen for following a football game and learning what to watch. [Open Fluent in Football](https://football-companion-rose.vercel.app/).
+A second screen for following a football game and learning what to watch. [Open Fluent in Football](https://fluentin.football/).
 
-The two-F logo follows the shape of player routes: a starting dot, an upfield stem, and a turn ending in an arrow. The editable mark is in `web/brand-mark.svg`, with the same routes used in `web/favicon.svg`.
+The two-F logo follows connected player routes: a rounded first F flows into a taller second F, with one starting dot and one forward arrow. Light and dark assets are `web/brand-mark.svg` and `web/brand-mark-dark.svg`. The header colors and matching favicon follow the selected appearance.
 
 The app puts a concrete watching suggestion first, with the next down, field position, and historical run/pass choices nearby. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default. Corrections update existing plays in order; repeated unreliable clocks are flagged.
 

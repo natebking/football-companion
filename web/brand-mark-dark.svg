@@ -2,8 +2,8 @@
   <title id="title">Fluent in Football</title>
   <desc id="desc">A rounded F flows into a taller angular F, from one starting dot to a forward arrow.</desc>
   <g id="routes" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 53V22C9 15 14 10 21 10H29M9 33H27C34 33 39 28 39 21" stroke="var(--brand-primary, #426216)"/>
-    <circle cx="9" cy="53" r="4.5" fill="var(--brand-primary, #426216)"/>
-    <path d="M39 57V9H65M39 34H59M59 3L65 9L59 15" stroke="var(--brand-secondary, #1e706a)"/>
+    <path d="M9 53V22C9 15 14 10 21 10H29M9 33H27C34 33 39 28 39 21" stroke="var(--brand-primary, #d4f76b)"/>
+    <circle cx="9" cy="53" r="4.5" fill="var(--brand-primary, #d4f76b)"/>
+    <path d="M39 57V9H65M39 34H59M59 3L65 9L59 15" stroke="var(--brand-secondary, #8bddc5)"/>
   </g>
 </svg>

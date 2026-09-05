@@ -5,9 +5,16 @@ The similarly named `/Users/nking/Documents/ChatGPT/Football Companion` folder i
 
 - Project: `football-companion`
 - Team: `nates-projects-925609f4`
-- Production: https://football-companion-rose.vercel.app
+- Production: https://fluentin.football
+- Vercel fallback: https://football-companion-rose.vercel.app
 - Companion at `/`; frozen v0 instrument at `/stopwatch`.
 - `vercel.json` supplies the static build. No backend or runtime secrets are needed.
+
+## Custom domain
+
+`fluentin.football` is assigned to the same Vercel project. Name.com hosts its DNS. On September 5, 2026, its default parking answer was replaced with Vercel's recommended apex A records `216.150.1.1` and `216.150.16.1`, TTL 300. Nameservers stay at Name.com. Vercel handles the HTTPS certificate; there is no need to buy a registrar SSL product.
+
+After DNS changes, check `vercel domains inspect fluentin.football --scope nates-projects-925609f4` and verify normal HTTPS before reporting the new address ready. A successful deployment alone does not prove the custom domain resolves.
 
 ## Git identity
 
