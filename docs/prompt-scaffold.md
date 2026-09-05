@@ -281,5 +281,5 @@ This is the honest answer to the accuracy risk. You cannot make the inference re
 ## 8. Open questions
 
 - **Cold start.** Week 1 has no tendency data. Fall back to prior-season aggregates, and mark the block `low_confidence` so the model hedges the percentages too.
-- **Two games at once.** The concept ledger is global but the tendency cache is per team. Card density needs a global cap or the user gets buried.
+- **Multi-feed, up to four games at once.** Requested as a future feature on 2026-09-05, not implemented. Proposed behavior: independent game state and TV delay for each feed, a shared concept ledger, per-team tendencies, and a global card/ask density cap. Layout and interaction details remain open.
 - **Post-game review mode.** Same scaffold, no time budget, no spoiler constraint, much deeper cards. Probably where the real learning happens and worth building second.

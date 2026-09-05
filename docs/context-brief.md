@@ -202,7 +202,7 @@ Position: **v1 should be aggressively shallow and fast.** Depth belongs in a pos
 ## Open threads
 
 - Teaching-value scoring function is drafted in the scaffold but untuned. Target one card per four to six plays.
-- Two games at once: concept ledger is global, tendency cache is per coordinator, card density needs a global cap.
+- Multi-feed, up to four games at once: requested as a future feature on 2026-09-05, not implemented. Proposed behavior: independent game state and TV delay for each feed, a shared concept ledger, and a global card/ask density cap. Layout and interaction details remain open.
 - Post-game review mode: same scaffold, no spoiler constraint, much deeper. Build second.
 - Not yet discussed: delivery surface (phone, tablet, web), buffer storage, whether prime cards need diagrams or stay text-only.
 - Mid-season play-calling changes: detection heuristic, or accept the confidence flag as sufficient?
