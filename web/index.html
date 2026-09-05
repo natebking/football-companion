@@ -195,9 +195,11 @@
   .lrow .stt.learning { color: var(--warn); }
   .lrow .stt.familiar { color: var(--accent); }
   .lrow .sc { margin-left: auto; color: var(--faint); font-variant-numeric: tabular-nums; }
-  #resetLedger { background: transparent; border: 1px solid var(--line); border-radius: 8px;
-                 color: var(--faint); font-size: 12px; padding: 9px 11px; cursor: pointer;
-                 min-height: 38px; }
+  .btnRow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px;
+           color: var(--faint); font-size: 12px; padding: 9px 11px; cursor: pointer;
+           min-height: 38px; }
+  #copyDiag { color: var(--dim); }
   .note { font-size: 12px; color: var(--faint); padding: 4px 0 10px; text-wrap: pretty; }
 
   /* ---------- delay sheet ---------- */
@@ -277,7 +279,11 @@
     <div class="grouphead">What you are learning</div>
     <div class="ledger" id="ledgerView"></div>
     <p class="note" id="ledgerNote"></p>
-    <button id="resetLedger">Reset what I have learned</button>
+    <div class="btnRow">
+      <button id="copyDiag" class="ghost">Copy diagnostics</button>
+      <button id="resetLedger" class="ghost">Reset what I have learned</button>
+    </div>
+    <p class="note" id="buildNote"></p>
   </div>
 </div>
 
@@ -296,8 +302,8 @@
       <div id="dVal">0s</div>
       <button id="dPlus" aria-label="one second more">+</button>
     </div>
-    <input id="dSlide" type="range" min="0" max="60" step="1" value="0" aria-label="TV delay in seconds">
-    <div class="dScale"><span>0s</span><span>30s</span><span>60s</span></div>
+    <input id="dSlide" type="range" min="0" max="90" step="1" value="0" aria-label="TV delay in seconds">
+    <div class="dScale"><span>0s</span><span>45s</span><span>90s</span></div>
     <p class="note" id="dNote"></p>
   </div>
 </div>

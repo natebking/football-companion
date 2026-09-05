@@ -1,13 +1,13 @@
-> Weekly in-season tendency refresh.
->
-> College plays Saturday, the NFL Sunday and Monday night, so Tuesday morning is
-> the first hour of the week when every game is final and nflverse has cut its
-> overnight rebuild. The job ingests the season in progress, rebuilds the tables
-> at the calibrated shrinkage, re-exports web/tendency-*.json, and commits only
-> when the numbers actually moved.
->
-> engine/refresh.py owns every decision about what to fetch and what to write.
-> This file supplies a clock, a key, and a commit.
+# Weekly in-season tendency refresh.
+#
+# College plays Saturday, the NFL Sunday and Monday night, so Tuesday morning is
+# the first hour of the week when every game is final and nflverse has cut its
+# overnight rebuild. The job ingests the season in progress, rebuilds the tables
+# at the calibrated shrinkage, re-exports web/tendency-*.json, and commits only
+# when the numbers actually moved.
+#
+# engine/refresh.py owns every decision about what to fetch and what to write.
+# This file supplies a clock, a key, and a commit.
 
 name: rebuild-tendencies
 

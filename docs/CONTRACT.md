@@ -221,6 +221,23 @@ Call it half. This is the governing fact for card copy: half the time the card s
 
 A cell whose `can_attribute` is false is never read by copy, because the card prints the league line over that situation either way. It ships as a diagnostic and is the first thing dropped if the file ever exceeds its budget: `_fit()` drops non-attributable cells first, then team cells bucket by bucket, least-used bucket first, leaving `league_baseline` whole so every dropped cell still has a fallback. Neither stage has run. Both files fit as built.
 
+## Live feed repair
+
+The next situation is read from the `end` block of the last play in ESPN's summary. Measured over six complete college games on 2026-09-05 (1,036 poll states, replayed prefix by prefix against the next real play's `start` block), the raw read was wrong on 50 of them and produced no card on 58 more where a card was due. Four rules in `web/app.js` (`isMarker`, `fixSituation`, `preSnap`, `sameSnap`) bring that to 21 wrong, of which 7 are the seconds between a half's last snap and the clock reading 0:00, and 3 are the harness disagreeing with itself. The rest are ESPN moving the spot or the down between one play's `end` and the next play's `start`, which nothing pre-snap can see.
+
+| what ESPN does | how often | rule |
+|---|---|---|
+| Timeout, End Period, End of Half and End of Game rows carry stale or zeroed `start` and `end` blocks, and are sometimes inserted out of order | 58 of 1,036 poll states had one as the last play | `preSnap` steps back past marker rows to the last real play. Markers never emit `result`, so a timeout before the snap leaves a pending call standing. |
+| `end.yardsToEndzone` in the wrong perspective, exactly `100 - true` | 21 of 917 end blocks | `possessionText` ("OSU 48", "50") agreed with the truth on all 917. It overrides the number only when the number is its exact mirror; a correction of a few yards is never second-guessed. |
+| `end.distance` 0 or negative | a handful per game | On an end block it means the marker was reached and the down not yet advanced: 1st and 10. On a `start` block, 0 is how ESPN writes "and goal", so it becomes the yards to goal. |
+| After a change of possession, `end.down` and `end.distance` still describe the drive that just ended | fumble recoveries, punt returns | Possession changed (`start.team` differs from `end.team`): 1st and 10, or and goal inside the ten. |
+| Halftime | every game | `STATUS_HALFTIME`, or period 2 or 4 with the clock at 0:00, means no next snap: no card until the kickoff. Between quarters the situation carries over and the card stays. |
+| Spot corrected by a few yards between `end` and the next `start` | about one snap in fifty | A released play settles a call when the offense and down match and the ball is within five yards. Exact match was leaving those calls ungraded. |
+
+`sitKey` is `down|distance|yardsToGoal|teamId` after these rules, built by the same function for the end block the card comes from and the start block a released play is matched by, so the two agree.
+
+The scoreboard call needs no `groups` or `limit` parameter: the default returns the same 68 FBS games as `groups=80&limit=200`.
+
 ## Card library
 
 `web/cards.json`. Verified content, written once, checked against real coaching references. No runtime generation.

@@ -40,12 +40,13 @@
 (function () {
 
 // ==================================================================== shell
+var VERSION = '2026-09-05a';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
 var TICK_MS = 250;           // delay queue pump
 var FEED_MAX = 25;
-var MAX_DELAY = 60;
+var MAX_DELAY = 90;          // streaming services can trail cable by more than a minute
 var FAST_MS = 4000;          // a call this quick, and right, counts as mastery
 var ASK_LOG_MAX = 400;
 
@@ -60,8 +61,9 @@ var NFL_ALIAS = { LAR: 'LA', WSH: 'WAS', JAC: 'JAX' };
 
 var LS = {
   league: 'fc_league', game: 'fc_game_',
-  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay'
+  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag'
 };
+var DIAG_MAX = 500;
 
 var $ = function (id) { return document.getElementById(id); };
 
@@ -200,6 +202,43 @@ function logAsk(row) {
   lsSet(LS.asks, JSON.stringify(askLog));
 }
 
+// ---------------------------------------------------------------- diagnostics
+// A ring of the last DIAG_MAX events (polls, snaps, results, cards, errors),
+// kept in the browser so a live test can be debriefed afterwards. Nothing in it
+// leaves the phone unless he taps "Copy diagnostics". It records what the app
+// did and when; it never records anything the card was not allowed to see.
+var diagRing = [];
+var diagDirty = false;
+function loadDiag() {
+  try {
+    var d = JSON.parse(lsGet(LS.diag) || 'null');
+    if (d && d.length) diagRing = d.slice(-DIAG_MAX);
+  } catch (e) { diagRing = []; }
+}
+function diag(kind, data) {
+  var row = { t: Date.now(), k: kind };
+  if (data !== undefined) row.d = data;
+  diagRing.push(row);
+  if (diagRing.length > DIAG_MAX) diagRing = diagRing.slice(-DIAG_MAX);
+  diagDirty = true;
+}
+setInterval(function () {
+  if (!diagDirty) return;
+  diagDirty = false;
+  lsSet(LS.diag, JSON.stringify(diagRing));
+}, 2000);
+function diagPayload(extra) {
+  var out = {
+    version: VERSION, at: new Date().toISOString(), ua: navigator.userAgent,
+    league: league, delay_sec: delaySec,
+    tables: TEND ? { generated: TEND.generated, seasons: TEND.seasons } : null,
+    cards: CARDS ? { version: CARDS.version, generated: CARDS.generated } : null,
+    ledger: ledger, asks: askLog, events: diagRing
+  };
+  for (var k in (extra || {})) out[k] = extra[k];
+  return JSON.stringify(out);
+}
+
 // ---------------------------------------------------------------- buckets
 // mirrors engine/buckets.py, per CONTRACT.md
 function distanceBand(d) { return d <= 3 ? 'short' : d <= 7 ? 'medium' : 'long'; }
@@ -209,6 +248,19 @@ function fieldZone(y) {
 function bucketKey(down, dist, ytg) {
   return 'd' + down + '_' + distanceBand(dist) + '_' + fieldZone(ytg);
 }
+// Whether a released play is the snap a call was made about. Keys are
+// "down|distance|yardsToGoal|teamId". ESPN corrects the spot by a yard or
+// three between a play's end block and the next play's start block often
+// enough (about one snap in fifty) that an exact match would leave those calls
+// ungraded. Same offense and same down, and the ball within five yards, is the
+// same snap.
+function sameSnap(a, b) {
+  if (a === b) return true;
+  var x = String(a || '').split('|'), y = String(b || '').split('|');
+  if (x.length !== 4 || y.length !== 4) return false;
+  if (x[3] !== y[3] || x[0] !== y[0]) return false;
+  return Math.abs(Number(x[2]) - Number(y[2])) <= 5 && Math.abs(Number(x[1]) - Number(y[1])) <= 5;
+}
 
 var shell = {
   bus: bus, esc: esc, $: $, jget: jget, lsGet: lsGet, lsSet: lsSet,
@@ -217,12 +269,13 @@ var shell = {
   FEED_MAX: FEED_MAX, FAST_MS: FAST_MS,
   showErr: showErr, footPad: footPad, seasonsLabel: seasonsLabel,
   distanceBand: distanceBand, fieldZone: fieldZone, bucketKey: bucketKey,
-  delayMs: delayMs,
+  sameSnap: sameSnap, delayMs: delayMs,
   league: function () { return league; },
   tend: function () { return TEND; },
   cards: function () { return CARDS; },
   conceptState: conceptState, knows: knows,
   bumpExposure: bumpExposure, recordCall: recordCall, logAsk: logAsk,
+  diag: diag, VERSION: VERSION,
   ledger: function () { return ledger; },
   resetLedger: function () {
     ledger = { concepts: {} }; askLog = [];
@@ -509,7 +562,7 @@ sh.bus.on('clear', function () {
 // he committed to before it happened.
 sh.bus.on('result', function (r) {
   var p = st.pending;
-  if (!p || p.sitKey !== r.sitKey) return;
+  if (!p || !sh.sameSnap(p.sitKey, r.sitKey)) return;
   if (p.answer === null) {
     // He let it go. Take the buttons away rather than leave him able to call a
     // play he has already watched, and say nothing about it.
@@ -521,6 +574,8 @@ sh.bus.on('result', function (r) {
   }
   st.pending = null;
   var g = grade(p.kind, p.answer, r);
+  sh.diag('grade', { sit: r.sitKey, kind: p.kind, answer: p.answer, play: r.kind,
+                     ok: g.voided ? null : !!g.ok, latency_ms: p.latency });
   if (g.voided) {
     st.res = { cls: 'void', head: '', body: g.voided, why: '' };
     logAskRow(p, null, true);
@@ -571,6 +626,11 @@ sh.bus.on('snap', function (sit) {
   st.card = card;
   st.rate = rate;
   st.ask = null;
+  sh.diag('card', {
+    sit: sit.sitKey, team: teamKey, bucket: ten ? ten.bucket : null,
+    rung: ten ? ten.rung : null, attr: !!(ten && ten.can_attribute),
+    rate: rate, card: card ? card.id : null
+  });
 
   if (card) {
     // Copy register and variant are frozen here, once, for this snap. Nothing
@@ -590,6 +650,7 @@ sh.bus.on('snap', function (sit) {
       st.sinceAsk = 0;
       st.gap = drawGap();
       st.res = null;                       // the new ask replaces the old result
+      sh.diag('ask', { sit: sit.sitKey, kind: a.kind, card: card.id });
       st.pending = {
         sitKey: sit.sitKey, cardId: card.id, kind: a.kind,
         concepts: (card.concepts || []).slice(),
@@ -893,8 +954,64 @@ function classify(p) {
   if (t.indexOf('pass') >= 0 || t.indexOf('sack') >= 0 ||
       t.indexOf('interception') >= 0 || t.indexOf('scramble') >= 0) return 'pass';
   if (t.indexOf('rush') >= 0 || t.indexOf('run') >= 0) return 'run';
-  if (t.indexOf('fumble') >= 0) return 'other';
+  // A fumble is typed by its recovery, not by the play that lost the ball.
+  if (t.indexOf('fumble') >= 0) {
+    if (/\bpass\b|\bsack/.test(raw)) return 'pass';
+    if (/\brush\b|\brun\b/.test(raw)) return 'run';
+    return 'other';
+  }
   return 'other';
+}
+// Timeouts, period ends and other markers are not snaps. ESPN writes stale or
+// zeroed start and end blocks on them (58 of 1,036 polls over six real games
+// had one as the last play), so the situation reader steps back past them and
+// the grader never settles a call against one.
+function isMarker(p) {
+  var t = ((p.type && p.type.text) || '').toLowerCase();
+  return t.indexOf('timeout') >= 0 ||
+    t.indexOf('end ') === 0 || t.indexOf('end of') === 0 ||
+    t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0 ||
+    t.indexOf('official') >= 0 || t.indexOf('coin toss') >= 0;
+}
+// ESPN's yardsToEndzone sits in the wrong perspective on about two per cent of
+// end blocks (21 of 917 over six games, every one exactly 100 minus the truth),
+// while possessionText ("OSU 48", "50") was right on all 917. The text is
+// trusted only when the number is its exact mirror, so a genuine spot
+// correction of a few yards is never second-guessed.
+function spotFromText(txt, offAbbr, defAbbr) {
+  var t = String(txt || '').trim();
+  if (t === '50') return 50;
+  var m = /^(\S+)\s+(\d{1,2})$/.exec(t);
+  if (!m) return null;
+  var side = m[1].toUpperCase(), n = Number(m[2]);
+  if (offAbbr && side === String(offAbbr).toUpperCase()) return 100 - n;
+  if (defAbbr && side === String(defAbbr).toUpperCase()) return n;
+  return null;
+}
+// One normalisation for both the end block the card is built from and the
+// start block a released play is matched by, so the two agree on the key.
+function fixSituation(b, offAbbr, defAbbr, newPossession, isEnd) {
+  var ytg = b.yardsToEndzone;
+  var txt = spotFromText(b.possessionText, offAbbr, defAbbr);
+  if (txt !== null && ytg === 100 - txt) ytg = txt;
+  var down = b.down, dist = b.distance;
+  if (newPossession) {
+    // A new possession starts first and ten, or first and goal inside the ten.
+    // ESPN sometimes leaves the previous drive's down and distance on the end
+    // block (a fumble recovery showed 2nd and 10, a punt return 1st and 6).
+    down = 1; dist = Math.min(10, ytg);
+  } else if (!(dist >= 1)) {
+    // On an end block, distance 0 or negative means the marker was reached and
+    // the down has not been advanced yet: it is first and ten. On a start
+    // block, distance 0 is how ESPN writes "and goal".
+    if (isEnd) { down = 1; dist = Math.min(10, ytg); } else dist = ytg;
+  } else if (dist > ytg) {
+    dist = ytg;
+  }
+  return { down: down, distance: dist, yardsToGoal: ytg };
+}
+function sitKeyOf(fx, teamId) {
+  return [fx.down, fx.distance, fx.yardsToGoal, String(teamId)].join('|');
 }
 function gainPhrase(y, need, down) {
   var s = y > 0 ? 'Gained ' + y + '.' : y < 0 ? 'Lost ' + (-y) + '.' : 'No gain.';
@@ -922,6 +1039,9 @@ function plainPlay(p) {
   if (t === 'sack') {
     return { s: 'The defense tackled the quarterback before he could throw' +
       (y !== null && y < 0 ? ', ' + (-y) + ' yards back.' : '.'), k: '' };
+  }
+  if (t.indexOf('interception') >= 0 && t.indexOf('touchdown') >= 0) {
+    return { s: 'Threw it, a defender caught it and ran it all the way back. Touchdown for the defense.', k: 'score' };
   }
   if (t.indexOf('interception') >= 0) return { s: 'Threw it, a defender caught it. The other team has the ball now.', k: 'turn' };
   if (t === 'fumble recovery (opponent)') return { s: 'The ball came loose and the other team fell on it.', k: 'turn' };
@@ -976,12 +1096,12 @@ function trimTeam(t) {
     displayName: t.displayName || '', name: t.name || ''
   };
 }
-// Reads strictly the LAST play's `end` block. ESPN writes `down: -1` on the
-// `end` of a play that ended the drive (made field goal, touchdown, end of
-// period). Walking backwards past one of those finds the situation of a snap
-// that has already happened, and the card would prime him for a play he just
-// watched. When the last play has no legal next snap the honest answer is no
-// card; the following kickoff supplies the real one a few seconds later.
+// Reads the `end` block of the last play that was actually a snap, stepping
+// back past timeouts and period markers, whose blocks are stale. ESPN writes
+// `down: -1` on the `end` of a play that ended the drive (made field goal,
+// touchdown), and that is honoured: when there is no legal next snap the
+// answer is no card, and the following kickoff supplies the real one. The end
+// of a half is the other case with no next snap, and the clock says so.
 //
 // This is the only function that writes the object PRIME receives. It copies a
 // fixed list of keys. No play text, yardage, scoring flag or turnover flag has
@@ -991,14 +1111,23 @@ function preSnap(sum, plays) {
   if (!comp) return null;
   var status = comp.status;
   if (!status || !status.type || status.type.state !== 'in') return null;
-  if (!plays.length) return null;
+  if (status.type.name === 'STATUS_HALFTIME') return null;
 
-  var end = plays[plays.length - 1].end;
+  var i = plays.length - 1;
+  while (i >= 0 && isMarker(plays[i])) i--;
+  if (i < 0) return null;
+  var p = plays[i], end = p.end;
   if (!end) return null;
   if (!(end.down >= 1 && end.down <= 4)) return null;
   if (typeof end.distance !== 'number') return null;
   if (typeof end.yardsToEndzone !== 'number' || end.yardsToEndzone < 1 || end.yardsToEndzone > 99) return null;
   if (!end.team || !end.team.id) return null;
+
+  var period = Number(status.period || 0);
+  var clock = clockToSeconds(status.displayClock);
+  // Half over, or regulation over: whatever the last end block says, the next
+  // thing on the field is a kickoff or nothing.
+  if ((period === 2 || period === 4) && clock === 0) return null;
 
   var offId = String(end.team.id);
   var cs = comp.competitors || [];
@@ -1008,13 +1137,17 @@ function preSnap(sum, plays) {
   }
   if (!off || !def) return null;
 
+  var newPoss = !!(p.start && p.start.team && p.start.team.id && String(p.start.team.id) !== offId);
+  var fx = fixSituation(end, off.team.abbreviation, def.team.abbreviation, newPoss, true);
+  if (!(fx.yardsToGoal >= 1 && fx.yardsToGoal <= 99)) return null;
+
   var os = Number(off.score || 0), ds = Number(def.score || 0);
   return Object.freeze({
-    down: end.down,
-    distance: Math.max(1, end.distance),
-    yardsToGoal: end.yardsToEndzone,
-    period: Number(status.period || 0),
-    clockSeconds: clockToSeconds(status.displayClock),
+    down: fx.down,
+    distance: fx.distance,
+    yardsToGoal: fx.yardsToGoal,
+    period: period,
+    clockSeconds: clock,
     offenseScore: os,
     defenseScore: ds,
     scoreDiff: os - ds,
@@ -1023,15 +1156,19 @@ function preSnap(sum, plays) {
     spotText: end.possessionText || '',
     ddText: end.shortDownDistanceText || '',
     gameId: String(st.gameId || ''),
-    sitKey: [end.down, end.distance, end.yardsToEndzone, offId].join('|')
+    sitKey: sitKeyOf(fx, offId)
   });
 }
 // The key a released play is matched against, so a call is only ever settled
-// by the snap it was made about.
-function playSitKey(p) {
+// by the snap it was made about. Same normalisation as preSnap, so the two
+// agree on the key.
+function playSitKey(p, abbr) {
   var s = p.start || {};
   if (!s.team || !s.team.id) return '';
-  return [s.down, s.distance, s.yardsToEndzone, String(s.team.id)].join('|');
+  if (!(s.down >= 1 && s.down <= 4) || typeof s.yardsToEndzone !== 'number') return '';
+  var offId = String(s.team.id), offA = abbr[offId] || '', defA = '';
+  for (var k in abbr) if (k !== offId) defA = abbr[k];
+  return sitKeyOf(fixSituation(s, offA, defA, false, false), offId);
 }
 
 // ---------------------------------------------------------------- delay queue
@@ -1045,15 +1182,17 @@ function pump() {
       st.rows.unshift(it.row);
       if (st.rows.length > sh.FEED_MAX) st.rows.length = sh.FEED_MAX;
       st.shownPlay = it.row;
-      if (!it.silent) {
+      if (!it.silent && !it.marker) {
         sh.bus.emit('result', {
           sitKey: it.sitKey, kind: it.cls,
           gained: it.gained, need: it.need
         });
       }
     } else if (it.kind === 'snap') {
+      sh.diag('snap', it.sit.sitKey);
       sh.bus.emit('snap', it.sit);
     } else if (it.kind === 'nosnap') {
+      sh.diag('nosnap', it.msg);
       sh.bus.emit('nosnap', it.msg);
     }
   }
@@ -1068,6 +1207,7 @@ function applySummary(sum) {
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   var status = comp && comp.status;
   st.gameState = (status && status.type && status.type.state) || '';
+  st.statusName = (status && status.type && status.type.name) || '';
 
   var plays = collectPlays(sum);
   var abbr = teamAbbrs(sum);
@@ -1086,10 +1226,10 @@ function applySummary(sum) {
     st.seen[id] = 1;
     var backlog = first && i < last;
     st.queue.push({
-      kind: 'play', at: backlog ? 0 : now, silent: backlog,
+      kind: 'play', at: backlog ? 0 : now, silent: backlog, marker: isMarker(p),
       row: feedRow(p, abbr),
       cls: classify(p),
-      sitKey: playSitKey(p),
+      sitKey: playSitKey(p, abbr),
       gained: typeof p.statYardage === 'number' ? p.statYardage : null,
       need: typeof (p.start || {}).distance === 'number' ? p.start.distance : null
     });
@@ -1099,6 +1239,12 @@ function applySummary(sum) {
   for (var k = 0; k < startAt; k++) st.seen[String(plays[k].id)] = 1;
 
   var sit = preSnap(sum, plays);
+  sh.diag('poll', {
+    plays: plays.length, q: st.queue.length,
+    last: plays.length ? ((plays[plays.length - 1].type || {}).text || '') : '',
+    sit: sit ? sit.sitKey : null, status: st.statusName,
+    clock: status ? status.displayClock : null, period: status ? status.period : null
+  });
   if (sit) {
     if (sit.sitKey !== st.lastQueuedSit) {
       st.lastQueuedSit = sit.sitKey;
@@ -1121,6 +1267,8 @@ function waitingMessage() {
   if (!st.gameId) return 'Pick a game to start.';
   if (st.gameState === 'pre') return 'Kickoff has not happened yet.';
   if (st.gameState === 'post') return 'Game over.';
+  if (st.statusName === 'STATUS_HALFTIME') return 'Halftime. Cards come back with the kickoff.';
+  if (st.statusName === 'STATUS_DELAYED') return 'Game delayed. Cards come back when play does.';
   return 'Between plays. The last one is in the feed below.';
 }
 
@@ -1208,11 +1356,13 @@ var pollTimer = null, sbTimer = null;
 function pollGame() {
   clearTimeout(pollTimer);
   if (!st.gameId) { pollTimer = setTimeout(pollGame, sh.POLL_MS); return; }
+  var t0 = Date.now();
   sh.jget(summaryUrl(sh.league(), st.gameId)).then(function (sum) {
     st.lastOk = Date.now();
     sh.showErr('');
     applySummary(sum);
   }).catch(function (e) {
+    sh.diag('err', { where: 'feed', msg: e.message, ms: Date.now() - t0 });
     sh.showErr('feed: ' + e.message);
     $('dot').className = 'dot';
   }).then(function () {
@@ -1245,6 +1395,7 @@ function resetGame() {
 }
 function selectGame(id) {
   st.gameId = String(id);
+  sh.diag('game', { id: st.gameId, league: sh.league() });
   resetGame();
   sh.lsSet(sh.LS.game + sh.league(), st.gameId);
   var g = st.games.filter(function (x) { return x.id === st.gameId; })[0];
@@ -1350,6 +1501,26 @@ $('resetLedger').addEventListener('click', function () {
   shell.resetLedger();
   bus.emit('reset');
 });
+// Everything the app logged, for a debrief after a game. Clipboard first, the
+// share sheet as the fallback, and either way nothing leaves the phone until
+// he decides where to paste it.
+$('copyDiag').addEventListener('click', function () {
+  var text = diagPayload({ game_label: $('pickLbl').textContent });
+  var btn = $('copyDiag');
+  function done(msg) {
+    btn.textContent = msg;
+    setTimeout(function () { btn.textContent = 'Copy diagnostics'; }, 2500);
+  }
+  var p = (navigator.clipboard && navigator.clipboard.writeText)
+    ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
+  p.then(function () { done('Copied. Paste it to Claude.'); }).catch(function () {
+    if (navigator.share) {
+      navigator.share({ title: 'Football Companion diagnostics', text: text })
+        .then(function () { done('Shared.'); }).catch(function () { done('Could not copy.'); });
+    } else done('Could not copy.');
+  });
+});
+$('buildNote').textContent = 'build ' + VERSION;
 document.querySelector('.seg').addEventListener('click', function (ev) {
   var b = ev.target.closest('button[data-lg]');
   if (!b || b.dataset.lg === league) return;
@@ -1378,6 +1549,8 @@ function loadTables() {
 
 loadLedger();
 loadAsks();
+loadDiag();
+diag('boot', { version: VERSION, league: league, delay: delaySec });
 paintDelay();
 footPad();
 
@@ -1389,6 +1562,7 @@ Promise.all([
   bus.emit('boot');
   keepAwake();
 }).catch(function (e) {
+  diag('err', { where: 'startup', msg: e.message });
   showErr('startup: ' + e.message);
   bus.emit('boot');
 });
