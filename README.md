@@ -19,8 +19,11 @@ Notes:
 
 ## Deploy
 
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the repository, Git identity,
+team scope, and deployment troubleshooting shared by Codex and Claude.
+
 ```
-vercel deploy --prod
+vercel deploy --prod --yes --scope nates-projects-925609f4
 ```
 
 Vercel project: `football-companion`.
