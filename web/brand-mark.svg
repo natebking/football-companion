@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 64" fill="none" color="#426216" role="img" aria-labelledby="title desc">
+  <title id="title">Fluent in Football</title>
+  <desc id="desc">Two F-shaped player routes, each starting at a dot and ending in a forward arrow.</desc>
+  <g id="routes" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 49V15a5 5 0 0 1 5-5h16M9 29h17M24 4l6 6-6 6"/>
+    <path d="M41 57V23a5 5 0 0 1 5-5h16M41 37h17M56 12l6 6-6 6"/>
+    <g fill="currentColor" stroke="none">
+      <circle cx="9" cy="50" r="4.5"/>
+      <circle cx="41" cy="58" r="4.5"/>
+    </g>
+  </g>
+</svg>

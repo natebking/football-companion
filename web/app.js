@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Football Companion, live page.
+ * Fluent in Football, live page.
  *
  * THREE SCOPES. The walls between them are the design, not decoration.
  *
@@ -1644,7 +1644,7 @@ $('copyDiag').addEventListener('click', function () {
     ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
   p.then(function () { done('Copied.'); }).catch(function () {
     if (navigator.share) {
-      navigator.share({ title: 'Football Companion diagnostics', text: text })
+      navigator.share({ title: 'Fluent in Football diagnostics', text: text })
         .then(function () { done('Shared.'); }).catch(function () { done('Could not copy.'); });
     } else done('Could not copy.');
   });
