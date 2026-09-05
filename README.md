@@ -2,9 +2,9 @@
 
 A second screen for following a football game and learning what to watch. [Open the companion](https://football-companion-rose.vercel.app/).
 
-The app shows the next down and field position, historical run/pass tendencies, a short watching suggestion, and recent plays. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default.
+The app shows the next down and field position, historical run/pass tendencies, a short watching suggestion, and recent plays. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default. Corrections update existing plays in order; repeated unreliable clocks are flagged.
 
-Choose a game, set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
+Choose a game, measure or set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
 
 ## Data and limits
 

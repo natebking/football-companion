@@ -1,0 +1,293 @@
+{
+  "source": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858433",
+  "capturedAt": "2026-09-05T22:26:42Z",
+  "status": {
+    "displayClock": "14:49",
+    "period": 4,
+    "type": {
+      "id": "2",
+      "name": "STATUS_IN_PROGRESS",
+      "state": "in",
+      "completed": false,
+      "description": "In Progress",
+      "detail": "14:49 - 4th Quarter",
+      "shortDetail": "14:49 - 4th",
+      "statusPrimary": "14:49",
+      "statusSecondary": "4th"
+    },
+    "displayPeriod": "4th"
+  },
+  "plays": [
+    {
+      "id": "401858433518",
+      "type": {
+        "id": "67",
+        "text": "Passing Touchdown",
+        "abbreviation": "TD"
+      },
+      "text": "Shotgun #5 D.Moore pass complete short left to #3 J.McClellan caught at BSU06, for 8 yards to the BSU00 TOUCHDOWN, clock 05:36 #97 G.Hurych kick attempt good (H: #39 B.Ettridge, LS: #71 R.Todd)",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433526",
+      "type": {
+        "id": "53",
+        "text": "Kickoff",
+        "abbreviation": "K"
+      },
+      "text": "#97 G.Hurych kickoff 65 yards to the BSU00, Touchback",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433529",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "#4 M.Madsen pass complete short left to #19 R.Jones caught at BSU42, for 22 yards to the BSU47 (#4 B.Finney), 1ST DOWN",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433534",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "No Huddle-Shotgun #4 M.Madsen pass complete short left to #26 S.Gaines for 6 yards to the ORE47 (#4 B.Finney)",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433539",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "No Huddle-Shotgun #26 S.Gaines rush middle for 5 yards gain to the ORE42 (#22 D.Jackson; #4 B.Finney), 1ST DOWN",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433543",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "Shotgun #4 M.Madsen pass complete short right to #19 R.Jones caught at ORE29, for 13 yards to the ORE29, End Of Play, 1ST DOWN",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433548",
+      "type": {
+        "id": "8",
+        "text": "Penalty",
+        "abbreviation": "PEN"
+      },
+      "text": "#4 M.Madsen pass intercepted by #2 N.Offord at ORE05 PENALTY ORE Pass Interference (#2 N.Offord) 15 yards from ORE29 to ORE14, 1ST DOWN. NO PLAY",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": true
+    },
+    {
+      "id": "401858433552",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "Shotgun #26 S.Gaines rush right for 5 yards gain to the ORE09 (#2 N.Offord; #9 D.Jackson)",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433556",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "Shotgun #0 D.Riley rush right for 2 yards gain to the ORE07 (#9 D.Jackson; #21 A.Flowers)",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433560",
+      "type": {
+        "id": "3",
+        "text": "Pass Incompletion"
+      },
+      "text": "#4 M.Madsen pass incomplete short left thrown to ORE00 QB hurried by #11 D.Williams",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "displayValue": "5:36"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433602",
+      "type": {
+        "id": "59",
+        "text": "Field Goal Good",
+        "abbreviation": "FG"
+      },
+      "text": "#97 G.Hurych field goal attempt from 44 yards GOOD (H: #39 B.Ettridge, LS: #71 R.Todd), clock 14:49",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433605",
+      "type": {
+        "id": "53",
+        "text": "Kickoff",
+        "abbreviation": "K"
+      },
+      "text": "#97 G.Hurych kickoff 65 yards to the BSU00, Touchback",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433608",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "Shotgun #26 S.Gaines rush middle for 2 yards gain to the BSU27 (#6 J.Mixon; #10 M.Uiagalelei)",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433612",
+      "type": {
+        "id": "8",
+        "text": "Penalty",
+        "abbreviation": "PEN"
+      },
+      "text": "PENALTY ORE Offside (#10 M.Uiagalelei) 5 yards from BSU27 to BSU32. NO PLAY",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": true
+    },
+    {
+      "id": "401858433615",
+      "type": {
+        "id": "8",
+        "text": "Penalty",
+        "abbreviation": "PEN"
+      },
+      "text": "Shotgun #4 M.Madsen pass incomplete deep to #19 R.Jones thrown to ORE29 QB hurried by #1 B.Alexander PENALTY ORE Pass Interference (#21 A.Flowers) 15 yards from BSU32 to BSU47, 1ST DOWN. NO PLAY",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": true
+    },
+    {
+      "id": "401858433619",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "#0 D.Riley rush middle for 4 yards gain to the ORE49 (#3 K.Perich; #21 A.Flowers)",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": false
+    },
+    {
+      "id": "401858433623",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "#4 M.Madsen pass complete short right to #88 M.Wagner caught at ORE48, for 5 yards to the ORE44 (#3 K.Perich)",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "displayValue": "14:49"
+      },
+      "isPenalty": false
+    }
+  ]
+}

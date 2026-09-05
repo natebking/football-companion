@@ -25,7 +25,7 @@ function polling() {
     clearTimeout: id => timers.delete(id),
     summaryUrl: (league, game) => league + '/' + game,
     applySummary: value => applied.push(value),
-    renderPicker: () => {}, renderFeed: () => {}, renderHeader: () => {}, waitingMessage: () => '',
+    renderPicker: () => {}, renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}, waitingMessage: () => '',
     $: () => ({ className: '' })
   });
   vm.runInContext(loop, context);
@@ -152,11 +152,11 @@ function liveQueue() {
   const events = [];
   let now = 100000;
   const context = vm.createContext({
-    window: { FootballPlay: require('../web/play-facts.js') },
+    window: { FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js') },
     Date: { now: () => now },
     st: { gameId: 'A', seen: {}, queue: [], rows: [], primed: false, lastQueuedSit: '' },
     sh: { FEED_MAX: 25, delayMs: () => 10000, diag: () => {}, bus: { emit: (name, value) => events.push({ name, value }) } },
-    renderFeed: () => {}, renderHeader: () => {}
+    renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}
   });
   const start = source.indexOf('function collectPlays(');
   const end = source.indexOf('// ---------------------------------------------------------------- render', start);
@@ -212,4 +212,204 @@ test('games cannot start while their league tendency table is still loading', ()
   h.context.selectGame('B');
   assert.equal(h.context.st.gameId, null);
   assert.equal(h.requests.length, 0);
+});
+
+function summaryOf(plays) {
+  return {
+    header: { competitions: [{
+      status: { type: { state: 'in', name: 'STATUS_IN_PROGRESS' }, period: 1, displayClock: '10:00' },
+      competitors: [{ team: { id: '194', abbreviation: 'OSU' }, score: '0' }, { team: { id: '2050', abbreviation: 'BALL' }, score: '0' }]
+    }] }, drives: { current: { plays } }
+  };
+}
+function runPlay() { return structuredClone(require('./fixtures/play-facts.json').normalRun.play); }
+function correctedPlay(original) {
+  const play = structuredClone(original);
+  play.type = { text: 'Penalty' }; play.text = 'PENALTY defense 5 yards. NO PLAY'; play.isPenalty = true;
+  play.end = { ...play.end, down: 1, distance: 5, yardsToEndzone: 79, possessionText: 'OSU 21', shortDownDistanceText: '1st & 5' };
+  return play;
+}
+
+test('same-ID correction updates the row and next down together after the delay', () => {
+  const h = liveQueue(), original = runPlay();
+  h.context.applySummary(summaryOf([original])); h.tick(110000);
+  h.tick(111000); h.context.applySummary(summaryOf([correctedPlay(original)]));
+  assert.equal(h.context.st.rows[0].plain, 'Run for 4 yards.');
+  assert.equal(h.events.filter(e => e.name === 'snap').at(-1).value.down, 2);
+  h.tick(121000);
+  assert.equal(h.context.st.rows.length, 1);
+  assert.match(h.context.st.rows[0].plain, /Penalty/);
+  assert.equal(h.context.st.rows[0].version, 2);
+  assert.equal(h.events.filter(e => e.name === 'snap').at(-1).value.down, 1);
+  const results = h.events.filter(e => e.name === 'result');
+  assert.equal(results.length, 2);
+  assert.equal(results[1].value.revised, true);
+  assert.equal(results[1].value.playId, original.id);
+});
+
+test('a queued report corrected before release never flashes or grades its old version', () => {
+  const h = liveQueue(), original = runPlay();
+  h.context.applySummary(summaryOf([original]));
+  h.tick(105000); h.context.applySummary(summaryOf([correctedPlay(original)]));
+  h.tick(110000);
+  assert.equal(h.context.st.rows.length, 0);
+  assert.equal(h.events.filter(e => e.name === 'result').length, 0);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 0);
+  h.tick(115000);
+  assert.equal(h.context.st.rows.length, 1);
+  const results = h.events.filter(e => e.name === 'result');
+  assert.equal(results.length, 1);
+  assert.ok(results[0].value.voidReason);
+});
+
+test('clock-only corrections update labels without grading the play twice', () => {
+  const h = liveQueue(), original = runPlay();
+  h.context.applySummary(summaryOf([original])); h.tick(110000);
+  const corrected = structuredClone(original); corrected.clock = { displayValue: '9:45' };
+  h.tick(111000); h.context.applySummary(summaryOf([corrected])); h.tick(121000);
+  assert.equal(h.context.st.rows[0].clock, '9:45');
+  assert.equal(h.events.filter(e => e.name === 'result').length, 1);
+});
+
+test('several queued corrections still invalidate the grade of the displayed version', () => {
+  const h = liveQueue(), original = runPlay();
+  h.context.applySummary(summaryOf([original])); h.tick(110000);
+  h.tick(111000); const corrected = correctedPlay(original); h.context.applySummary(summaryOf([corrected]));
+  h.tick(112000); corrected.clock = { displayValue: '9:45' }; h.context.applySummary(summaryOf([corrected]));
+  h.tick(122000);
+  assert.equal(h.events.filter(e => e.name === 'result' && e.value.revised).length, 1);
+});
+
+test('an older correction or late inserted play does not move the feed or scoreboard backward', () => {
+  const h = liveQueue(), a = runPlay(), b = runPlay(); b.id = 'newer';
+  h.context.applySummary(summaryOf([a, b])); h.tick(110000);
+  h.tick(111000); h.context.applySummary(summaryOf([correctedPlay(a), b])); h.tick(121000);
+  assert.equal(h.context.st.shownPlay.id, 'newer');
+  assert.equal(h.context.st.rows[0].id, 'newer');
+  const inserted = runPlay(); inserted.id = 'late-inserted';
+  const resultCount = h.events.filter(e => e.name === 'result').length;
+  h.tick(122000); h.context.applySummary(summaryOf([correctedPlay(a), inserted, b])); h.tick(132000);
+  assert.equal(h.context.st.shownPlay.id, 'newer');
+  assert.equal(h.context.st.rows.find(r => r.id === 'late-inserted').observedAt, null);
+  assert.deepEqual(Array.from(h.context.st.rows, r => r.id), ['newer', 'late-inserted', a.id]);
+  assert.equal(h.events.filter(e => e.name === 'result').length, resultCount);
+});
+
+test('the prime heading uses normalized numbers instead of a contradictory source label', () => {
+  const h = liveQueue(), play = runPlay();
+  play.end.shortDownDistanceText = '1st & 10';
+  const snap = h.context.preSnap(summaryOf([play]), [play]);
+  assert.equal(snap.down, 2);
+  assert.equal(snap.distance, 6);
+  assert.equal(snap.ddText, '2nd & 6');
+  assert.equal(h.context.preSnap(summaryOf([play]), [play], { stalled: true }).clockSeconds, null);
+});
+
+test('a corrected result invalidates only its own prediction, without adding a second record', () => {
+  const rows = [
+    { lg: 'cfb', game: 'A', play_id: 'play', correct: true, voided: false },
+    { lg: 'cfb', game: 'B', play_id: 'play', correct: true, voided: false }
+  ];
+  const context = vm.createContext({ askLog: rows, league: 'cfb', LS: { asks: 'asks' }, lsSet: () => {} });
+  const start = source.indexOf('function invalidateCalls(');
+  vm.runInContext(source.slice(start, source.indexOf('// ---------------------------------------------------------------- diagnostics', start)), context);
+  context.invalidateCalls('A', 'play');
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].correct, null);
+  assert.equal(rows[0].voided, true);
+  assert.equal(rows[1].correct, true);
+});
+
+test('a timeout after a corrected play cannot release the superseded next-snap card', () => {
+  const h = liveQueue(), original = runPlay();
+  const marker = { id: 'timeout', type: { text: 'Timeout' }, period: { number: 1 }, clock: { displayValue: '10:00' } };
+  // Prime the game with no history so both the play and marker are held.
+  h.context.applySummary(summaryOf([])); h.tick(110000);
+  h.context.applySummary(summaryOf([original, marker]));
+  h.tick(115000); h.context.applySummary(summaryOf([correctedPlay(original), marker]));
+  h.tick(120000);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 0);
+  h.tick(125000);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 1);
+  assert.equal(h.events.filter(e => e.name === 'snap')[0].value.down, 1);
+});
+
+test('correcting an older queued play does not enqueue the newer next-snap card twice', () => {
+  const h = liveQueue(), a = runPlay(), b = runPlay(); b.id = 'B';
+  b.end.down = 3; b.end.distance = 2;
+  h.context.applySummary(summaryOf([])); h.tick(110000);
+  h.context.applySummary(summaryOf([a]));
+  h.tick(113000); h.context.applySummary(summaryOf([a, b]));
+  h.tick(116000); h.context.applySummary(summaryOf([correctedPlay(a), b]));
+  h.tick(130000);
+  const snapshots = h.events.filter(e => e.name === 'snap' && e.value.down === 3);
+  assert.equal(snapshots.length, 1);
+});
+
+function syncControls() {
+  const elements = {}, handlers = {}, events = [];
+  let now = 120000;
+  const context = vm.createContext({
+    Date: { now: () => now },
+    st: { rows: [], syncCandidate: null, syncSample: null, gameId: 'A', lastOk: 100000, lastChange: 100000 },
+    $: id => elements[id] || (elements[id] = { classList: { contains: () => true }, addEventListener: (name, fn) => { handlers[id] = fn; } }),
+    sh: { delayMs: () => 10000, diag: () => {}, bus: { on: () => {}, emit: (name, value) => events.push({ name, value }) } }
+  });
+  const start = source.indexOf('function ageText(');
+  vm.runInContext(source.slice(start, source.indexOf('function renderPicker()', start)), context);
+  return { context, elements, handlers, events, setNow: value => { now = value; } };
+}
+
+test('TV timing uses first receipt, excludes initial history, and keeps its selected play stable', () => {
+  const h = syncControls();
+  h.context.st.rows = [{ id: 'history', observedAt: null, plain: 'Old play' }];
+  h.context.refreshSyncCandidate();
+  assert.equal(h.elements.syncSaw.disabled, true);
+  const selected = { id: 'new', version: 1, observedAt: 100000, off: 'OSU', plain: 'Run for 4 yards.' };
+  h.context.st.rows.unshift(selected); h.context.refreshSyncCandidate();
+  assert.equal(h.elements.syncSaw.disabled, false);
+  h.context.st.rows.unshift({ id: 'newer', version: 1, observedAt: 115000 });
+  h.context.refreshSyncCandidate();
+  assert.equal(h.context.st.syncCandidate.id, 'new');
+  h.handlers.syncSaw();
+  assert.equal(h.context.st.syncSample, 20);
+  assert.match(h.elements.syncResult.textContent, /20 seconds/);
+});
+
+test('a timing sample invalidates when its selected report changes', () => {
+  const h = syncControls();
+  h.context.st.rows = [{ id: 'new', version: 1, observedAt: 100000 }];
+  h.context.refreshSyncCandidate(); h.handlers.syncSaw();
+  h.context.st.rows = [{ id: 'new', version: 2, observedAt: 100000 }];
+  h.context.refreshSyncCandidate();
+  assert.equal(h.context.st.syncSample, null);
+  assert.equal(h.elements.syncApply.hidden, true);
+});
+
+test('TV-ahead remains independent of a candidate and applying survives synchronous queue changes', () => {
+  const h = syncControls();
+  h.context.st.rows = [{ id: 'new', version: 1, observedAt: 100000 }]; h.context.refreshSyncCandidate();
+  h.handlers.syncAhead();
+  assert.equal(h.context.st.syncCandidate, null);
+  assert.equal(h.context.st.syncSample, 0);
+  h.context.refreshSyncCandidate();
+  assert.equal(h.context.st.syncCandidate, null);
+  h.context.sh.bus.emit = (name, value) => { h.events.push({ name, value }); h.context.st.syncSample = null; };
+  h.handlers.syncApply();
+  assert.equal(h.events[0].value, 0);
+  assert.match(h.elements.syncResult.textContent, /set to 0s/);
+  assert.ok(!h.elements.syncResult.textContent.includes('null'));
+});
+
+test('correcting a queued drive-ending play still clears the old card when the revision releases', () => {
+  const h = liveQueue(), a = runPlay();
+  const score = structuredClone(require('./fixtures/play-facts.json').touchdownPass.play);
+  h.context.applySummary(summaryOf([a])); h.tick(110000);
+  h.context.applySummary(summaryOf([a, score]));
+  h.tick(115000); score.clock = { displayValue: '9:30' };
+  h.context.applySummary(summaryOf([a, score]));
+  h.tick(120000);
+  assert.equal(h.events.filter(e => e.name === 'nosnap').length, 0);
+  h.tick(125000);
+  assert.equal(h.events.filter(e => e.name === 'nosnap').length, 1);
 });

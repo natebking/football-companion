@@ -146,10 +146,27 @@
     <input id="dSlide" type="range" min="0" max="90" step="1" value="0" aria-label="TV delay in seconds">
     <div class="dScale"><span>0s</span><span>45s</span><span>90s</span></div>
     <p class="note" id="dNote"></p>
+    <section class="sync-check" aria-labelledby="syncTitle">
+      <h2 id="syncTitle">Check your TV timing</h2>
+      <p class="note">When the play below finishes on TV, tap <b>I saw this play</b>.</p>
+      <p class="sync-play" id="syncPlay">Waiting for a new play.</p>
+      <div class="sync-actions">
+        <button id="syncSaw" class="sync-primary" type="button" disabled>I saw this play</button>
+        <button id="syncAhead" class="ghost" type="button">My TV is ahead</button>
+      </div>
+      <p class="note" id="syncResult" role="status"></p>
+      <button id="syncApply" class="sync-primary" type="button" hidden>Use this delay</button>
+      <p class="note sync-help">This needs a new update. Plays already listed when you opened the game cannot measure the timing. If your TV is ahead of the feed, adding a delay will not help.</p>
+      <div class="feed-health">
+        <p class="note" id="feedStatus">Pick a game to check the feed.</p>
+        <p class="note" id="clockStatus">The game clock comes from the feed and may be delayed.</p>
+      </div>
+    </section>
   </div>
 </div>
 
 <script src="play-facts.js"></script>
+<script src="feed-health.js"></script>
 <script src="glossary.js"></script>
 <script src="app.js"></script>
 <script src="ui.js"></script>

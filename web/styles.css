@@ -191,6 +191,16 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 #dVal { flex: 1; text-align: center; font: 700 3.75rem/1 var(--heading); font-variant-numeric: tabular-nums; }
 #dSlide { width: 100%; height: 44px; accent-color: var(--accent); }
 .dScale { display: flex; justify-content: space-between; color: var(--dim); font-size: .75rem; }
+.sync-check { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+.sync-check h2 { margin: 0; font-size: 1.0625rem; font-weight: 600; line-height: 1.4; }
+.sync-play { margin: 14px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: .9375rem; line-height: 1.55; overflow-wrap: anywhere; }
+.sync-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sync-actions button { flex: 1 1 150px; }
+.sync-primary { min-height: 44px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-bg); color: var(--accent); font-size: .875rem; font-weight: 600; }
+.sync-primary:disabled { border-color: var(--line); background: var(--surface); color: var(--dim); cursor: default; opacity: .65; }
+.sync-check .sync-help { font-size: .8125rem; }
+.feed-health { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
+.feed-health .note { margin: 6px 0; font-size: .8125rem; }
 
 /* transitions-dev: icon swap, with the documented hooks and motion guard. */
 .t-icon-swap {
@@ -312,3 +322,5 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
   .help-link { width: 48px; white-space: normal; line-height: 1.25; text-decoration: none; font-size: .6875rem; }
   #pickBtn { gap: 4px; padding: 8px; font-size: .75rem; }
 }
+
+.report-update { display: inline-block; margin-top: 6px; color: var(--dim); font-size: .6875rem; }

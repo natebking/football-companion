@@ -258,6 +258,10 @@ The renderer uses reported end states for the next down, respects changes of pos
 
 Grades describe actual actions: a scramble is a run; a sack is ungraded. Penalties, missing data, and ambiguous play types do not count against a prediction. Return yardage on a turnover is not offensive progress. Markers such as timeouts do not settle predictions. When the feed moves on without a matching result, an answered pick is recorded as ungraded; switching games closes the old pick with its original league and game.
 
+Play IDs are versioned by content. Corrections replace their existing rows through the delay queue; late backfills preserve source ordering and cannot settle predictions or supply timing samples. A correction that changes grading evidence invalidates the existing prediction record. The next-card heading uses normalized numeric down/distance.
+
+Repeated source clocks across three eligible scrimmage plays are marked unreliable by `web/feed-health.js`. Do not infer a ticking clock or a TV offset from those values. The TV-delay panel measures first receipt to a viewer tap for newly received plays; applying that measured delay is explicit. Request success and the age of the last play update are separate diagnostics. See [the timing incident](TIMING-INCIDENT-2026-09-05.md).
+
 A selected game has at most one active summary request, with a 15-second timeout. A game or league change aborts and invalidates old requests and clears the old queue before new tables load. Summary refreshes are three seconds during play and thirty seconds after a final; stale scoreboard responses are also ignored.
 
 ## Concept exposure and prediction history

@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-plays';
+var VERSION = '2026-09-05-timing';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -150,11 +150,22 @@ function logAsk(row) {
   lsSet(LS.asks, JSON.stringify(askLog));
 }
 
+function invalidateCalls(game, playId) {
+  var changed = false;
+  askLog.forEach(function (row) {
+    if (row.lg === league && row.game === game && row.play_id === playId && !row.voided) {
+      row.correct = null; row.voided = true; row.reason = 'feed_correction'; changed = true;
+    }
+  });
+  if (changed) lsSet(LS.asks, JSON.stringify(askLog));
+}
+
 // ---------------------------------------------------------------- diagnostics
 // A ring of the last DIAG_MAX events (polls, snaps, results, cards, errors),
 // kept in the browser so a live test can be debriefed afterwards. Nothing in it
 // leaves the phone unless he taps "Copy diagnostics". It records what the app
-// did and when; it never records anything the card was not allowed to see.
+// did and when, including source IDs, revisions, and timing. It does not
+// persist full ESPN responses or supply diagnostic fields to card selection.
 var diagRing = [];
 var diagDirty = false;
 function loadDiag() {
@@ -222,7 +233,7 @@ var shell = {
   tend: function () { return TEND; },
   cards: function () { return CARDS; },
   shortHints: function () { return shortHints; },
-  bumpExposure: bumpExposure, logAsk: logAsk,
+  bumpExposure: bumpExposure, logAsk: logAsk, invalidateCalls: invalidateCalls,
   calls: function () { return askLog; },
   diag: diag, VERSION: VERSION,
   ledger: function () { return ledger; },
@@ -493,12 +504,21 @@ sh.bus.on('clear', function () {
 // A play that has already been shown to him. Only ever used to settle a call
 // he committed to before it happened.
 sh.bus.on('result', function (r) {
+  if (r.revised) {
+    sh.invalidateCalls(r.game, r.playId);
+    if (st.res && st.res.playId === r.playId) {
+      st.res = { cls: 'void', head: 'Report corrected.', body: 'ESPN changed this play. Your pick no longer counts.' };
+      render();
+    }
+    renderLedger();
+    return;
+  }
   var p = st.pending;
   if (!p || !sh.sameSnap(p.sitKey, r.sitKey)) return;
   if (p.answer === null) {
     // He let it go. Take the buttons away rather than leave him able to call a
     // play he has already watched, and say nothing about it.
-    logAskRow(p, null, false);
+    logAskRow(p, null, false, r.playId);
     st.pending = null;
     st.ask = null;
     render();
@@ -510,22 +530,23 @@ sh.bus.on('result', function (r) {
                      ok: g.voided ? null : !!g.ok, latency_ms: p.latency });
   if (g.voided) {
     st.res = { cls: 'void', head: '', body: g.voided };
-    logAskRow(p, null, true);
+    logAskRow(p, null, true, r.playId);
   } else {
     st.res = {
       cls: g.ok ? 'ok' : 'no',
       head: g.ok ? 'Good call.' : 'Not this time.',
       body: g.truth
     };
-    logAskRow(p, g.ok, false);
+    logAskRow(p, g.ok, false, r.playId);
   }
+  st.res.playId = r.playId;
   render();
 });
 
-function logAskRow(p, ok, voided) {
+function logAskRow(p, ok, voided, playId) {
   sh.logAsk({
     t: new Date().toISOString(),
-    lg: p.league, game: p.game || '',
+    lg: p.league, game: p.game || '', play_id: playId || null,
     card: p.cardId, ask: p.kind, bucket: p.bucket,
     down: p.down, distance: p.distance, yards_to_goal: p.ytg,
     answer: p.answer, correct: ok, voided: !!voided,
@@ -798,8 +819,9 @@ sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedg
 var st = {
   gameId: null, games: [], gameLabel: '', gameState: '',
   sum: null,                 // latest raw summary, this scope only
-  seen: {}, queue: [], rows: [], shownPlay: null,
-  lastQueuedSit: '', primed: false, lastOk: 0, sheet: false
+  seen: {}, order: {}, queue: [], rows: [], shownPlay: null,
+  health: null, lastQueuedHealth: '', lastChange: 0, syncCandidate: null, syncSample: null,
+  lastQueuedSit: '', lastQueuedBasis: '', primed: false, lastOk: 0, sheet: false
 };
 
 function etDate(offsetDays) {
@@ -987,7 +1009,7 @@ function trimTeam(t) {
 // This is the only function that writes the object PRIME receives. It copies a
 // fixed list of keys. No play text, yardage, scoring flag or turnover flag has
 // a path onto the result, so the card pipeline has no outcome to leak.
-function preSnap(sum, plays) {
+function preSnap(sum, plays, health) {
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   if (!comp) return null;
   var status = comp.status;
@@ -1005,7 +1027,7 @@ function preSnap(sum, plays) {
   if (!end.team || !end.team.id) return null;
 
   var period = Number(status.period || 0);
-  var clock = clockToSeconds(status.displayClock);
+  var clock = health && health.stalled ? null : clockToSeconds(status.displayClock);
   // Half over, or regulation over: whatever the last end block says, the next
   // thing on the field is a kickoff or nothing.
   if ((period === 2 || period === 4) && clock === 0) return null;
@@ -1035,7 +1057,7 @@ function preSnap(sum, plays) {
     offenseTeam: trimTeam(off.team),
     defenseTeam: trimTeam(def.team),
     spotText: end.possessionText || '',
-    ddText: end.shortDownDistanceText || '',
+    ddText: ['', '1st', '2nd', '3rd', '4th'][fx.down] + ' & ' + (fx.distance >= fx.yardsToGoal ? 'Goal' : fx.distance),
     gameId: String(st.gameId || ''),
     sitKey: sitKeyOf(fx, offId)
   });
@@ -1060,89 +1082,129 @@ function pump() {
     var it = st.queue.shift();
     moved = true;
     if (it.kind === 'play') {
-      st.rows.unshift(it.row);
+      var index = st.rows.findIndex(function (row) { return row.id === it.row.id; });
+      var prior = index >= 0 ? st.rows[index] : null;
+      if (index >= 0) st.rows[index] = it.row; else st.rows.push(it.row);
+      st.rows.sort(function (a, b) { return (st.order[b.id] ?? -1) - (st.order[a.id] ?? -1); });
       if (st.rows.length > sh.FEED_MAX) st.rows.length = sh.FEED_MAX;
-      st.shownPlay = it.row;
-      if (!it.silent && !it.marker) {
+      st.shownPlay = st.rows[0] || null;
+      // A correction changes the existing report in place. Only changes to
+      // grading fields invalidate a past pick; never grade the same play twice.
+      var correctedGrade = it.wasReleased && it.priorGradeKey !== it.row.gradeKey;
+      if (st.seen[it.row.id]) { st.seen[it.row.id].released = true; st.seen[it.row.id].releasedGradeKey = it.row.gradeKey; }
+      if ((!it.wasReleased && !it.silent && !it.marker) || correctedGrade) {
         sh.bus.emit('result', {
+          game: st.gameId, playId: it.row.id, revised: !!it.wasReleased,
           sitKey: it.sitKey, kind: it.cls,
           gained: it.gained, need: it.need, turnover: it.turnover, voidReason: it.voidReason
         });
       }
+      sh.diag('release', { id: it.row.id, version: it.row.version, revised: !!prior,
+        observed_at: it.at, released_at: now, display_id: st.shownPlay && st.shownPlay.id });
     } else if (it.kind === 'snap') {
-      sh.diag('snap', it.sit.sitKey);
+      sh.diag('snap', { sit: it.sit.sitKey, basis: it.basis, version: it.version });
       sh.bus.emit('snap', it.sit);
     } else if (it.kind === 'nosnap') {
       sh.diag('nosnap', it.msg);
       sh.bus.emit('nosnap', it.msg);
+    } else if (it.kind === 'health') {
+      st.health = it.health;
     }
   }
-  if (moved) { renderFeed(); renderHeader(); }
-  // countdown for whatever is still waiting
+  if (moved) { renderFeed(); renderHeader(); refreshSyncCandidate(); }
   var head = st.queue.length ? Math.ceil((due(st.queue[0]) - now) / 1000) : 0;
   sh.bus.emit('hold', head > 0 ? head : 0);
 }
 
+function playFingerprint(p) {
+  return JSON.stringify([p.type, p.text, p.statYardage, p.start, p.end, p.scoringPlay,
+    p.isPenalty, p.isTurnover, p.pointAfterAttempt, p.scoringType, p.scoreValue,
+    p.awayScore, p.homeScore, p.clock, p.period]);
+}
 function applySummary(sum) {
   st.sum = sum;
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   var status = comp && comp.status;
   st.gameState = (status && status.type && status.type.state) || '';
   st.statusName = (status && status.type && status.type.name) || '';
-
-  var plays = collectPlays(sum);
-  var abbr = teamAbbrs(sum);
-  var first = !st.primed;
-  var now = Date.now();
-  var last = plays.length - 1;
-
-  // On the first poll of a game the backlog is history he has already watched,
-  // so it goes up at once. The exception is the play at the end of it: on his
-  // TV that one is probably still in the air, so it waits the full delay like
-  // every play after it. Failing late is invisible, failing early ruins it.
+  var plays = collectPlays(sum), abbr = teamAbbrs(sum);
+  var health = window.FootballFeed.inspectClocks(plays, status || {});
+  var first = !st.primed, now = Date.now(), last = plays.length - 1;
   var startAt = first ? Math.max(0, plays.length - sh.FEED_MAX) : 0;
+  var added = 0, revised = 0, newestKnown = -1;
+  st.order = {};
+  plays.forEach(function (p, i) {
+    st.order[String(p.id)] = i;
+    if (st.seen[String(p.id)]) newestKnown = i;
+  });
   for (var i = startAt; i < plays.length; i++) {
-    var p = plays[i], id = String(p.id);
-    if (st.seen[id]) continue;
-    st.seen[id] = 1;
+    var p = plays[i], id = String(p.id), previous = st.seen[id];
+    var fingerprint = playFingerprint(p);
+    if (previous && (previous.skip || previous.fingerprint === fingerprint)) continue;
     var backlog = first && i < last;
+    var backfill = !first && !previous && i < newestKnown;
     var facts = window.FootballPlay.describe(p, abbr);
+    var row = feedRow(p, abbr, facts);
+    row.version = previous ? previous.version + 1 : 1;
+    row.observedAt = previous ? previous.observedAt : first || backfill ? null : now;
+    row.revised = !!previous;
+    row.marker = isMarker(p);
+    row.gradeKey = JSON.stringify([facts.outcome, facts.gained, facts.need, facts.turnover, facts.voidReason, playSitKey(p, abbr)]);
+    // Superseded queued reports must not flash or settle a pick while the
+    // corrected version is waiting for the same broadcast delay.
+    st.queue = st.queue.filter(function (item) {
+      var remove = (item.kind === 'play' && item.row.id === id) ||
+        ((item.kind === 'snap' || item.kind === 'nosnap') && item.basis === id);
+      if (remove && item.kind !== 'play' && item.basis === st.lastQueuedBasis) st.lastQueuedSit = null;
+      return !remove;
+    });
+    st.seen[id] = { fingerprint: fingerprint, version: row.version, observedAt: row.observedAt,
+      released: !!(previous && previous.released), releasedGradeKey: previous && previous.releasedGradeKey };
+    if (previous) revised++; else added++;
     st.queue.push({
-      kind: 'play', at: backlog ? 0 : now, silent: backlog, marker: isMarker(p),
-      row: feedRow(p, abbr, facts),
+      kind: 'play', at: backlog ? 0 : now,
+      silent: backlog || backfill,
+      wasReleased: !!(previous && previous.released), priorGradeKey: previous && previous.releasedGradeKey,
+      marker: isMarker(p), row: row,
       cls: facts.outcome, turnover: facts.turnover, voidReason: facts.voidReason,
-      sitKey: playSitKey(p, abbr),
-      gained: facts.gained, need: facts.need
+      sitKey: playSitKey(p, abbr), gained: facts.gained, need: facts.need
     });
   }
-  // plays already seen but not yet released stay queued; mark the rest seen so
-  // a first-poll backlog older than FEED_MAX never appears later
-  for (var k = 0; k < startAt; k++) st.seen[String(plays[k].id)] = 1;
-
-  var sit = preSnap(sum, plays);
+  for (var k = 0; k < startAt; k++) st.seen[String(plays[k].id)] = { skip: true };
+  if (added || revised) st.lastChange = now;
+  var sit = preSnap(sum, plays, health);
+  var basisIndex = last;
+  while (basisIndex >= 0 && isMarker(plays[basisIndex])) basisIndex--;
+  var basis = basisIndex >= 0 ? String(plays[basisIndex].id) : '';
+  var version = st.seen[basis] ? st.seen[basis].version : 0;
+  var tail = last >= 0 ? plays[last] : null;
   sh.diag('poll', {
-    plays: plays.length, q: st.queue.length,
-    last: plays.length ? ((plays[plays.length - 1].type || {}).text || '') : '',
-    sit: sit ? sit.sitKey : null, status: st.statusName,
-    clock: status ? status.displayClock : null, period: status ? status.period : null
+    plays: plays.length, added: added, revised: revised, q: st.queue.length,
+    source_id: tail && String(tail.id), basis_id: basis, source_version: version,
+    displayed_id: st.shownPlay && st.shownPlay.id, displayed_version: st.shownPlay && st.shownPlay.version,
+    last: tail ? ((tail.type || {}).text || '') : '', sit: sit ? sit.sitKey : null,
+    raw_down: tail && tail.end && tail.end.shortDownDistanceText, normalized_down: sit && sit.ddText,
+    status: st.statusName, clock: status ? status.displayClock : null, period: status ? status.period : null,
+    clock_stalled: health.stalled, repeated_clock_plays: health.repeatedCount,
+    last_change_at: st.lastChange, delay_ms: sh.delayMs(), next_release_at: st.queue.length ? due(st.queue[0]) : null
   });
   if (sit) {
     if (sit.sitKey !== st.lastQueuedSit) {
-      st.lastQueuedSit = sit.sitKey;
-      st.queue.push({ kind: 'snap', at: now, sit: sit });
+      st.lastQueuedSit = sit.sitKey; st.lastQueuedBasis = basis;
+      st.queue.push({ kind: 'snap', at: now, sit: sit, basis: basis, version: version });
     }
-  } else if (st.lastQueuedSit !== '') {
-    // the drive ended: touchdown, made kick, end of period. Take the card down
-    // on the same delay, so it does not vanish before he has seen the play.
-    st.lastQueuedSit = '';
-    st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage() });
-  } else if (first) {
-    st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage() });
+  } else if (st.lastQueuedSit !== '' || first) {
+    st.lastQueuedSit = ''; st.lastQueuedBasis = basis;
+    st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage(), basis: basis, version: version });
   } else {
     sh.bus.emit('quiet', waitingMessage());
   }
+  var healthKey = JSON.stringify(health);
+  if (healthKey !== st.lastQueuedHealth) {
+    st.lastQueuedHealth = healthKey;
+    st.queue.push({ kind: 'health', at: now, health: health });
+  }
   st.primed = true;
-
   pump();
   renderHeader();
 }
@@ -1182,6 +1244,8 @@ function renderHeader() {
     var detail = held
       ? (st.shownPlay.period ? 'Q' + st.shownPlay.period + ' ' + st.shownPlay.clock : '')
       : delayed ? 'Waiting for TV delay' : ((status.type && (status.type.shortDetail || status.type.detail)) || '');
+    if (st.health && st.health.stalled) detail = 'Q' + st.health.period + ' · ESPN clock not updating';
+    else if (held && st.health && st.health.unreliableIds.indexOf(st.shownPlay.id) >= 0) detail = 'Q' + st.shownPlay.period + ' · Clock unavailable';
     $('hmeta').textContent = detail;
     st.gameLabel = an + ' at ' + hn;
   }
@@ -1189,8 +1253,10 @@ function renderHeader() {
 }
 function paintConnection() {
   var fresh = Date.now() - st.lastOk < (st.gameState === 'post' ? 45000 : sh.STALE_MS);
-  $('dot').className = 'dot' + (fresh ? ' ok' : '');
-  $('connectionLabel').textContent = fresh ? 'Connected' : st.gameId ? 'Connecting' : 'No game';
+  var clockBad = st.health && st.health.stalled;
+  $('dot').className = 'dot' + (fresh && !clockBad ? ' ok' : '');
+  $('connectionLabel').textContent = fresh ? 'Feed responding' : st.gameId ? 'Reconnecting' : 'No game';
+  paintFeedStatus();
 }
 function renderFeed() {
   var el = $('feed');
@@ -1213,8 +1279,9 @@ function renderFeed() {
     h += '<div class="play">' +
       '<div class="pl1">' + (r.off ? '<b>' + sh.esc(r.off) + '</b>' : '') +
       '<span>' + sh.esc(r.dd) + '</span>' +
-      '<span class="t num">' + sh.esc(r.when) + '</span></div>' +
+      '<span class="t num">' + sh.esc(st.health && st.health.unreliableIds.indexOf(r.id) >= 0 ? (r.period ? 'Q' + r.period : '') : r.when) + '</span></div>' +
       '<div class="pl2 ' + r.kind + '">' + window.FootballGlossary.annotate(r.plain) + '</div>' +
+      (r.revised ? '<span class="report-update">Updated report</span>' : '') +
       (r.players ? '<p class="play-players">' + sh.esc(r.players) + '</p>' : '') +
       (facts ? '<div class="play-facts" aria-label="Details reported by ESPN">' + facts + '</div>' : '') +
       (r.consequence ? '<p class="play-after">' + window.FootballGlossary.annotate(r.consequence) + '</p>' : '') +
@@ -1225,6 +1292,73 @@ function renderFeed() {
   }
   el.innerHTML = h;
 }
+function ageText(at) {
+  if (!at) return 'not yet';
+  var seconds = Math.max(0, Math.floor((Date.now() - at) / 1000));
+  return seconds < 2 ? 'just now' : seconds < 60 ? seconds + 's ago' : Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's ago';
+}
+function paintFeedStatus() {
+  $('feedStatus').textContent = !st.gameId ? 'Pick a game to check the feed.' :
+    'Feed checked ' + ageText(st.lastOk) + '. Last play update: ' + ageText(st.lastChange) + '.';
+  $('clockStatus').textContent = st.health && st.health.stalled ?
+    'ESPN’s clock is not updating. Compare the play description with your TV.' :
+    'The game clock is reported by ESPN. It is not a running clock or a measure of TV delay.';
+}
+function refreshSyncCandidate() {
+  if (!$('dsheet').classList.contains('on')) return;
+  if (st.syncCandidate) {
+    var current = st.rows.find(function (row) { return row.id === st.syncCandidate.id; });
+    if (!current || current.version !== st.syncCandidate.version) {
+      st.syncCandidate = null; st.syncSample = null;
+      $('syncResult').textContent = 'That report changed. Match the updated play below.';
+      $('syncApply').hidden = true;
+    }
+  }
+  if (!st.syncCandidate && st.syncSample === null) {
+    st.syncCandidate = st.rows.find(function (row) { return row.observedAt !== null && row.observedAt !== undefined && !row.marker; }) || null;
+  }
+  var row = st.syncCandidate;
+  $('syncPlay').textContent = row ? row.off + ' · ' + row.plain + (row.players ? ' ' + row.players : '') : 'Waiting for a newly received play.';
+  $('syncSaw').disabled = !row || st.syncSample !== null;
+  paintFeedStatus();
+}
+sh.bus.on('syncOpen', function () {
+  st.syncCandidate = null; st.syncSample = null;
+  $('syncResult').textContent = '';
+  $('syncApply').hidden = true;
+  refreshSyncCandidate();
+});
+$('syncSaw').addEventListener('click', function () {
+  var row = st.syncCandidate;
+  if (!row || st.syncSample !== null) return;
+  var seconds = Math.max(0, Math.round((Date.now() - row.observedAt) / 1000));
+  st.syncSample = seconds;
+  sh.diag('tv_sync', { game: st.gameId, play: row.id, version: row.version, feed_observed_at: row.observedAt,
+    tv_finished_at: Date.now(), measured_seconds: seconds, configured_delay_ms: sh.delayMs() });
+  $('syncResult').textContent = seconds > 90 ?
+    'This play reached the app ' + seconds + ' seconds before you tapped. That exceeds the 90-second delay limit. Check another play to confirm.' :
+    'This play reached the app about ' + seconds + ' seconds before you tapped. Try that delay, then check another play.';
+  $('syncApply').textContent = 'Use ' + seconds + 's delay';
+  $('syncApply').hidden = seconds > 90;
+  refreshSyncCandidate();
+});
+$('syncAhead').addEventListener('click', function () {
+  sh.diag('tv_ahead', { game: st.gameId, display_id: st.shownPlay && st.shownPlay.id,
+    last_response_at: st.lastOk, last_play_change_at: st.lastChange, configured_delay_ms: sh.delayMs() });
+  $('syncResult').textContent = 'If TV is already ahead, adding delay makes the gap larger. Use 0s; the app has to wait for ESPN to report the play.';
+  st.syncCandidate = null; st.syncSample = 0;
+  $('syncApply').textContent = 'Use 0s delay';
+  $('syncApply').hidden = false;
+  $('syncSaw').disabled = true;
+});
+$('syncApply').addEventListener('click', function () {
+  if (st.syncSample === null || st.syncSample > 90) return;
+  var seconds = st.syncSample;
+  sh.bus.emit('syncApply', seconds);
+  $('syncResult').textContent = 'TV delay set to ' + seconds + 's. Reopen this panel to check another play.';
+  $('syncApply').hidden = true;
+});
+
 function renderPicker() {
   $('pickBtn').dataset.gameLabel = st.gameLabel;
   $('pickBtn').setAttribute('aria-label', st.gameLabel ? 'Change game, currently ' + st.gameLabel : 'Choose a game');
@@ -1318,8 +1452,11 @@ function resetGame() {
   clearTimeout(pollTimer);
   if (pollRequest) pollRequest.controller.abort();
   pollRequest = null;
-  st.sum = null; st.seen = {}; st.queue = []; st.rows = [];
-  st.shownPlay = null; st.lastQueuedSit = ''; st.primed = false;
+  st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = [];
+  st.health = null; st.lastQueuedHealth = ''; st.lastChange = 0;
+  st.syncCandidate = null; st.syncSample = null;
+  $('syncApply').hidden = true; $('syncResult').textContent = '';
+  st.shownPlay = null; st.lastQueuedSit = ''; st.lastQueuedBasis = ''; st.primed = false;
   st.lastOk = 0; st.gameState = ''; st.statusName = '';
   sh.bus.emit('clear');
 }
@@ -1432,7 +1569,8 @@ function setDelay(n) {
   paintDelay();
   bus.emit('delay', n);
 }
-$('delayBtn').addEventListener('click', function () { $('dsheet').className = 'sheet on'; });
+$('delayBtn').addEventListener('click', function () { $('dsheet').className = 'sheet on'; bus.emit('syncOpen'); });
+bus.on('syncApply', function (seconds) { setDelay(seconds); });
 $('closeDelay').addEventListener('click', function () { $('dsheet').className = 'sheet'; });
 $('dsheet').addEventListener('click', function (ev) {
   if (ev.target === $('dsheet')) $('dsheet').className = 'sheet';
