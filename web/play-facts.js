@@ -99,13 +99,17 @@
     return null;
   }
 
-  function playYardage(p, abbr, text) {
-    // Some live records leave statYardage at zero after the report and field
-    // position have advanced. Replace it only when those two sources agree.
+  function reportedYardage(text) {
     text = text.split(/\bPENALTY\b/i)[0];
     var loss = /\bfor (?:a )?loss of (\d+) (?:yards?|yds?)\b/i.exec(text);
     var amount = /\bfor (-?\d+) (?:yards?|yds?)(?: (gain|loss))?\b/i.exec(text);
-    var reported = loss ? -Number(loss[1]) : amount ? Number(amount[1]) * (amount[2] && amount[2].toLowerCase() === 'loss' ? -1 : 1) : /\bno gain\b/i.test(text) ? 0 : null;
+    return loss ? -Number(loss[1]) : amount ? Number(amount[1]) * (amount[2] && amount[2].toLowerCase() === 'loss' ? -1 : 1) : /\bno gain\b/i.test(text) ? 0 : null;
+  }
+
+  function playYardage(p, abbr, text) {
+    // Some live records leave statYardage at zero after the report and field
+    // position have advanced. Replace it only when those two sources agree.
+    var reported = reportedYardage(text);
     var stat = number(p.statYardage) ? p.statYardage : null;
     var start = p.start || {}, end = p.end || {}, movement = null;
     if (teamId(start) && teamId(start) === teamId(end)) {
@@ -121,7 +125,7 @@
     return { value: null, conflict: true };
   }
 
-  function describe(p, abbr) {
+  function describeBase(p, abbr) {
     p = p || {}; abbr = abbr || {};
     var type = String((p.type || {}).text || '').toLowerCase();
     var raw = String(p.text || ''), primary = primaryText(raw);
@@ -272,6 +276,107 @@
       result.gained = y;
       var need = start.distance === 0 ? yardsToGoal(start, abbr) : start.distance;
       result.need = Number.isInteger(need) && need >= 1 ? need : null;
+    }
+    return result;
+  }
+
+  function validatedMovement(p, abbr, result, text) {
+    var start = p.start || {}, end = p.end || {};
+    if (!teamId(start) || teamId(start) !== teamId(end) || result.turnover || result.outcome === 'kick') return null;
+    var from = yardsToGoal(start, abbr), to = yardsToGoal(end, abbr);
+    if (to === null && end.yardsToEndzone === 0 && result.kind === 'score') to = 0;
+    if (from === null || to === null) return null;
+    var net = from - to;
+    var penalties = text.split(/\bPENALTY\s+/i).slice(1).filter(function (clause) { return !/\bdeclined\b/i.test(clause); });
+    if (penalties.length) {
+      if (penalties.length !== 1 || /\bnullified\b|\boffset/i.test(text)) return null;
+      var enforced = /\b(\d+) yards? from\b/i.exec(penalties[0]);
+      if (!enforced) return null;
+      var playGain = /\bNO PLAY\b/i.test(text) || /^\s*PENALTY\b/i.test(text) ? 0 : reportedYardage(text);
+      if (playGain === null) return null;
+      if (from - playGain < 0 || from - playGain > 100) return null;
+      var penaltyGain = net - playGain;
+      if (Math.abs(penaltyGain) !== Number(enforced[1])) return null;
+      return { start: from, end: to, net: net, play: playGain, penalty: penaltyGain };
+    }
+    if (result.gained !== null && result.gained === net) return { start: from, end: to, net: net, play: net, penalty: 0 };
+    if (/\bsacked\b|\bkneel|\bspike[ds]?\b/i.test(text)) {
+      var checked = playYardage(p, abbr, text);
+      if (!checked.conflict && checked.value === net) return { start: from, end: to, net: net, play: net, penalty: 0 };
+    }
+    return null;
+  }
+
+  function catchPosition(text, p, abbr, movement) {
+    if (/\bcaught at 50\b/i.test(text)) return 50;
+    var caught = /\bcaught at ([A-Za-z]+)\s*(\d{1,2})(?=[\s,.)]|$)/i.exec(text);
+    if (!caught || Number(caught[2]) > 50) return null;
+    var n = Number(caught[2]), side = caught[1].toUpperCase();
+    if (n === 50) return 50;
+    var off = teamId(p.start), offAbbr = abbr[off];
+    if (offAbbr && side === offAbbr.toUpperCase()) return 100 - n;
+    if (Object.keys(abbr).some(function (id) { return id !== off && abbr[id].toUpperCase() === side; })) return n;
+    // ESPN prose often uses OhioSt where its structured spot uses OSU. Resolve
+    // that alias only when the same prose end spot matches the validated end.
+    var end = /\bfor -?\d+ (?:yards?|yds?)(?: (?:gain|loss))? to (?:the )?([A-Za-z]+)\s*(\d{1,2})(?=[\s,.)]|$)/i.exec(text);
+    if (!end || side !== end[1].toUpperCase() || movement.end === 50) return null;
+    if (Number(end[2]) !== Math.min(movement.end, 100 - movement.end)) return null;
+    return movement.end > 50 ? 100 - n : n;
+  }
+
+  function describe(p, abbr) {
+    p = p || {}; abbr = abbr || {};
+    var result = describeBase(p, abbr), text = primaryText(result.raw).split(/\bOriginal Play:/i)[0];
+    result.meaning = ''; result.airYards = null; result.yardsAfterCatch = null;
+    result.depthText = ''; result.depthSource = null;
+    result.startYardsToGoal = yardsToGoal(p.start || {}, abbr);
+    result.movement = validatedMovement(p, abbr, result, text);
+    result.people = { passer: '', receiver: '', runner: '' };
+    var names = result.players.split(' to ');
+    if (result.outcome === 'pass' || /\bsacked\b/i.test(text)) {
+      result.people.passer = names[0]; result.people.receiver = names[1] || '';
+    } else if (result.outcome === 'run') result.people.runner = names[0];
+
+    var movement = result.movement;
+    if (movement && movement.penalty) {
+      var direction = movement.penalty > 0 ? 'forward' : 'back';
+      result.consequence = movement.play ?
+        (movement.play > 0 ? yards(movement.play) + ' gained on the play' : yards(movement.play) + ' lost on the play') + ', then ' + yards(movement.penalty) + ' ' + direction + ' for the penalty.' :
+        'The penalty moved the ball ' + yards(movement.penalty) + ' ' + direction + '.';
+      var next = endSituation(p, abbr);
+      if (/\bNO PLAY\b/i.test(text) && !/\b1ST DOWN\b/i.test(text) && (p.start || {}).down !== (p.end || {}).down) next = '';
+      if (/\b1ST DOWN\b/i.test(text) && (p.end || {}).down !== 1) next = '';
+      if (next) result.consequence += ' Next: ' + next + '.';
+      else if (/\b1ST DOWN\b/i.test(text)) result.consequence += ' First down.';
+      if (/\bNO PLAY\b/i.test(text)) result.meaning = 'The penalty changed the spot. The play itself does not count.';
+    } else if (result.gained !== null && result.need !== null && result.kind !== 'score') {
+      var goal = /\bgoal\b/i.test((p.start || {}).shortDownDistanceText || (p.start || {}).downDistanceText || '') ||
+        (p.start || {}).distance === 0 || result.startYardsToGoal === result.need;
+      if (goal && movement) result.meaning = 'The ball is now ' + yards(movement.end) + ' from the end zone.';
+      else if (result.gained >= result.need) result.meaning = 'They reached the first-down line and earned a new set of downs.';
+      else if (result.gained >= 0) result.meaning = 'They gained ' + result.gained + ' of the ' + result.need + ' yards needed for a first down.';
+      else result.meaning = 'Losing ' + yards(result.gained) + ' leaves ' + (result.need - result.gained) + ' yards to the first-down line.';
+    }
+
+    var complete = !/\b(?:incomplete|intercepted)\b/i.test(text) &&
+      (/\bpass complete\b/i.test(text) || /reception/i.test((p.type || {}).text || '') || p.complete_pass === 1);
+    if (complete && result.outcome === 'pass' && result.gained !== null && !result.turnover && !result.voidReason) {
+      // Known enriched CFBD and nflverse field spellings, never a number inferred
+      // from the words "short" or "deep".
+      var air = p.airYards !== undefined ? p.airYards : p.air_yards;
+      var after = p.yardsAfterCatch !== undefined ? p.yardsAfterCatch : p.yards_after_catch;
+      var source = null;
+      var caught = movement && movement.penalty === 0 ? catchPosition(text, p, abbr, movement) : null;
+      if (Number.isInteger(air) && Number.isInteger(after) && Math.abs(air) <= 99 && Math.abs(after) <= 99 && air + after === result.gained) {
+        if (caught === null || (air === movement.start - caught && after === caught - movement.end)) source = 'reported';
+      } else if (air == null && after == null && caught !== null) {
+        air = movement.start - caught; after = caught - movement.end; source = 'reported spots';
+      }
+      if (source) {
+        result.airYards = air; result.yardsAfterCatch = after; result.depthSource = source;
+        result.depthText = air === 0 ? 'Caught at the line of scrimmage' : 'Caught ' + yards(air) + (air > 0 ? ' beyond' : ' behind') + ' the line of scrimmage';
+        result.depthText += after >= 0 ? '; ' + yards(after) + ' after the catch.' : '; then lost ' + yards(after) + '.';
+      }
     }
     return result;
   }

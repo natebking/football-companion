@@ -1,0 +1,142 @@
+{
+  "sources": [
+    "nflverse play-by-play 2025",
+    "FTN Data via nflverse; CC-BY-SA 4.0; https://creativecommons.org/licenses/by-sa/4.0/",
+    "CollegeFootballData /passing/plays 2025 Oregon postseason"
+  ],
+  "nfl": [
+    {
+      "game_id": "2025_01_BAL_BUF",
+      "play_id": 2796.0,
+      "season": 2025,
+      "week": 1,
+      "down": 1.0,
+      "ydstogo": 10.0,
+      "posteam": "BAL",
+      "defteam": "BUF",
+      "yards_gained": 36.0,
+      "play_type": "pass",
+      "penalty": 0.0,
+      "air_yards": 3.0,
+      "yards_after_catch": 33.0
+    },
+    {
+      "game_id": "2025_01_BAL_BUF",
+      "play_id": 3106.0,
+      "season": 2025,
+      "week": 1,
+      "down": 3.0,
+      "ydstogo": 6.0,
+      "posteam": "BUF",
+      "defteam": "BAL",
+      "yards_gained": 51.0,
+      "play_type": "pass",
+      "penalty": 0.0,
+      "air_yards": -3.0,
+      "yards_after_catch": 54.0
+    },
+    {
+      "game_id": "2025_01_ARI_NO",
+      "play_id": 1188.0,
+      "season": 2025,
+      "week": 1,
+      "down": 2.0,
+      "ydstogo": 4.0,
+      "posteam": "ARI",
+      "defteam": "NO",
+      "yards_gained": 45.0,
+      "play_type": "pass",
+      "penalty": 0.0,
+      "air_yards": 39.0,
+      "yards_after_catch": 6.0
+    },
+    {
+      "game_id": "2025_01_ARI_NO",
+      "play_id": 327.0,
+      "season": 2025,
+      "week": 1,
+      "down": 1.0,
+      "ydstogo": 10.0,
+      "posteam": "ARI",
+      "defteam": "NO",
+      "yards_gained": 5.0,
+      "play_type": "pass",
+      "penalty": 0.0,
+      "air_yards": -3.0,
+      "yards_after_catch": 8.0
+    },
+    {
+      "game_id": "2025_04_TEN_HOU",
+      "play_id": 1178.0,
+      "season": 2025,
+      "week": 4,
+      "down": 3.0,
+      "ydstogo": 8.0,
+      "posteam": "HOU",
+      "defteam": "TEN",
+      "yards_gained": 5.0,
+      "play_type": "pass",
+      "penalty": 0.0,
+      "air_yards": 4.0,
+      "yards_after_catch": 1.0
+    }
+  ],
+  "ftn": [
+    {
+      "nflverse_game_id": "2025_01_BAL_BUF",
+      "nflverse_play_id": 3106,
+      "is_play_action": false,
+      "is_screen_pass": true,
+      "is_motion": false
+    },
+    {
+      "nflverse_game_id": "2025_01_ARI_NO",
+      "nflverse_play_id": 1188,
+      "is_play_action": true,
+      "is_screen_pass": false,
+      "is_motion": true
+    }
+  ],
+  "cfbd": [
+    {
+      "gameId": 401769074,
+      "playId": "401769074527",
+      "driveId": "40176907426",
+      "season": 2025,
+      "week": 1,
+      "seasonType": "postseason",
+      "offenseId": 2483,
+      "offense": "Oregon",
+      "offenseConference": "B1G",
+      "defenseId": 84,
+      "defense": "Indiana",
+      "defenseConference": "B1G",
+      "period": 3,
+      "clock": {
+        "minutes": 2,
+        "seconds": 48
+      },
+      "down": 3,
+      "distance": 11,
+      "playText": "(03:02) Shotgun #5 D.Moore pass complete deep left to #11 J.McClellan caught at Ore47, for 43 yards to the Ore47 (#5 D.Ponds), 1ST DOWN. #6 M.Kamara injured on the play",
+      "passerId": "4870921",
+      "passer": "Dante Moore",
+      "targetId": "5079519",
+      "target": "Jeremiah McClellan",
+      "outcome": "completion",
+      "airYards": 43,
+      "passDepth": "deep",
+      "passDirection": "left",
+      "passLocation": "deep left",
+      "totalYards": 43,
+      "yardsAfterCatch": 0,
+      "startYardline": 96,
+      "startYardsToGoal": 96,
+      "targetYardsToGoal": 53,
+      "isSpike": false,
+      "isThrowaway": false,
+      "isIntentionalGrounding": false,
+      "parseStatus": "complete"
+    }
+  ]
+}

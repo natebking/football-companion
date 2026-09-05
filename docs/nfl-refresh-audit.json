@@ -1,0 +1,73 @@
+{
+  "grain": "one NFL play per game_id + play_id",
+  "rows": 137265,
+  "eligible": 104878,
+  "duplicatePlayIds": 0,
+  "duplicateOrder": 0,
+  "eligibleMissingFeatures": 0,
+  "unbucketable": 0,
+  "seasons": [
+    {
+      "season": 2023,
+      "rows": 46160,
+      "eligible": 35474,
+      "games": 285,
+      "teams": 32,
+      "passRate": 0.5819473417150589
+    },
+    {
+      "season": 2024,
+      "rows": 45919,
+      "eligible": 34902,
+      "games": 285,
+      "teams": 32,
+      "passRate": 0.5700819437281531
+    },
+    {
+      "season": 2025,
+      "rows": 45186,
+      "eligible": 34502,
+      "games": 285,
+      "teams": 32,
+      "passRate": 0.5692133789345545
+    }
+  ],
+  "validation": {
+    "outerSplit": "season 2025 held out, trained on [2023, 2024]",
+    "innerSplit": "weeks from 2024w10 held out (25.7% of eligible training plays)",
+    "holdoutPlays": 34502,
+    "shippedK": 60.0,
+    "validationBestK": 55.6,
+    "validationPlateau": [
+      23.6,
+      117.6
+    ],
+    "brier": 0.2189566280285201,
+    "baselineBrier": 0.21901082788939769,
+    "accuracy": 0.624717407686511,
+    "baselineAccuracy": 0.6213552837516666,
+    "ece": 0.011245516201959299,
+    "baselineEce": 0.008212387687670237,
+    "pairedBrierDifference": -5.419986087762463e-05,
+    "teamBootstrap95Interval": [
+      -0.0008452363066162408,
+      0.0008311035074475777
+    ],
+    "bootstrapReplicates": 2000,
+    "verdict": "statistical tie"
+  },
+  "export": {
+    "seasons": [
+      2023,
+      2024,
+      2025
+    ],
+    "generated": "2026-09-05",
+    "bytes": 197869,
+    "gzipBytes": 16683,
+    "teamEntries": 1495,
+    "attributableEntries": 728,
+    "clientMismatchedPlays": 0,
+    "sha256": "c5501f34f778169cb58c26d44aa1fdc5a6fa41d04cc295f8e0f1f6c09fa86ba0"
+  }
+}

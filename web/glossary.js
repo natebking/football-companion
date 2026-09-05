@@ -7,6 +7,11 @@
     });
   }
   var extras = {
+    motion: 'A player moves before the ball is snapped. Watch how the defense responds, then check what those defenders do once the play starts.',
+    pocket: 'The space the blockers try to keep around the quarterback while he looks for a throw. That space can shrink as defenders get past them.',
+    route: 'The path a receiver runs to get into position for a pass. Watch where he turns and how the nearest defender reacts.',
+    screen: 'A short pass with blockers moving out to lead the receiver. A short throw on its own does not tell you it was a screen.',
+    yards_after_catch: 'The yards a receiver gains between catching the pass and the end of the play. They count toward the total gain.',
     safety: 'A safety can mean a defender who lines up deep, or a two-point score for the defense, usually when the offense is stopped in its own end zone.',
     first_down: 'The offense gets four tries to gain 10 yards. Reaching that line earns a first down and four new tries.',
     end_zone: 'The scoring area at each end of the field. Carrying or catching the ball there scores a touchdown.',
@@ -63,6 +68,10 @@
     close(); anchor = button;
     popup.querySelector('strong').textContent = key.replace(/_/g, ' ');
     popup.querySelector('p').textContent = definitions[key];
+    var diagram = popup.querySelector('[data-lesson]');
+    var lessonForTerm = { motion: 'motion', pocket: 'pocket_edges', sack: 'pocket_edges', route: 'route_break', receiver: 'route_break', screen: 'screen_blockers', play_action: 'handoff_fake', safety: 'deep_defenders', red_zone: 'red_zone', first_down: 'first_down_line', sticks: 'first_down_line', yards_after_catch: 'first_down_line' };
+    diagram.hidden = !lessonForTerm[key];
+    diagram.dataset.lesson = lessonForTerm[key] || '';
     popup.showPopover();
     var box = button.getBoundingClientRect();
     var width = popup.offsetWidth, height = popup.offsetHeight;
@@ -78,11 +87,12 @@
     popup.setAttribute('role', 'dialog');
     popup.setAttribute('aria-labelledby', 'termTitle');
     popup.setAttribute('aria-describedby', 'termDefinition');
-    popup.innerHTML = '<div class="term-heading"><strong id="termTitle"></strong><button type="button" aria-label="Close definition">×</button></div><p id="termDefinition"></p>';
+    popup.innerHTML = '<div class="term-heading"><strong id="termTitle"></strong><button type="button" aria-label="Close definition">×</button></div><p id="termDefinition"></p><button type="button" class="depth-link" data-lesson="" aria-haspopup="dialog" aria-controls="learningSheet" hidden>See the idea ↗</button>';
     root.document.body.appendChild(popup);
     popup.querySelector('button').addEventListener('click', function () {
       close(true);
     });
+    popup.querySelector('[data-lesson]').addEventListener('click', function () { close(true); });
     root.document.addEventListener('click', function (event) {
       var button = event.target.closest('button[data-term]');
       if (button) show(button);

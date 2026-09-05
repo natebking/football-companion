@@ -1,6 +1,6 @@
 """nflverse play-by-play -> unified play schema.
 
-    python engine/ingest_nfl.py                    # 2024 only (file already on disk)
+    python engine/ingest_nfl.py --seasons 2023-2025 # current published history
     python engine/ingest_nfl.py --seasons 2022-2024
     python engine/ingest_nfl.py --seasons 2023,2024 --out data/plays_nfl.parquet
 

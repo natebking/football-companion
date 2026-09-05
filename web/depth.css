@@ -1,0 +1,71 @@
+.depth-link { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 0; border: 0; background: none; color: var(--accent); font-size: .8125rem; font-weight: 600; text-align: left; }
+.depth-link span { font-size: 1.1rem; }
+.depth-caption { color: var(--dim); font-size: .75rem; line-height: 1.6; }
+.tendency-label { display: block; font-size: .6875rem; color: var(--faint); margin-bottom: 3px; }
+.tendency-block { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+.watch-block { margin-top: 20px; padding-top: 0; border-top: 0; }
+#pTen { font-size: .9375rem; font-weight: 400; color: var(--dim); }
+#prime.low #pTen { color: var(--dim); }
+.drive-story { padding: 20px 22px; background: var(--card); border: 1px solid var(--line); border-radius: 15px; margin-bottom: 16px; }
+.depth-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.depth-heading h2 { font: 700 1.45rem/1.2 var(--heading); text-transform: uppercase; }
+.depth-heading span { font-size: .75rem; color: var(--accent); font-weight: 600; }
+#driveSummary { font-size: .9375rem; line-height: 1.6; }
+.drive-progress { margin-top: 8px; }
+.drive-progress svg { width: 100%; color: var(--accent); }
+.drive-yards { stroke: var(--line); stroke-width: 1; }
+.drive-step { stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
+.drive-penalty { stroke: var(--warn); stroke-dasharray: 4 4; }
+.drive-ball { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.drive-legend { display: flex; justify-content: space-between; gap: 8px; font-size: .625rem; color: var(--dim); }
+#driveNote { margin-top: 12px; }
+.game-patterns { margin-bottom: 25px; padding: 0 4px 18px; border-bottom: 1px solid var(--line); }
+.game-patterns > summary { cursor: pointer; font-size: .875rem; color: var(--text); padding: 6px 0; }
+.pattern-team { margin-top: 14px; }
+.pattern-team h3 { font-size: .8125rem; margin-bottom: 5px; color: var(--accent); }
+.pattern-team p { font-size: .875rem; margin-top: 5px; color: var(--dim); }
+.game-patterns > .depth-caption { margin-top: 14px; }
+.play-understand { margin-top: 9px; }
+.play-understand summary { display: inline-flex; align-items: center; cursor: pointer; min-height: 32px; font-size: .8125rem; color: var(--accent); list-style: none; }
+.play-understand summary::-webkit-details-marker { display: none; }
+.play-understand summary::after { content: '+'; margin-left: 8px; }
+.play-understand[open] summary::after { content: '−'; }
+.play-understand > p { font-size: .875rem; margin-top: 8px; line-height: 1.6; }
+.example-entry { margin-top: 25px; border: 1px solid var(--line); border-radius: 14px; padding: 20px; background: var(--accent-bg); }
+.example-entry h2 { font: 700 1.5rem/1.2 var(--heading); margin: 8px 0; }
+.example-entry p { color: var(--dim); font-size: .875rem; }
+.learning-panel { max-width: 700px; }
+.depth-context { padding: 10px 12px; background: var(--surface); border-radius: 8px; color: var(--dim); margin-bottom: 14px; font-size: .8125rem; }
+.learning-intro { color: var(--dim); text-wrap: pretty; margin: 5px 0 20px; font-size: 1rem; line-height: 1.65; }
+.learning-caption { font-size: .75rem; color: var(--dim); margin: 10px 0 20px; }
+.learning-observe { padding-top: 20px; margin-top: 20px; border-top: 1px solid var(--line); }
+.learning-observe h2 { font-size: 1.125rem; line-height: 1.4; margin: 7px 0; }
+.learning-choices { display: flex; gap: 8px; flex-wrap: wrap; margin: 15px 0; }
+.learning-choices button { min-height: 44px; padding: 9px 13px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; font-size: .875rem; }
+.learning-choices button[aria-pressed="true"] { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.learning-response { border-radius: 10px; text-wrap: pretty; padding: 14px; border-left: 3px solid var(--accent); background: var(--accent-bg); font-size: .9375rem; line-height: 1.6; margin: 15px 0; }
+.example-label { color: var(--faint); font-size: .75rem; margin: 12px 0 8px; display: block; }
+.example-summary { font-size: 1.25rem; line-height: 1.4; margin: 10px 0; }
+.example-list { display: grid; gap: 12px; }
+.example-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; position: relative; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 16px 40px 16px 18px; text-align: left; }
+.example-choice .example-label { margin: 0; }
+.example-choice b { font-size: 1.05rem; line-height: 1.4; }
+.example-choice > span:not(.example-label):not(.example-arrow) { font-size: .8125rem; color: var(--dim); }
+.example-arrow { position: absolute; top: 17px; right: 16px; color: var(--accent); }
+.example-sources { border-top: 1px solid var(--line); padding-top: 14px; margin: 22px 0 8px; font-size: .8125rem; color: var(--dim); }
+.example-sources summary { cursor: pointer; padding: 5px 0; }
+.example-sources p { margin-top: 9px; overflow-wrap: anywhere; }
+.example-sources a { color: var(--accent); }
+.yardage-breakdown { padding: 15px; border: 1px solid var(--line); border-radius: 12px; margin: 18px 0; }
+.yardage-breakdown svg { width: 100%; }
+.yardage-track { stroke: var(--line); stroke-width: 5; }
+.yardage-air { stroke: var(--dim); stroke-width: 5; stroke-dasharray: 5 4; }
+.yardage-run { stroke: var(--accent); stroke-width: 7; }
+.yardage-start { stroke: var(--text); stroke-width: 1; }
+.yardage-catch { fill: var(--card); stroke: var(--accent); stroke-width: 2; }
+.yardage-labels { display: flex; gap: 12px; justify-content: space-between; font-size: .75rem; color: var(--dim); margin-bottom: 10px; }
+.yardage-labels b { color: var(--text); font-size: 1.1rem; }
+@media(max-width: 600px) { .drive-story { padding: 17px; } .learning-choices { flex-direction: column; } .learning-choices button { text-align: left; } }
+
+.learning-choices button:hover { border-color: var(--accent); }
+@media (forced-colors: active) { .learning-choices button[aria-pressed="true"] { border-width: 3px; } }

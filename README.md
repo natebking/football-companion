@@ -4,7 +4,11 @@ A second screen for following a football game and learning what to watch. [Open 
 
 The two-F logo follows the shape of player routes: a starting dot, an upfield stem, and a turn ending in an arrow. The editable mark is in `web/brand-mark.svg`, with the same routes used in `web/favicon.svg`.
 
-The app shows the next down and field position, historical run/pass tendencies, a short watching suggestion, and recent plays. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default. Corrections update existing plays in order; repeated unreliable clocks are flagged.
+The app puts a concrete watching suggestion first, with the next down, field position, and historical run/pass choices nearby. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default. Corrections update existing plays in order; repeated unreliable clocks are flagged.
+
+Open **Understand this play** for the meaning of a gain and, when verified, the yards through the air versus after the catch. The drive story separates progress on plays from penalties. **So far in this game** shows observed player involvement and direction with coverage counts. These views use the full released history, even though the visible feed keeps only the latest 25 rows.
+
+**See the idea** opens an illustrative diagram and an optional observation question. Answers are self-reported, never checked against the feed or treated as mastery. **Explore plays** offers six real examples from nflverse, FTN Data, and CollegeFootballData, with source and license links.
 
 Choose a game, measure or set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
 
@@ -12,7 +16,7 @@ Choose a game, measure or set a TV delay, and use light, dark, or system appeara
 
 The static app polls ESPN directly in the browser. Historical tendencies ship as JSON; they describe past situations, not the next play's formation or strategy. Richer live details vary by game. Missing routes, coverage, or assignments are not inferred. All explanations are deterministic, with no runtime AI calls or backend.
 
-Current shipped tables cover CFB 2023–2025 and NFL 2024. The successful refresh dry-run on September 5 did not publish newer data. See the [product review](docs/PRODUCT-REVIEW-2026-09-05.md) for evidence, decisions, and remaining limits.
+Both shipped tendency tables now cover 2023–2025. The NFL refresh adds 104,878 eligible plays, but its chronological test found no reliable forecasting advantage over a situation-only baseline. Treat the percentages as descriptive history. See the [data refresh and source audit](docs/DATA-REFRESH-2026-09-05.md) for results, reproduction commands, and access limits. CFBD live requires a higher subscription tier; Sportradar is not connected. Public FTN charting supplies historical lessons, not live tactical observations.
 
 ## Develop and verify
 
@@ -21,6 +25,7 @@ The live app is in `web/`. The root `index.html` is the frozen broadcast-timing 
 ```sh
 python3 -m http.server 8765 --bind 127.0.0.1 --directory web
 node --test tests/*.test.js
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
 ```
 
 The tests cover curated real ESPN plays, scoring and penalty edge cases, prediction grading, and request races. The interface also needs browser verification against a live game after changes.

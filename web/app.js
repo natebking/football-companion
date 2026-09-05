@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-arrivals';
+var VERSION = '2026-09-05-understand';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -248,7 +248,7 @@ var shell = {
 (function initPrime(sh) {
 
 var st = {
-  sit: null, sitKey: '', card: null, ten: null,
+  sit: null, sitKey: '', card: null, ten: null, lesson: null,
   sitLine: '', tendLine: '', watchLine: '', attributed: false, rate: null,
   ask: null,          // {id, kind, q, opts, priority}
   askAt: 0,
@@ -388,7 +388,8 @@ function useShortWatch(card) {
 }
 sh.bus.on('hints', function () {
   if (!st.card || !st.sit) return;
-  st.watchLine = fill(useShortWatch(st.card) ? st.card.prime.watch_short : st.card.prime.watch, st.sit, st.rate);
+  st.watchLine = st.lesson ? (sh.shortHints() ? st.lesson.shortWatch : st.lesson.watch) :
+    fill(useShortWatch(st.card) ? st.card.prime.watch_short : st.card.prime.watch, st.sit, st.rate);
   render();
 });
 
@@ -496,6 +497,7 @@ sh.bus.on('nosnap', function (msg) {
   st.skippedGrade = false;
   st.quiet = msg || '';
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
+  st.lesson = null;
   st.ask = null;
   render();
 });
@@ -503,6 +505,7 @@ sh.bus.on('clear', function () {
   window.FootballGlossary.close();
   closePending('The game changed before this pick could be graded.');
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
+  st.lesson = null;
   st.ask = null; st.pending = null; st.res = null;
   st.skippedGrade = false;
   st.sinceAsk = 99; st.sig = ''; st.asig = '';
@@ -591,6 +594,7 @@ sh.bus.on('snap', function (sit) {
 
   st.ten = ten;
   st.card = card;
+  st.lesson = window.FootballLearning.choose(sit);
   st.rate = rate;
   st.ask = null;
   sh.diag('card', {
@@ -612,7 +616,7 @@ sh.bus.on('snap', function (sit) {
     var watchTpl = useShortWatch(card) ? (pr.watch_short || pr.watch) : pr.watch;
     st.sitLine = fill(pr.situation, sit, rate);
     st.tendLine = fill(tendTpl, sit, rate);
-    st.watchLine = fill(watchTpl, sit, rate);
+    st.watchLine = st.lesson ? (sh.shortHints() ? st.lesson.shortWatch : st.lesson.watch) : fill(watchTpl, sit, rate);
 
     var a = askFor(card);
     if (a && askEligible(a)) {
@@ -629,7 +633,7 @@ sh.bus.on('snap', function (sit) {
         answer: null, latency: 0
       };
     }
-    sh.bumpExposure(card.concepts);
+    sh.bumpExposure(st.lesson ? st.lesson.concepts : card.concepts);
   }
   render();
   flash();
@@ -651,6 +655,7 @@ function quietPrime(msg) {
   $('pSit').textContent = '';
   $('pTen').textContent = '';
   $('pWatch').textContent = '';
+  $('exploreRead').hidden = true;
   $('pFoot').innerHTML = '';
   $('fieldPosition').hidden = true;
 }
@@ -711,6 +716,7 @@ function render() {
   renderField(sit);
 
   if (!st.card) {
+    $('exploreRead').hidden = true;
     $('pSit').textContent = '';
     $('pTen').textContent = '';
     $('pWatch').textContent = '';
@@ -725,6 +731,8 @@ function render() {
   $('pSit').innerHTML = /^(First|Second|Third|Fourth) and \d+\.$/.test(st.sitLine) ? '' : window.FootballGlossary.annotate(st.sitLine);
   $('pTen').innerHTML = window.FootballGlossary.annotate(st.tendLine);
   $('pWatch').innerHTML = window.FootballGlossary.annotate(st.watchLine);
+  $('exploreRead').hidden = !st.lesson;
+  if (st.lesson) $('exploreRead').dataset.lesson = st.lesson.id;
   $('prime').className = st.attributed ? '' : 'low';
 
   // The source chip is attribution too. It carries the team name on exactly
@@ -737,7 +745,7 @@ function render() {
   } else {
     chips.push('<span class="chip srcl">All offenses · ' + sh.seasonsLabel() + '</span>');
   }
-  var cs = st.card.concepts || [];
+  var cs = (st.lesson ? st.lesson.concepts : st.card.concepts) || [];
   for (var i = 0; i < cs.length; i++) {
     if ($('prime').querySelector('.term-link[data-term="' + cs[i] + '"]')) continue;
     chips.push('<button class="chip" data-term="' + esc(cs[i]) + '" aria-haspopup="dialog" aria-controls="termPopover">' + esc(cs[i].replace(/_/g, ' ')) + '</button>');
@@ -828,7 +836,7 @@ sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedg
 var st = {
   gameId: null, games: [], gameLabel: '', gameState: '',
   sum: null,                 // latest raw summary, this scope only
-  seen: {}, order: {}, queue: [], rows: [], shownPlay: null,
+  seen: {}, order: {}, queue: [], rows: [], released: {}, shownPlay: null,
   health: null, lastQueuedHealth: '', lastChange: 0, syncCandidate: null, syncSample: null, timingBreak: null,
   lastQueuedSit: '', lastQueuedBasis: '', primed: false, lastOk: 0, sheet: false
 };
@@ -909,7 +917,7 @@ function collectPlays(sum) {
   for (var i = 0; i < drives.length; i++) {
     var ps = drives[i].plays || [];
     for (var j = 0; j < ps.length; j++) {
-      var p = ps[j], id = String(p.id);
+      var p = Object.assign({}, ps[j], { driveId: String(drives[i].id || ps[j].driveId || '') }), id = String(p.id);
       if (seen[id] !== undefined) { out[seen[id]] = p; continue; }
       seen[id] = out.length;
       out.push(p);
@@ -986,6 +994,8 @@ function feedRow(p, abbr, facts) {
           ((p.clock && p.clock.displayValue) || ''),
     plain: facts.summary, kind: facts.kind, raw: facts.raw,
     players: facts.players, facts: facts.facts, consequence: facts.consequence,
+    meaning: facts.meaning || '', depthText: facts.depthText || '', depthSource: facts.depthSource,
+    related: window.FootballLearning.relatedToReport(facts),
     reportFirst: /[Ss]ee the play report/.test(facts.consequence),
     awayScore: typeof p.awayScore === 'number' ? p.awayScore : null,
     homeScore: typeof p.homeScore === 'number' ? p.homeScore : null,
@@ -1099,6 +1109,7 @@ function pump(trigger) {
       var index = st.rows.findIndex(function (row) { return row.id === it.row.id; });
       var prior = index >= 0 ? st.rows[index] : null;
       if (index >= 0) st.rows[index] = it.row; else st.rows.push(it.row);
+      if (it.source) st.released[it.row.id] = it.source;
       st.rows.sort(function (a, b) { return (st.order[b.id] ?? -1) - (st.order[a.id] ?? -1); });
       if (st.rows.length > sh.FEED_MAX) st.rows.length = sh.FEED_MAX;
       st.shownPlay = st.rows[0] || null;
@@ -1137,7 +1148,7 @@ function pump(trigger) {
   if (released.length > 1 && maxOverdue > sh.STALE_MS && trigger !== 'delay_change') {
     st.timingBreak = { at: now, reason: 'queue_catchup' };
   }
-  if (moved) { renderFeed(); renderHeader(); refreshSyncCandidate(); }
+  if (moved) { renderFeed(); renderInsights(); renderHeader(); refreshSyncCandidate(); }
   var head = st.queue.length ? Math.ceil((due(st.queue[0]) - now) / 1000) : 0;
   sh.bus.emit('hold', head > 0 ? head : 0);
 }
@@ -1145,7 +1156,8 @@ function pump(trigger) {
 function playFingerprint(p) {
   return JSON.stringify([p.type, p.text, p.statYardage, p.start, p.end, p.scoringPlay,
     p.isPenalty, p.isTurnover, p.pointAfterAttempt, p.scoringType, p.scoreValue,
-    p.awayScore, p.homeScore, p.clock, p.period]);
+    p.awayScore, p.homeScore, p.clock, p.period, p.driveId,
+    p.airYards, p.yardsAfterCatch, p.air_yards, p.yards_after_catch, p.complete_pass]);
 }
 function applySummary(sum) {
   st.sum = sum;
@@ -1159,7 +1171,6 @@ function applySummary(sum) {
   var responseGap = st.lastOk ? now - st.lastOk : null;
   var resumed = !first && responseGap > sh.STALE_MS;
   st.lastOk = now;
-  var startAt = first ? Math.max(0, plays.length - sh.FEED_MAX) : 0;
   var added = 0, revised = 0, newestKnown = -1;
   st.order = {};
   plays.forEach(function (p, i) {
@@ -1174,10 +1185,10 @@ function applySummary(sum) {
   if (resumed || freshIds.length > 1) {
     st.timingBreak = { at: now, reason: resumed ? 'response_gap' : 'batch' };
   }
-  for (var i = startAt; i < plays.length; i++) {
+  for (var i = 0; i < plays.length; i++) {
     var p = plays[i], id = String(p.id), previous = st.seen[id];
     var fingerprint = playFingerprint(p);
-    if (previous && (previous.skip || previous.fingerprint === fingerprint)) continue;
+    if (previous && previous.fingerprint === fingerprint) continue;
     var backlog = first && i < last;
     var backfill = !first && !previous && i < newestKnown;
     var facts = window.FootballPlay.describe(p, abbr);
@@ -1201,7 +1212,7 @@ function applySummary(sum) {
       released: !!(previous && previous.released), releasedGradeKey: previous && previous.releasedGradeKey };
     if (previous) revised++; else added++;
     st.queue.push({
-      kind: 'play', at: backlog ? 0 : now,
+      kind: 'play', at: now, source: p,
       silent: backlog || backfill,
       wasReleased: !!(previous && previous.released), priorGradeKey: previous && previous.releasedGradeKey,
       marker: isMarker(p), row: row,
@@ -1209,7 +1220,6 @@ function applySummary(sum) {
       sitKey: playSitKey(p, abbr), gained: facts.gained, need: facts.need
     });
   }
-  for (var k = 0; k < startAt; k++) st.seen[String(plays[k].id)] = { skip: true };
   if (added || revised) st.lastChange = now;
   var sit = preSnap(sum, plays, health);
   var basisIndex = last;
@@ -1306,8 +1316,9 @@ function renderFeed() {
     el.innerHTML = '<div class="empty">Waiting for the first play.</div>';
     return;
   }
-  var expanded = {};
+  var expanded = {}, understood = {};
   el.querySelectorAll('details[data-play]').forEach(function (details) { expanded[details.dataset.play] = details.open; });
+  el.querySelectorAll('details[data-understand]').forEach(function (details) { understood[details.dataset.understand] = details.open; });
   var h = '';
   for (var i = 0; i < st.rows.length; i++) {
     var r = st.rows[i];
@@ -1327,12 +1338,22 @@ function renderFeed() {
       (r.players ? '<p class="play-players">' + sh.esc(r.players) + '</p>' : '') +
       (facts ? '<div class="play-facts" aria-label="Details reported by ESPN">' + facts + '</div>' : '') +
       (r.consequence ? '<p class="play-after">' + window.FootballGlossary.annotate(r.consequence) + '</p>' : '') +
+      ((r.meaning || r.depthText || r.related) ? '<details class="play-understand" data-understand="' + sh.esc(r.id) + '"' + (understood[r.id] ? ' open' : '') + '><summary>Understand this play</summary>' +
+        (r.depthText ? '<p>' + sh.esc(r.depthText) + '</p><span class="depth-caption">' + (r.depthSource === 'reported spots' ? 'Calculated from the positions in the play report.' : 'Distances supplied by the play report.') + '</span>' : '') +
+        (r.meaning ? '<p>' + window.FootballGlossary.annotate(r.meaning) + '</p>' : '') +
+        (r.related ? '<button type="button" class="depth-link" data-lesson="' + sh.esc(r.related.lesson.id) + '" data-lesson-context="' + sh.esc(r.related.reason) + '" aria-haspopup="dialog" aria-controls="learningSheet">' + sh.esc(r.related.lesson.title) + ' <span aria-hidden="true">↗</span></button>' : '') + '</details>' : '') +
       (r.raw ? '<details class="play-details" data-play="' + sh.esc(r.id) + '"' +
         (detailsOpen ? ' open' : '') + '><summary>ESPN play report</summary><p class="pl3">' +
         sh.esc(r.raw) + '</p></details>' : '') +
       '</div>';
   }
   el.innerHTML = h;
+}
+function renderInsights() {
+  var plays = Object.keys(st.released).map(function (id) { return st.released[id]; }).sort(function (a, b) {
+    return (st.order[String(a.id)] ?? -1) - (st.order[String(b.id)] ?? -1);
+  });
+  window.FootballDepth.renderInsights(window.FootballInsights.summarize(plays, { teamAbbreviations: teamAbbrs(st.sum) }));
 }
 function ageText(at) {
   if (!at) return 'not yet';
@@ -1499,7 +1520,8 @@ function resetGame() {
   clearTimeout(pollTimer);
   if (pollRequest) pollRequest.controller.abort();
   pollRequest = null;
-  st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = [];
+  st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = []; st.released = {};
+  window.FootballDepth.renderInsights({ drive: null, teams: [] });
   st.health = null; st.lastQueuedHealth = ''; st.lastChange = 0;
   st.syncCandidate = null; st.syncSample = null; st.timingBreak = null;
   $('syncApply').hidden = true; $('syncResult').textContent = '';

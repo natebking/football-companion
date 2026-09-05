@@ -35,7 +35,7 @@ CFB already ships plus the live one, so no season currently in the tables is
 dropped to make room. With the half-life at 1.0 the fourth season back carries
 weight 0.125, so the tail is small by construction. `--seasons` overrides it.
 
-This does move the NFL tables, which ship one season today. Four seasons of
+This can move the NFL tables beyond their currently published seasons. Four seasons of
 nflverse is more sample under the same shrinkage, not a different method, but it
 is a change to shipped numbers and `engine/backtest.py` should be re-run against
 it before anyone quotes the contract's NFL Brier as describing the live file.
@@ -54,13 +54,13 @@ to the point, means the cache only ever holds weeks that are done.
 
 CFBD budget
 -----------
-Free tier is 5000 calls a month. The Action starts cold every run because
+Free tier is 1000 calls a month (CFBD pricing checked 2026-09-05). The Action starts cold every run because
 `data/` is gitignored, so the worst run is the whole window from scratch:
 
     1 calendar + 16 weeks per season in the window + 1 in-progress week
 
 which is 66 calls at a window of 4. At the Tuesday cadence, 52/12 runs a month,
-that is about 286 calls, under 6% of the tier. The run prints its own count and
+that is about 286 calls, under 29% of the tier. The run prints its own count and
 this projection every time, so the number is measured rather than assumed.
 """
 import argparse
@@ -98,7 +98,7 @@ SEASON_WINDOW = 4
 # 2027, so a January run is still refreshing the 2026 season.
 SEASON_ROLLOVER_MONTH = 7
 
-FREE_TIER_CALLS = 5000
+FREE_TIER_CALLS = 1000
 RUNS_PER_MONTH = 52.0 / 12.0
 
 LEAGUES: Dict[str, Dict[str, str]] = {

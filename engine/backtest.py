@@ -11,7 +11,7 @@ before scoring. `build()` is handed the training frame only, so the ladder's own
 Method
 ------
 1. Split the play frame in time. Multi-season frames hold out the most recent
-   season. A single-season frame (the NFL parquet is 2024 only) holds out the
+   season. A single-season frame holds out the
    most recent weeks instead, which is a weaker test and is labelled as such.
 2. Build tables on the training side.
 3. For every held-out eligible play, query the block and record the predicted

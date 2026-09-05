@@ -1,0 +1,27 @@
+/* Illustrative football diagrams. Panel layout lives in depth.css. */
+.learning-diagram { width: 100%; height: auto; overflow: visible; --learning-route: #d4f76b; --learning-defense: #f2cb85; }
+.learning-pitch { fill: var(--field); }
+.learning-field-bound { fill: none; stroke: var(--field-ink); stroke-opacity: .28; }
+.learning-yard-line { fill: none; stroke: var(--field-ink); stroke-opacity: .12; }
+.learning-scrimmage { fill: none; stroke: #91c4de; stroke-width: 2; stroke-opacity: .7; }
+.learning-offense { fill: var(--learning-route); stroke: var(--field); stroke-width: 2; }
+.learning-defense { fill: none; stroke: var(--learning-defense); stroke-width: 3; stroke-linecap: round; }
+.learning-svg-label { fill: var(--field-ink); font: 16px "DM Sans", sans-serif; }
+.learning-svg-small { font-size: 13px; }
+.learning-svg-overline { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; }
+.learning-right { text-anchor: end; font-size: 13px; }
+.learning-centered, .learning-player-label { text-anchor: middle; }
+.learning-player-label { fill: #213216; font-size: 10px; font-weight: 600; }
+.learning-route, .learning-arrowhead { fill: none; stroke: var(--learning-route); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.learning-defender-path { stroke: var(--learning-defense); }
+.learning-pass { stroke: #b5d9ef; stroke-dasharray: 5 6; }
+.learning-arrowhead.learning-pass { stroke-dasharray: none; }
+.learning-guide { fill: none; stroke: var(--field-ink); stroke-width: 1; stroke-opacity: .6; }
+.learning-highlight { fill: none; stroke: var(--learning-route); stroke-width: 2; stroke-dasharray: 3 4; }
+.learning-zone { fill: var(--learning-route); fill-opacity: .09; stroke: var(--learning-route); stroke-opacity: .35; stroke-dasharray: 4 5; }
+.learning-endzone { fill: var(--field-ink); fill-opacity: .1; }
+.learning-boundary { stroke: var(--field-ink); stroke-width: 3; }
+.learning-marker { stroke: var(--learning-defense); stroke-width: 2; stroke-dasharray: 8 6; }
+@media (forced-colors: active) {
+  .learning-diagram { forced-color-adjust: none; }
+}

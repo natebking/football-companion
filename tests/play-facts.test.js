@@ -84,16 +84,18 @@ test('a scramble is an actual run, even if the data type says pass', () => {
   assert.equal(p.summary, 'Quarterback scramble for 4 yards.');
 });
 
-test('accepted penalties suppress misleading yardage and malformed next downs', () => {
+test('accepted penalties stay ungraded while validated advancement explains the ruling', () => {
   for (const name of ['penalty', 'runWithPenalty', 'automaticFirstDown']) {
     const p = fixture(name);
     assert.equal(p.outcome, 'other', name);
     assert.equal(p.gained, null, name);
     assert.equal(p.need, null, name);
     assert.equal(p.voidReason, 'A penalty affected this play, so your pick does not count.', name);
-    assert.equal(p.consequence, 'See the play report for the ruling.', name);
-    assert.doesNotMatch(p.consequence, /Next:|short|First down/i, name);
+    assert.ok(p.movement, name);
   }
+  assert.equal(fixture('penalty').consequence, 'The penalty moved the ball 5 yards back. Next: 1st & 15 at BALL 20.');
+  assert.equal(fixture('runWithPenalty').consequence, '6 yards gained on the play, then 10 yards back for the penalty. Next: 2nd & 14 at NEB 39.');
+  assert.equal(fixture('automaticFirstDown').consequence, '8 yards gained on the play, then 15 yards forward for the penalty. First down.');
 });
 
 test('a declined penalty preserves the play and its reported facts', () => {
@@ -234,6 +236,7 @@ test('goal-line distance zero is normalized without printing a first down', () =
   }, { '1': 'OFF', '2': 'DEF' });
   assert.equal(p.need, 3);
   assert.equal(p.consequence, 'Next: 2nd & goal at DEF 2.');
+  assert.equal(p.meaning, 'The ball is now 2 yards from the end zone.');
 });
 
 test('negative end distances never produce a made-up next down', () => {
@@ -274,4 +277,119 @@ test('browser entry point exposes the same pure describe API', () => {
   vm.runInNewContext(fs.readFileSync(require.resolve('../web/play-facts.js'), 'utf8'), context);
   assert.equal(typeof context.window.FootballPlay.describe, 'function');
   assert.equal(context.window.FootballPlay.describe(fixtures.normalRun.play).outcome, 'run');
+});
+
+test('reported catch spots separate the throw from yards after the catch', () => {
+  const p = fixture('normalPass');
+  assert.equal(p.airYards, 11);
+  assert.equal(p.yardsAfterCatch, 1);
+  assert.equal(p.depthSource, 'reported spots');
+  assert.equal(p.depthText, 'Caught 11 yards beyond the line of scrimmage; 1 yard after the catch.');
+  assert.deepEqual(p.people, { passer: '#6 K.Luster', receiver: '#10 J.McDougle', runner: '' });
+  assert.deepEqual(p.movement, { start: 61, end: 49, net: 12, play: 12, penalty: 0 });
+});
+
+test('an explicit end-zone catch and matching prose alias support touchdown depth', () => {
+  const p = fixture('touchdownPass');
+  assert.equal(p.airYards, 48);
+  assert.equal(p.yardsAfterCatch, 0);
+  assert.equal(p.movement.end, 0);
+  assert.equal(p.depthSource, 'reported spots');
+});
+
+test('unmapped catch-side aliases are not guessed from short or deep labels', () => {
+  const f = copy('normalPass');
+  f.play.text = f.play.text.replace('BallSt50', 'Unknown42');
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.airYards, null);
+  assert.equal(p.yardsAfterCatch, null);
+  assert.equal(p.depthText, '');
+  assert.ok(p.facts.includes('Short pass over the middle'));
+});
+
+test('a behind-the-line catch can have more after-catch yards than the total gain', () => {
+  const f = copy('normalPass');
+  f.play.text = f.play.text.replace('BallSt50', 'BALL36'); // Started at own 39.
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.airYards, -3);
+  assert.equal(p.yardsAfterCatch, 15);
+  assert.equal(p.depthText, 'Caught 3 yards behind the line of scrimmage; 15 yards after the catch.');
+});
+
+test('the real Jackson to Flowers 36-yard play is 3 air yards plus 33 after the catch', () => {
+  // nflverse data/raw/nfl_pbp_2025.parquet, game 2025_01_BAL_BUF, play 2796.
+  const p = describe({ id: '2025_01_BAL_BUF:2796', type: { text: 'Pass Reception' },
+    text: '(2:42) 8-L.Jackson pass short right to 4-Z.Flowers pushed ob at BUF 32 for 36 yards (C.Bishop).',
+    statYardage: 36, complete_pass: 1, air_yards: 3, yards_after_catch: 33 });
+  assert.equal(p.gained, 36);
+  assert.equal(p.airYards, 3);
+  assert.equal(p.yardsAfterCatch, 33);
+  assert.equal(p.depthSource, 'reported');
+});
+
+test('structured catch data must reconcile and cannot override a contradictory live result', () => {
+  for (const [air, after] of [[3, 8], ['3', 9], [3, null], [100, -88]]) {
+    const f = copy('normalPass');
+    f.play.airYards = air; f.play.yardsAfterCatch = after;
+    assert.equal(describe(f.play, f.abbr).depthText, '');
+  }
+  const f = copy('normalPass');
+  f.play.airYards = 3; f.play.yardsAfterCatch = 9;
+  assert.equal(describe(f.play, f.abbr).airYards, null); // The explicit catch spot says 11 + 1.
+  f.play.text = f.play.text.replace('caught at BallSt50, ', '');
+  assert.equal(describe(f.play, f.abbr).airYards, 3);
+  f.play.end.yardsToEndzone = 47; f.play.end.possessionText = 'OSU 47';
+  assert.equal(describe(f.play, f.abbr).depthText, '');
+});
+
+test('nullable optional fields do not erase an independently reported catch spot', () => {
+  const f = copy('normalPass'); f.play.airYards = null; f.play.yardsAfterCatch = null;
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.airYards, 11);
+  assert.equal(p.yardsAfterCatch, 1);
+  assert.equal(p.depthSource, 'reported spots');
+});
+
+test('turnovers, penalties and incomplete passes do not acquire catch-yardage claims', () => {
+  for (const name of ['interception', 'fourthDown', 'nullifiedTouchdown', 'runWithPenalty']) {
+    const f = copy(name); f.play.airYards = 3; f.play.yardsAfterCatch = 4;
+    const p = describe(f.play, f.abbr);
+    assert.equal(p.depthText, '', name);
+    if (name !== 'runWithPenalty') assert.equal(p.movement, null, name);
+  }
+  const f = copy('normalPass');
+  f.play.text = f.play.text.replace('pass complete', 'pass incomplete');
+  assert.equal(describe(f.play, f.abbr).depthText, '');
+});
+
+test('penalty movement must reconcile with the enforcement and cannot make up missing yards', () => {
+  const f = copy('runWithPenalty');
+  assert.deepEqual(describe(f.play, f.abbr).movement, { start: 57, end: 61, net: -4, play: 6, penalty: -10 });
+  f.play.text = f.play.text.replace('10 yards from', '15 yards from');
+  let p = describe(f.play, f.abbr);
+  assert.equal(p.movement, null);
+  assert.equal(p.consequence, 'See the play report for the ruling.');
+  f.play.text = f.play.text.replace('15 yards from', '10 yards from');
+  delete f.play.end;
+  p = describe(f.play, f.abbr);
+  assert.equal(p.movement, null);
+  assert.equal(p.consequence, 'See the play report for the ruling.');
+});
+
+test('a no-play penalty cannot advance the down without a reported first down', () => {
+  const f = copy('penalty'); f.play.end.down = 2;
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.consequence, 'The penalty moved the ball 5 yards back.');
+  assert.equal(p.meaning, 'The penalty changed the spot. The play itself does not count.');
+});
+
+test('sacks and knees can contribute verified drive movement while staying ungraded', () => {
+  assert.deepEqual(fixture('sack').movement, { start: 58, end: 63, net: -5, play: -5, penalty: 0 });
+  const f = copy('normalRun'); f.play.text = 'Kneel down by #10 J.Sayin for 1 yard loss';
+  f.play.statYardage = -1; f.play.end.yardsToEndzone = 85; f.play.end.possessionText = 'OSU 15';
+  f.play.end.distance = 11;
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.movement.net, -1);
+  assert.equal(p.gained, null);
+  assert.equal(p.outcome, 'other');
 });

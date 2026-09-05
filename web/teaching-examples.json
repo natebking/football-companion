@@ -1,0 +1,188 @@
+{
+  "generated": "2026-09-05",
+  "kind": "historical-lessons",
+  "notice": "Real plays from the 2025 season. These are examples to explore, separate from the game you are watching.",
+  "examples": [
+    {
+      "id": "short-throw-big-gain",
+      "topic": "yards-after-catch",
+      "title": "A short throw, a long gain",
+      "league": "nfl",
+      "season": 2025,
+      "week": 1,
+      "gameId": "2025_01_BAL_BUF",
+      "playId": "2796",
+      "offense": "BAL",
+      "defense": "BUF",
+      "summary": "Lamar Jackson found Zay Flowers for 36 yards.",
+      "explanation": "The catch was 3 yards beyond the starting line. Flowers added 33 after the catch. A 36-yard completion can come mostly from what happens with the ball in the receiver's hands.",
+      "facts": {
+        "down": 1,
+        "distance": 10,
+        "yardsGained": 36,
+        "airYards": 3,
+        "yardsAfterCatch": 33
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        }
+      ]
+    },
+    {
+      "id": "screen-behind-the-line",
+      "topic": "screen",
+      "title": "Catch it behind the line",
+      "league": "nfl",
+      "season": 2025,
+      "week": 1,
+      "gameId": "2025_01_BAL_BUF",
+      "playId": "3106",
+      "offense": "BUF",
+      "defense": "BAL",
+      "summary": "Josh Allen completed a screen to James Cook for 51 yards.",
+      "explanation": "Cook caught the ball 3 yards behind the starting line, then gained 54 after the catch. FTN charted this as a screen. On a screen, look for blockers getting in front of the receiver. The data does not establish which block created the opening.",
+      "facts": {
+        "down": 3,
+        "distance": 6,
+        "yardsGained": 51,
+        "airYards": -3,
+        "yardsAfterCatch": 54,
+        "playAction": false,
+        "screen": true,
+        "motion": false
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    },
+    {
+      "id": "fake-handoff-deep-pass",
+      "topic": "play-action",
+      "title": "The handoff was a fake",
+      "league": "nfl",
+      "season": 2025,
+      "week": 1,
+      "gameId": "2025_01_ARI_NO",
+      "playId": "1188",
+      "offense": "ARI",
+      "defense": "NO",
+      "summary": "Kyler Murray completed a 45-yard pass to Marvin Harrison Jr.",
+      "explanation": "FTN charted a fake handoff and motion before the snap. The throw traveled 39 yards and Harrison added 6 after the catch. Watch the quarterback and running back first; their fake is part of the play's design. The charting does not prove a defender fell for it.",
+      "facts": {
+        "down": 2,
+        "distance": 4,
+        "yardsGained": 45,
+        "airYards": 39,
+        "yardsAfterCatch": 6,
+        "playAction": true,
+        "screen": false,
+        "motion": true
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    },
+    {
+      "id": "five-yards-first-down",
+      "topic": "down-and-distance",
+      "title": "Five yards that leave options",
+      "league": "nfl",
+      "season": 2025,
+      "week": 1,
+      "gameId": "2025_01_ARI_NO",
+      "playId": "327",
+      "offense": "ARI",
+      "defense": "NO",
+      "summary": "Completed pass for 5 yards.",
+      "explanation": "Arizona needed 10 yards on first down. A 5-yard completion left second-and-five, with two more downs before a fourth-down decision. The useful detail is how much work remains.",
+      "facts": {
+        "down": 1,
+        "distance": 10,
+        "yardsGained": 5,
+        "nextDown": 2,
+        "remaining": 5
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        }
+      ]
+    },
+    {
+      "id": "five-yards-third-down",
+      "topic": "down-and-distance",
+      "title": "The same gain, a different result",
+      "league": "nfl",
+      "season": 2025,
+      "week": 4,
+      "gameId": "2025_04_TEN_HOU",
+      "playId": "1178",
+      "offense": "HOU",
+      "defense": "TEN",
+      "summary": "Completed pass for 5 yards.",
+      "explanation": "Houston needed 8 yards on third down. A 5-yard completion left fourth-and-three. It gained ground but did not reach the marker. Compare it with the first-down example: the yards are identical; the consequence is different.",
+      "facts": {
+        "down": 3,
+        "distance": 8,
+        "yardsGained": 5,
+        "nextDown": 4,
+        "remaining": 3
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        }
+      ]
+    },
+    {
+      "id": "long-throw-college",
+      "topic": "yards-after-catch",
+      "title": "This time, the throw covered the ground",
+      "league": "cfb",
+      "season": 2025,
+      "week": 1,
+      "seasonType": "postseason",
+      "gameId": "401769074",
+      "playId": "401769074527",
+      "offense": "Oregon",
+      "defense": "Indiana",
+      "summary": "Dante Moore completed a 43-yard pass to Jeremiah McClellan.",
+      "explanation": "CollegeFootballData parsed 43 yards through the air and none after the catch. Unlike the Flowers example, the throw accounted for the whole gain. These measurements come from the written play report, not player tracking.",
+      "facts": {
+        "down": 3,
+        "distance": 11,
+        "yardsGained": 43,
+        "airYards": 43,
+        "yardsAfterCatch": 0
+      },
+      "sources": [
+        {
+          "label": "CollegeFootballData enriched passing",
+          "url": "https://api.collegefootballdata.com/api/passing"
+        }
+      ]
+    }
+  ]
+}

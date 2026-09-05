@@ -2,6 +2,18 @@
 
 Interfaces every module codes against. Written before implementation so parallel work composes. If an implementation needs to deviate, it says so in its output rather than silently diverging.
 
+## Current evidence and learning views — September 5, 2026
+
+The NFL export now covers 2023–2025. Its 2025 holdout Brier is **0.21896** versus **0.21901** for the situation-only baseline. The paired difference interval **[−0.00085, +0.00083]** includes zero. There is no demonstrated NFL team-specific forecasting edge in this newer test. The historical measurements below explain the original estimator decisions; they are not current performance claims. See [the refresh audit](DATA-REFRESH-2026-09-05.md) for complete results.
+
+New modules keep the existing live truth boundary:
+
+- `FootballPlay.describe` exposes a situational explanation, literal named people, validated movement, and optional passing components. Missing or inconsistent distances remain unknown. A short throw never establishes a screen; a sack never establishes a blitz.
+- `FootballInsights.summarize` uses all released raw play records, deduplicated by play ID. A correction replaces the original. Drive totals require consistent positions and movement, with penalty progress separated. Player and direction counts describe available reports and disclose missing coverage.
+- `FootballLearning` chooses eight observational lessons from the whitelisted pre-snap situation. Static diagrams show examples only. Self-reported observations are separate from prediction grading and are never evidence of mastery.
+- `FootballDepth` renders these views. All game aggregates cross the same TV-delay queue as the play feed, including initial history and corrections. They never read an unreleased source snapshot to obtain scores or totals.
+- `teaching-examples.json` contains six identified historical plays. FTN-derived lessons retain attribution and CC-BY-SA 4.0 source links. Sources are not queried by the runtime library. Historical examples never modify the live game.
+
 ## Architecture
 
 Static site, no backend. The browser polls ESPN directly (ESPN 403s datacenter IPs but serves `access-control-allow-origin: *`) and looks up precomputed tendency tables shipped as static JSON. Card copy comes from a verified template library filled with computed numbers, so the live path makes zero LLM calls. Feed errors and parsing mistakes remain possible and require explicit checks.
@@ -83,6 +95,8 @@ Recency weighting inside a rung: exponential decay by season, half-life one seas
 
 ### Shrinkage
 
+The calibration measurements below record the original method selection. The refreshed NFL nested fit selects `k=55.6`, with the existing `k=60` inside its flat range of 23.6–117.6; no parameter changed.
+
 Rates computed on 30 to 50 plays carry a standard error near 0.08, so extreme buckets are mostly noise. Unshrunk, the engine's 0.9-1.0 CFB bin predicted 0.9331 and observed 0.8037, its 0.0-0.1 bin predicted 0.0522 and observed 0.1628, and the engine lost to a baseline carrying no team information at all. Every rate in the block is corrected by one constant:
 
 ```
@@ -138,7 +152,7 @@ A real block, USC on 1st and 10 from their own 25, CFB tables over 2023-2025:
 - `shrink_weight` is `w`. It decides whether copy may attribute the number to the team, and it is the only honest basis for that call.
 - `success_rate` and `explosive_rate` are shrunk toward their own league counterparts with the same `k`.
 
-### Measured against the bar
+### Original validation (superseded for current NFL reporting)
 
 Out of sample, against the league's rate for the identical situation bucket (`engine/backtest.py`, unchanged):
 
@@ -149,13 +163,13 @@ Out of sample, against the league's rate for the identical situation bucket (`en
 | CFB ECE | 0.0278 | **0.0092** | 0.0033 | |
 | NFL ECE | 0.0217 | **0.0126** | 0.0075 | |
 
-Team-clustered paired bootstrap, 2000 reps, against the situation baseline: CFB -0.00140, 95% CI [-0.00309, -0.00007]; NFL -0.00217, 95% CI [-0.00388, -0.00048]. Both exclude zero. Team attribution now earns its place, having previously lost to a model with no team in it.
+Team-clustered paired bootstrap, 2000 reps, against the situation baseline: CFB -0.00140, 95% CI [-0.00309, -0.00007]; NFL -0.00217, 95% CI [-0.00388, -0.00048]. Both excluded zero in that original test. The newer full-season NFL holdout above does not establish that advantage.
 
 ## Shipped tendency JSON
 
 `web/tendency-cfb.json`, `web/tendency-nfl.json`. Written by `engine/export_tables.py`, read by the browser once at load.
 
-The size gate is the **gzipped** bytes, because that is what crosses the wire and what the phone waits on: under 100KB each. CFB ships 74,008 gzipped over 920,201 raw, NFL 12,160 over 149,409 (the exporter reports both on every run). Uncompressed size is a parse cost of a few milliseconds and no transfer cost, so it is reported and not budgeted. Rates round to 3 decimals, `shrink_weight` to the engine's 4 so the two never disagree about a confidence cut.
+The size gate is the **gzipped** bytes, because that is what crosses the wire and what the phone waits on: under 100KB each. CFB ships 74,008 gzipped over 920,201 raw, NFL 16,683 over 197,869 after the September 5 refresh (the exporter reports both on every run). Uncompressed size is a parse cost of a few milliseconds and no transfer cost, so it is reported and not budgeted. Rates round to 3 decimals, `shrink_weight` to the engine's 4 so the two never disagree about a confidence cut.
 
 ```json
 {
@@ -177,7 +191,7 @@ The size gate is the **gzipped** bytes, because that is what crosses the wire an
 }
 ```
 
-Teams carry every bucket that reached rung 1, 2 or 3. Rung 3 ships now that confidence is a function of `shrink_weight` rather than of the rung: a rung-3 cell on 200 plays is exactly as trustworthy as a rung-1 cell on 200 plays, and the same two conditions gate it. It costs 1,405 CFB cells and buys an exact match to the engine on every snap, so the client read and `tendency.query` now agree on all 360,592 CFB and 34,902 NFL eligible plays. Rung 4 cannot appear because the engine no longer has it; the ordinal stays retired. Rung 5 is the league line, which is `league_baseline`, not a team cell.
+Teams carry every bucket that reached rung 1, 2 or 3. Rung 3 ships now that confidence is a function of `shrink_weight` rather than of the rung: a rung-3 cell on 200 plays is exactly as trustworthy as a rung-1 cell on 200 plays, and the same two conditions gate it. It costs 1,405 CFB cells and buys an exact match to the engine on every snap, so the client read and `tendency.query` now agree on all 360,592 CFB and 104,878 NFL eligible plays. Rung 4 cannot appear because the engine no longer has it; the ordinal stays retired. Rung 5 is the league line, which is `league_baseline`, not a team cell.
 
 `rules` carries the constants the file was built under so the client holds no magic numbers. `league_overall` is the last-resort league line for the handful of buckets the league itself never filled (four in the NFL, every one of them 1st and short, in all four zones outside the red zone); a team can still reach rung 2 or 3 there through a widened filter, and the engine shrinks toward the overall rate, so the client must fall back to the same thing.
 

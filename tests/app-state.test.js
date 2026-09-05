@@ -10,10 +10,11 @@ const grading = source.slice(source.indexOf('function grade('), source.indexOf('
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 function polling() {
-  const requests = [], applied = [], errors = [], timers = new Map();
+  const requests = [], applied = [], errors = [], insights = [], timers = new Map();
   let timerId = 0, league = 'cfb';
   const context = vm.createContext({
     AbortController, Date,
+    window: { FootballDepth: { renderInsights: value => insights.push(value) } },
     st: { gameId: 'A', games: [], gameState: 'in' },
     sh: {
       POLL_MS: 3000, SB_MS: 12000, LS: { game: 'game' },
@@ -29,7 +30,7 @@ function polling() {
     $: () => ({ className: '' })
   });
   vm.runInContext(loop, context);
-  return { context, requests, applied, errors, timers, setLeague: value => { league = value; } };
+  return { context, requests, applied, errors, insights, timers, setLeague: value => { league = value; } };
 }
 
 test('repeated wake-up polls share one active request and one next timer', async () => {
@@ -125,10 +126,14 @@ test('brief hints are an explicit preference, independent of prediction history'
 test('switching leagues clears the old game before its new table or schedule arrives', async () => {
   const h = polling();
   h.context.st.queue = [{ kind: 'play', row: 'CFB play' }];
+  h.context.st.released = { 'old-cfb': { id: 'old-cfb' } };
   h.context.pollGame();
   h.setLeague('nfl'); h.context.clearLeague();
   assert.equal(h.context.st.gameId, null);
   assert.equal(h.context.st.queue.length, 0);
+  assert.equal(Object.keys(h.context.st.released).length, 0);
+  assert.equal(h.insights.at(-1).drive, null);
+  assert.equal(h.insights.at(-1).teams.length, 0);
   assert.equal(h.requests[0].signal.aborted, true);
   h.context.pollGame();
   assert.equal(h.requests.length, 1); // No NFL request with a CFB game ID.
@@ -149,19 +154,30 @@ test('a pick closed after switching leagues retains its original league', () => 
 });
 
 function liveQueue(delay = 10000) {
-  const events = [], diagnostics = [];
+  const events = [], diagnostics = [], insightInputs = [], insights = [];
   let now = 100000;
   const context = vm.createContext({
-    window: { FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js') },
+    window: {
+      FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js'),
+      FootballLearning: require('../web/learning.js'),
+      FootballInsights: { summarize: (plays, options) => {
+        insightInputs.push(structuredClone(Array.from(plays)));
+        return require('../web/game-insights.js').summarize(plays, options);
+      } },
+      FootballDepth: { renderInsights: value => insights.push(structuredClone(value)) }
+    },
     Date: { now: () => now },
-    st: { gameId: 'A', seen: {}, queue: [], rows: [], primed: false, lastQueuedSit: '', lastOk: 0, timingBreak: null },
+    st: { gameId: 'A', seen: {}, queue: [], rows: [], released: {}, primed: false, lastQueuedSit: '', lastOk: 0, timingBreak: null },
     sh: { FEED_MAX: 25, STALE_MS: 9000, delayMs: () => delay, diag: (name, value) => diagnostics.push({ name, value }), bus: { emit: (name, value) => events.push({ name, value }) } },
     renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}
   });
   const start = source.indexOf('function collectPlays(');
   const end = source.indexOf('// ---------------------------------------------------------------- render', start);
   vm.runInContext(source.slice(start, end), context);
-  return { context, events, diagnostics, setNow: value => { now = value; }, tick: value => { now = value; context.pump(); } };
+  const renderStart = source.indexOf('function renderInsights(');
+  vm.runInContext(source.slice(renderStart, source.indexOf('function ageText(', renderStart)), context);
+  return { context, events, diagnostics, insightInputs, insights,
+    setNow: value => { now = value; }, tick: value => { now = value; context.pump(); } };
 }
 
 test('reported play facts and the next hint both wait behind the TV delay', () => {
@@ -431,6 +447,106 @@ function syntheticTimedRun(id, step = 0) {
   return play;
 }
 
+function syntheticHistory() {
+  // Ten small synthetic drives make the aggregate history exceed the 25-row
+  // visible feed. They are not a reconstruction of an actual game.
+  const drives = Array.from({ length: 10 }, (_, drive) => ({
+    id: 'synthetic-drive-' + drive,
+    plays: Array.from({ length: 3 }, (_, step) => syntheticTimedRun('synthetic-history-' + drive + '-' + step, step))
+  }));
+  const summary = summaryOf([]);
+  summary.drives = { previous: drives.slice(0, -1), current: drives.at(-1) };
+  return summary;
+}
+
+test('game summaries retain all initial history after release even when the visible feed has 25 rows', () => {
+  const h = liveQueue(), summary = syntheticHistory();
+  h.context.applySummary(summary);
+  assert.equal(Object.keys(h.context.st.released).length, 0);
+  assert.equal(h.insights.length, 0);
+  h.tick(109999);
+  assert.equal(h.insights.length, 0);
+  h.tick(110000);
+  assert.equal(h.context.st.rows.length, 25);
+  assert.equal(Object.keys(h.context.st.released).length, 30);
+  assert.equal(h.insightInputs.at(-1).length, 30);
+  assert.equal(h.insights.at(-1).coverage.uniqueReports, 30);
+  assert.equal(h.insights.at(-1).teams[0].coverage.observedPlays, 30);
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.runs, 20);
+  assert.equal(h.insights.at(-1).drive.id, 'synthetic-drive-9');
+  assert.equal(h.insights.at(-1).drive.netYards, 12);
+  assert.equal(h.insightInputs.at(-1)[0].driveId, 'synthetic-drive-0');
+  assert.equal(summary.drives.previous[0].plays[0].driveId, undefined, 'Collection does not mutate the source play.');
+  assert.equal(h.events.filter(event => event.name === 'result').length, 1, 'Initial history does not grade old plays.');
+});
+
+test('a new source report cannot enter game summaries before its TV delay expires', () => {
+  const h = liveQueue(), a = syntheticTimedRun('synthetic-visible'), b = syntheticTimedRun('synthetic-held', 1);
+  const first = summaryOf([a]); first.drives.current.id = 'synthetic-delay-drive';
+  h.context.applySummary(first); h.tick(110000);
+  assert.equal(h.insights.at(-1).drive.netYards, 4);
+  const next = summaryOf([a, b]); next.drives.current.id = 'synthetic-delay-drive';
+  h.tick(111000); h.context.applySummary(next);
+  assert.equal(h.context.st.sum.drives.current.plays.length, 2, 'The source already contains the held play.');
+  // An unrelated repaint must still summarize the released records only.
+  h.context.renderInsights();
+  assert.deepEqual(h.insightInputs.at(-1).map(play => play.id), [a.id]);
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.runs, 1);
+  assert.equal(h.insights.at(-1).drive.netYards, 4);
+  h.tick(120999);
+  assert.equal(h.insights.at(-1).coverage.uniqueReports, 1);
+  h.tick(121000);
+  assert.deepEqual(h.insightInputs.at(-1).map(play => play.id), [a.id, b.id]);
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.runs, 2);
+  assert.equal(h.insights.at(-1).drive.netYards, 8);
+});
+
+test('a same-ID correction outside the visible feed replaces its old aggregate contributions after release', () => {
+  const h = liveQueue(), original = syntheticHistory();
+  const id = original.drives.previous[0].plays[0].id;
+  h.context.applySummary(original); h.tick(110000);
+  assert.equal(h.context.st.rows.some(row => row.id === id), false);
+  const revised = structuredClone(original), play = revised.drives.previous[0].plays[0];
+  play.type = { text: 'Pass' };
+  play.text = 'Test Quarterback pass complete short left to Test Receiver for 4 yards to OSU 20.';
+  h.tick(113000); h.context.applySummary(revised);
+  h.context.renderInsights();
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.runs, 20);
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.passes, 0);
+  assert.equal(h.context.st.released[id].type.text, original.drives.previous[0].plays[0].type.text);
+  h.tick(123000);
+  const result = h.insights.at(-1), team = result.teams[0];
+  assert.equal(result.coverage.uniqueReports, 30);
+  assert.equal(h.insightInputs.at(-1).filter(play => play.id === id).length, 1);
+  assert.equal(h.context.st.released[id].type.text, 'Pass');
+  assert.equal(team.earlyDowns.runs, 19);
+  assert.equal(team.earlyDowns.passes, 1);
+  assert.equal(team.coverage.runs, 29);
+  assert.equal(team.coverage.passes, 1);
+  assert.equal(team.directions.pass.left, 1);
+  assert.equal(team.receivers[0].name, 'Test Receiver');
+  assert.equal(team.receivers[0].targets, 1);
+  assert.equal(h.context.st.rows.length, 25);
+  assert.equal(h.context.st.rows.some(row => row.id === id), false);
+});
+
+test('a superseded queued report never contributes its old version to game summaries', () => {
+  const h = liveQueue(), run = syntheticTimedRun('synthetic-corrected-before-release');
+  h.context.applySummary(summaryOf([run]));
+  const pass = structuredClone(run);
+  pass.type = { text: 'Pass' };
+  pass.text = 'Test Quarterback pass complete short left to Test Receiver for 4 yards to OSU 20.';
+  h.tick(105000); h.context.applySummary(summaryOf([pass]));
+  h.tick(110000);
+  assert.equal(Object.keys(h.context.st.released).length, 0);
+  assert.ok(h.insights.every(result => result.teams.length === 0));
+  h.tick(115000);
+  assert.equal(h.insights.at(-1).coverage.uniqueReports, 1);
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.runs, 0);
+  assert.equal(h.insights.at(-1).teams[0].earlyDowns.passes, 1);
+  assert.ok(h.insightInputs.every(plays => plays.every(play => play.type.text === 'Pass')));
+});
+
 test('two forward plays received together are ineligible for TV timing', () => {
   const h = liveQueue(0), history = syntheticTimedRun('synthetic-history');
   h.context.applySummary(summaryOf([history]));
@@ -574,7 +690,7 @@ test('an intermediate queue transition closes an old pick before a later play re
     situation: 'Second and 6.', tendency: '', watch: 'Watch the box.'
   } };
   const prime = vm.createContext({
-    Date, window: { FootballGlossary: { close: () => {} } },
+    Date, window: { FootballGlossary: { close: () => {} }, FootballLearning: require('../web/learning.js') },
     st: {
       pending: { sitKey: oldKey, game: 'A', league: 'cfb', cardId: 'synthetic-old-card',
         kind: 'passrun', answer: 'run', latency: 1500, down: 1, distance: 10, ytg: 84 },
@@ -583,6 +699,7 @@ test('an intermediate queue transition closes an old pick before a later play re
     sh: {
       bus: { on: (name, handler) => { (handlers[name] || (handlers[name] = [])).push(handler); } },
       logAsk: record => records.push(record), diag: () => {}, invalidateCalls: () => {}, league: () => 'cfb',
+      shortHints: () => false,
       bumpExposure: concepts => exposures.push(concepts)
     },
     resolveTeam: () => null, lookupTendency: () => null, printedRate: () => null,
@@ -623,6 +740,8 @@ test('an intermediate queue transition closes an old pick before a later play re
   assert.equal(prime.st.pending.sitKey, finalKey);
   assert.equal(prime.st.pending.answer, null);
   assert.equal(exposures.length, 1);
+  assert.equal(prime.st.watchLine, prime.st.lesson.watch);
+  assert.deepEqual(exposures[0], prime.st.lesson.concepts);
   assert.equal(h.events.filter(event => event.name === 'snap').length, 1);
   assert.equal(h.events.filter(event => event.name === 'nosnap').length, 0);
   assert.equal(h.events.filter(event => event.name === 'result').length, 1);

@@ -1,0 +1,152 @@
+/* Read-only views of released insights and optional football lessons. */
+(function (root) {
+  'use strict';
+  var doc = root.document;
+  var $ = function (id) { return doc.getElementById(id); };
+  function esc(text) { return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  }); }
+  var examples = null, selectedLesson = null, selectedExample = null;
+  function rich(text) { return root.FootballGlossary.annotate(text); }
+  function resetView() {
+    $('learningSheet').querySelector('.sheetInner').scrollTop = 0;
+    if (!$('learningSheet').inert) $('closeLearning').focus({ preventScroll: true });
+  }
+
+  function open() {
+    root.FootballGlossary.close();
+    doc.querySelectorAll('.sheet.on').forEach(function (sheet) {
+      if (sheet.id !== 'learningSheet') sheet.querySelector('.closex').click();
+    });
+    $('learningSheet').classList.add('on');
+  }
+  function close() { $('learningSheet').classList.remove('on'); }
+  $('closeLearning').addEventListener('click', close);
+  $('learningSheet').addEventListener('click', function (event) { if (event.target === $('learningSheet')) close(); });
+
+  function showLesson(id, context) {
+    var lesson = root.FootballLearning.get(id);
+    if (!lesson) return;
+    selectedLesson = lesson; selectedExample = null;
+    $('learningTitle').textContent = lesson.title;
+    $('learningContent').innerHTML = (context ? '<p class="depth-context">' + esc(context) + '</p>' : '') +
+      '<p class="learning-intro">' + rich(lesson.explanation) + '</p>' +
+      root.FootballLearning.renderDiagram(id) +
+      '<p class="learning-caption">' + esc(lesson.diagramCaption) + '</p>' +
+      '<section class="learning-observe" aria-labelledby="observeTitle"><span class="eyebrow">Your observation</span>' +
+      '<h2 id="observeTitle">' + esc(lesson.question) + '</h2><p class="depth-caption">Your observation, not checked against the feed. Choose “Couldn’t tell” if the camera missed it.</p>' +
+      '<div class="learning-choices">' + lesson.choices.map(function (choice) {
+        return '<button type="button" data-observation="' + esc(choice.id) + '" aria-pressed="false">' + esc(choice.label) + '</button>';
+      }).join('') + '</div><p id="observationResponse" class="learning-response" role="status" hidden></p></section>' +
+      '<button type="button" class="depth-link" data-example-library>Explore a real past play <span aria-hidden="true">↗</span></button>';
+    open();
+    resetView();
+  }
+  function yardageGraphic(facts) {
+    if (!facts || !Number.isFinite(facts.airYards) || !Number.isFinite(facts.yardsAfterCatch) ||
+        facts.yardsAfterCatch < 0 || facts.airYards + facts.yardsAfterCatch !== facts.yardsGained) return '';
+    var air = facts.airYards, after = facts.yardsAfterCatch, total = facts.yardsGained;
+    var low = Math.min(0, air), high = Math.max(1, total, air), span = high - low;
+    var x = function (yards) { return 30 + (yards - low) / span * 440; };
+    return '<div class="yardage-breakdown"><svg viewBox="0 0 500 84" role="img" aria-label="' + esc(air + ' yards through the air, ' + after + ' after the catch, ' + total + ' total.') + '">' +
+      '<path d="M30 28H470M30 52H470" class="yardage-track"/><path d="M' + x(0) + ' 28H' + x(air) + '" class="yardage-air"/>' +
+      '<path d="M' + x(air) + ' 52H' + x(total) + '" class="yardage-run"/>' +
+      '<path d="M' + x(0) + ' 14V66" class="yardage-start"/><circle cx="' + x(air) + '" cy="28" r="6" class="yardage-catch"/>' +
+      '</svg><div class="yardage-labels"><span><b>' + air + '</b> yards through the air</span><span><b>' + after + '</b> after the catch</span></div>' +
+      '<p class="depth-caption">Top: throw. Bottom: yards after the catch. The vertical line marks where the play began. This shows distance, not the receiver’s route.</p></div>';
+  }
+  function sourceLinks(list) {
+    return (list || []).map(function (source) {
+      if (!/^https:\/\//.test(source.url || '')) return '';
+      return '<a href="' + esc(source.url) + '" target="_blank" rel="noopener noreferrer">' + esc(source.label) + '</a>' +
+        (source.license && /^https:\/\//.test(source.licenseUrl || '') ? ' · <a href="' + esc(source.licenseUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(source.license) + '</a>' : '');
+    }).filter(Boolean).join('<br>');
+  }
+  function topicLesson(topic) {
+    var lessons = { screen: 'screen_blockers', 'play-action': 'handoff_fake', 'down-and-distance': 'first_down_line' };
+    return lessons[topic] ? root.FootballLearning.get(lessons[topic]) : null;
+  }
+  function showExample(id) {
+    var example = examples && examples.examples.find(function (entry) { return entry.id === id; });
+    if (!example) return;
+    selectedExample = example; selectedLesson = null;
+    var topic = topicLesson(example.topic);
+    $('learningTitle').textContent = example.title;
+    $('learningContent').innerHTML = '<button type="button" class="depth-link" data-example-library>← All examples</button>' +
+      '<p class="example-label">Past game · ' + esc(example.season) + ' · ' + esc(example.offense) + ' vs ' + esc(example.defense) + '</p>' +
+      '<h2 class="example-summary">' + esc(example.summary) + '</h2><p class="learning-intro">' + rich(example.explanation) + '</p>' +
+      yardageGraphic(example.facts) +
+      (topic ? root.FootballLearning.renderDiagram(topic.id) + '<p class="learning-caption">' + esc(topic.diagramCaption) + '</p>' +
+        '<button type="button" class="depth-link" data-lesson="' + esc(topic.id) + '">Learn what to watch <span aria-hidden="true">↗</span></button>' : '') +
+      '<details class="example-sources"><summary>Source and play details</summary><p>' + sourceLinks(example.sources) + '</p>' +
+      '<p class="depth-caption">Game ' + esc(example.gameId) + ' · Play ' + esc(example.playId) + '</p></details>';
+    resetView();
+  }
+  function paintLibrary() {
+    selectedLesson = null; selectedExample = null;
+    $('learningTitle').textContent = 'Explore plays';
+    $('learningContent').innerHTML = '<p class="learning-intro">' + esc(examples.notice) + '</p><div class="example-list">' +
+      examples.examples.map(function (example) {
+        return '<button type="button" class="example-choice" data-example="' + esc(example.id) + '"><span class="example-label">' +
+          esc(example.season) + ' · ' + esc(example.offense) + ' vs ' + esc(example.defense) + '</span><b>' + esc(example.title) +
+          '</b><span>' + esc(example.summary) + '</span><span class="example-arrow" aria-hidden="true">↗</span></button>';
+      }).join('') + '</div>';
+    resetView();
+  }
+  function showLibrary() {
+    $('learningTitle').textContent = 'Explore plays';
+    selectedLesson = null; selectedExample = null;
+    open();
+    if (examples) { paintLibrary(); return; }
+    $('learningContent').innerHTML = '<p class="learning-intro" role="status">Loading the examples…</p>';
+    fetch('teaching-examples.json').then(function (response) { if (!response.ok) throw new Error('unavailable'); return response.json(); }).then(function (data) {
+      examples = data;
+      if (!selectedLesson && !selectedExample) paintLibrary();
+    }).catch(function () {
+      if (!selectedLesson && !selectedExample) $('learningContent').innerHTML = '<p class="learning-intro">The examples could not load. Close this panel and try again.</p>';
+    });
+  }
+
+  function renderInsights(insights) {
+    var drive = insights.drive;
+    $('driveStory').hidden = !drive;
+    if (drive) {
+      $('driveTitle').textContent = drive.complete ? 'Last drive' : 'This drive';
+      $('driveTeam').textContent = drive.team || '';
+      $('driveSummary').textContent = drive.summary;
+      var progress = (drive.progress || []).filter(function (step) { return Number.isFinite(step.from) && Number.isFinite(step.to); });
+      $('driveGraphic').innerHTML = progress.length ? '<div class="drive-progress" role="img" aria-label="' + esc(drive.summary) + '"><svg viewBox="0 0 500 78">' +
+        '<path d="M30 20V64M140 28V64M250 20V64M360 28V64M470 20V64" class="drive-yards"/>' +
+        progress.map(function (step, index) {
+          var y = 32 + (index % 3) * 10;
+          return '<path d="M' + (30 + step.from * 4.4) + ' ' + y + 'H' + (30 + step.to * 4.4) + '" class="drive-step ' + (step.kind === 'penalty' ? 'drive-penalty' : '') + '"/>';
+        }).join('') + '<circle cx="' + (30 + progress[progress.length - 1].to * 4.4) + '" cy="' + (32 + ((progress.length - 1) % 3) * 10) + '" r="5" class="drive-ball"/>' +
+        '</svg><div class="drive-legend"><span>Own goal</span><span>Green: plays · Gold: penalties</span><span>End zone →</span></div></div>' : '';
+      $('driveNote').textContent = drive.verified ? drive.playCount + ' reported ' + (drive.playCount === 1 ? 'play' : 'plays') + '. Based on the start and end spots in the reports.' : 'Some play positions are incomplete. A drive total is not available yet.';
+    }
+    var teams = Array.isArray(insights.teams) ? insights.teams : Object.values(insights.teams || {});
+    $('gamePatterns').hidden = !teams.length;
+    $('patternDetails').innerHTML = teams.map(function (team) {
+      return '<div class="pattern-team"><h3>' + esc(team.team) + '</h3>' + (team.summaries || []).map(function (line) {
+        return '<p>' + esc(line) + '</p>';
+      }).join('') + (team.coverage && team.coverage.text ? '<p class="depth-caption">' + esc(team.coverage.text) + '</p>' : '') + '</div>';
+    }).join('');
+  }
+  doc.addEventListener('click', function (event) {
+    var lessonButton = event.target.closest('[data-lesson]');
+    if (lessonButton) { showLesson(lessonButton.dataset.lesson, lessonButton.dataset.lessonContext); return; }
+    var exampleButton = event.target.closest('[data-example]');
+    if (exampleButton) { showExample(exampleButton.dataset.example); return; }
+    if (event.target.closest('[data-example-library]')) { showLibrary(); return; }
+    var choice = event.target.closest('[data-observation]');
+    if (choice && selectedLesson) {
+      var response = root.FootballLearning.observationResponse(selectedLesson.id, choice.dataset.observation);
+      if (!response) return;
+      $('learningContent').querySelectorAll('[data-observation]').forEach(function (button) { button.setAttribute('aria-pressed', String(button === choice)); });
+      $('observationResponse').innerHTML = rich(response);
+      $('observationResponse').hidden = false;
+    }
+  });
+  $('exploreExamples').addEventListener('click', showLibrary);
+  root.FootballDepth = { showLesson: showLesson, showLibrary: showLibrary, renderInsights: renderInsights };
+})(window);

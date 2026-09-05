@@ -57,8 +57,13 @@
         event.preventDefault();
         window.FootballGlossary.close(true);
       } else if (event.key === 'Tab') {
-        event.preventDefault();
-        definition.querySelector('button').focus();
+        var definitionControls = Array.from(definition.querySelectorAll('button')).filter(function (button) { return !button.hidden; });
+        var definitionFirst = definitionControls[0], definitionLast = definitionControls[definitionControls.length - 1];
+        if (event.shiftKey && document.activeElement === definitionFirst) {
+          event.preventDefault(); definitionLast.focus();
+        } else if (!event.shiftKey && document.activeElement === definitionLast) {
+          event.preventDefault(); definitionFirst.focus();
+        }
       }
       return;
     }

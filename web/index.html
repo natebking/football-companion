@@ -15,6 +15,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js"></script>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="learning.css">
+<link rel="stylesheet" href="depth.css">
 </head>
 <body>
 
@@ -53,8 +55,9 @@
       <div class="card-heading"><span class="eyebrow">Before the snap</span><span class="card-symbol" aria-hidden="true">↗</span></div>
       <div class="pQuiet" id="pQuiet">Pick a game to start.</div>
       <div class="pTop" hidden><span id="pDD"></span><span id="pSpot"></span></div>
-      <div class="tendency-block"><p id="pSit"></p><p id="pTen"></p></div>
       <div class="watch-block"><div class="watch-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Where to look</div><p id="pWatch"></p></div>
+      <button id="exploreRead" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="learningSheet" hidden>See the idea <span aria-hidden="true">↗</span></button>
+      <div class="tendency-block"><span class="tendency-label">Past play choices</span><p id="pSit"></p><p id="pTen"></p></div>
       <div class="pFoot" id="pFoot"></div>
       <div id="fieldPosition" class="field-position" hidden>
         <div class="field-caption"><span>Field position</span><span id="fieldDirection"></span></div>
@@ -81,11 +84,29 @@
         <div id="askLock" hidden></div>
       </div>
     </section>
+    <section class="example-entry">
+      <span class="eyebrow">Learn from a real play</span>
+      <h2>A big gain can start with a short throw.</h2>
+      <p>Explore past plays, see where the yards came from, and learn what to notice next time.</p>
+      <button id="exploreExamples" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="learningSheet">Explore plays <span aria-hidden="true">↗</span></button>
+    </section>
   </div>
 
   <section class="plays-panel" aria-labelledby="feedTitle">
+    <section id="driveStory" class="drive-story" aria-labelledby="driveTitle" hidden>
+      <div class="depth-heading"><h2 id="driveTitle">This drive</h2><span id="driveTeam"></span></div>
+      <p id="driveSummary"></p>
+      <div id="driveGraphic"></div>
+      <p class="depth-caption" id="driveNote"></p>
+    </section>
+    <details id="gamePatterns" class="game-patterns" hidden>
+      <summary>So far in this game</summary>
+      <div id="patternDetails"></div>
+      <p class="depth-caption">Counts from the reported plays. These describe this game; they do not predict the next play.</p>
+    </details>
     <div class="feedhead"><h1 id="feedTitle">Recent plays</h1><span>Latest first</span></div>
     <div id="feed"><div class="empty">Waiting for the first play.</div></div>
+
   </section>
 </main>
 
@@ -97,7 +118,9 @@
     </div>
     <p class="note">Pick a game, then keep watching on TV. Before the snap, a hint suggests where to look. Tap an underlined football term for a definition.</p>
     <p class="note">The percentages come from past run and pass choices in similar situations. They do not tell us the next play or how anyone is lined up. The app does not watch your TV picture.</p>
-    <p class="note">Recent plays explains what happened and what changed. Player names, formations, and direction appear when the feed reports them. Updates can arrive late or be corrected.</p>
+    <p class="note">Recent plays explains what happened and what changed. The drive story connects those plays, including progress from penalties. Open <b>So far in this game</b> to see which players and parts of the field have been involved. Updates can arrive late or be corrected.</p>
+    <p class="note">Use <b>See the idea</b> for a diagram and a question about what you noticed. Those answers are your observations, not a graded quiz. Diagrams explain the concept; they do not reconstruct the players’ actual paths.</p>
+    <p class="note"><b>Explore plays</b> uses named examples from past games, including NFL charting from FTN Data via nflverse. Historical examples are separate from the live game. Passing detail is shown only when its numbers agree with the play report.</p>
     <p class="note">If the app gets ahead of your TV, use <b>TV delay</b> to hold cards, plays, and scores by 0–90 seconds. Adjust it as you watch. Your occasional picks are practice: a correct prediction does not measure your understanding of a football concept.</p>
   </div>
 </div>
@@ -172,9 +195,19 @@
   </div>
 </div>
 
+<div id="learningSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="learningTitle" inert>
+  <div class="sheetInner learning-panel">
+    <div class="sheetTop"><span class="ttl" id="learningTitle">Watch and learn</span><button id="closeLearning" class="closex" type="button">Close</button></div>
+    <div id="learningContent"></div>
+  </div>
+</div>
+
 <script src="play-facts.js"></script>
 <script src="feed-health.js"></script>
+<script src="game-insights.js"></script>
+<script src="learning.js"></script>
 <script src="glossary.js"></script>
+<script src="depth-ui.js"></script>
 <script src="app.js"></script>
 <script src="ui.js"></script>
 </body>

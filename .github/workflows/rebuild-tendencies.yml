@@ -65,7 +65,7 @@ jobs:
 
       # data/ is gitignored, so this starts cold and refetches the window from
       # CFBD every run. That is roughly 66 calls, about 286 a month against a
-      # free tier of 5000. refresh.py prints the count and the projection.
+      # free tier of 1000. refresh.py prints the count and the projection.
       - name: Refresh tendency tables
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
