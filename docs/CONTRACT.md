@@ -4,7 +4,7 @@ Interfaces every module codes against. Written before implementation so parallel
 
 ## Architecture
 
-Static site, no backend. The browser polls ESPN directly (ESPN 403s datacenter IPs but serves `access-control-allow-origin: *`) and looks up precomputed tendency tables shipped as static JSON. Card copy comes from a verified template library filled with computed numbers, so the live path makes zero LLM calls and cannot hallucinate.
+Static site, no backend. The browser polls ESPN directly (ESPN 403s datacenter IPs but serves `access-control-allow-origin: *`) and looks up precomputed tendency tables shipped as static JSON. Card copy comes from a verified template library filled with computed numbers, so the live path makes zero LLM calls. Feed errors and parsing mistakes remain possible and require explicit checks.
 
 ```
 CFBD API  ─┐
@@ -242,35 +242,33 @@ The scoreboard call needs no `groups` or `limit` parameter: the default returns 
 
 `web/cards.json`. Verified content, written once, checked against real coaching references. No runtime generation.
 
-```json
-{
-  "id": "d3_long_pass_expected",
-  "applies": { "down": [3], "distance_band": ["long"], "min_pass_rate": 0.75 },
-  "prime": {
-    "situation": "3rd and {distance}, they need it in one play.",
-    "tendency": "{team} throws here {pass_rate}% of the time.",
-    "watch": "Watch the deepest defenders. They'll line up right around the first-down marker."
-  },
-  "concepts": ["sticks", "soft_coverage"],
-  "explain_hint": "If the catch happened short of the marker, that cushion is why."
-}
-```
+Rules:
 
-Rules, non-negotiable:
-
-- **Prime cards receive pre-snap information only.** Situation, tendency block, ledger state. The play result is not passed to the prime path at all, so nothing can leak and no filter is needed.
-- Outcome knowledge does exactly two things, both in code, never in copy: veto a queued prime (kneel, spike, penalty wipe) and gate explain cards.
-- 25 word cap on primes, 40 to 70 on explains.
-- No term appears undefined. First use carries a plain inline definition; the ledger tracks exposure and drops the definition at `learning`.
+- **Prime cards receive pre-snap information only.** Situation and tendency block. Released result fields settle an existing pick; they do not choose a card or write its watch instruction.
+- Full `watch` definitions are the default. `watch_short` requires the user's explicit Shorter hints setting (`fc_short_hints`). Exposure or correct guesses never shorten the copy automatically.
+- Suggestions invite the reader to look. They do not assert a formation, coverage, route, or coaching intent that the live data has not established.
+- Stored `explain_hint` and `ask.resolve` are editorial reference material, not post-play evidence. They are never attached to a prediction grade.
 - No em dashes. No exclamation points. No hype.
 
-## Concept ledger
+## Post-play descriptions and grading
 
-`localStorage`, key `fc_ledger`. States: `unknown` → `introduced` (1) → `learning` (2-4) → `familiar` (5+). Dormancy and spaced re-surfacing are deferred until the loop survives three weekends.
+`web/play-facts.js` exposes the pure `FootballPlay.describe(play, teamAbbreviations)` function. It returns a summary, consequence, optional reported players and facts, original report, and conservative grading fields. LIVE owns this output and releases it through the existing TV-delay queue. Player names and optional formation, direction, and depth never enter PRIME.
+
+The renderer uses reported end states for the next down, respects changes of possession and scoring conversions, and declines malformed or contradictory fields. Accepted penalties and called-back plays show the original report by default rather than guess the ruling. Optional details disappear when missing; absent direction is not evidence of any particular direction.
+
+Grades describe actual actions: a scramble is a run; a sack is ungraded. Penalties, missing data, and ambiguous play types do not count against a prediction. Return yardage on a turnover is not offensive progress. Markers such as timeouts do not settle predictions. When the feed moves on without a matching result, an answered pick is recorded as ungraded; switching games closes the old pick with its original league and game.
+
+A selected game has at most one active summary request, with a 15-second timeout. A game or league change aborts and invalidates old requests and clears the old queue before new tables load. Summary refreshes are three seconds during play and thirty seconds after a final; stale scoreboard responses are also ignored.
+
+## Concept exposure and prediction history
+
+`localStorage`, key `fc_ledger`, records `exposures` and `last_seen` for terms on cards shown. It does not measure recognition or understanding. There are no automatic learning or familiarity states.
 
 ```json
-{ "concepts": { "sticks": { "exposures": 3, "last_seen": "2026-08-29T20:12:00Z", "state": "learning" } } }
+{ "concepts": { "sticks": { "exposures": 3, "last_seen": "2026-09-05T20:12:00Z" } } }
 ```
+
+`fc_asks` separately records prediction answers, correctness when gradable, and latency. The visible prediction score includes only answered, graded picks. This score is not evidence of learning football concepts.
 
 ## Presentation
 
@@ -288,7 +286,7 @@ expand PRIME's input whitelist.
 
 The field-position diagram in PRIME reads only the existing pre-snap whitelist.
 Offense always moves left to right, with the ball and first-down or goal line shown.
-The raw play description remains available under each play's disclosure. No card
+Underlined football terms open a definition popover from `web/glossary.js`, including keyboard dismissal and focus restoration. The header links to a How it works dialog. The raw play description remains available under each play's disclosure. No card
 copy, attribution rule, grading rule, or broadcast-delay rule changes with the theme.
 
 ### UX voice

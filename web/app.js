@@ -18,21 +18,21 @@
  *             bus 'snap'    a frozen pre-snap whitelist, built in LIVE by
  *                           copying a fixed list of keys. No play text, yards
  *                           gained, scoring flag or turnover flag exists on it.
- *             bus 'result'  four scalars describing a play that has ALREADY
+ *             bus 'result'  observed action and grading fields for a play ALREADY
  *                           been released to his screen, used only to resolve
  *                           a call he already committed to. It arrives after
- *                           the reveal, never before it.
+ *                           the reveal, never before it. Optional reported
+ *                           players, formations and direction stay in LIVE.
  *
  * DELAY QUEUE, in LIVE. Nothing reaches the screen, card or feed or score,
  * before observed_at + the user's broadcast delay. The delay is a setting,
- * 0 to 60 seconds, default 0, persisted, changeable mid-game. Raising it
+ * 0 to 90 seconds, default 0, persisted, changeable mid-game. Raising it
  * re-bases everything still waiting.
  *
  * THE ASK, in PRIME. Temporal occlusion: commit before the reveal. Rationed to
  * roughly one snap in six to eight, never two in a row, higher ask_priority
- * cards get first call on the budget. Answer and latency are both persisted,
- * and the concept ledger sequences on speed-of-correct-call, not on how many
- * times a word has been printed.
+ * cards get first call on the budget. Answer and latency are persisted as
+ * prediction records. They never establish familiarity with a concept.
  *
  * No backend. The browser talks to ESPN directly (ESPN 403s datacenter IPs but
  * serves access-control-allow-origin: *). No LLM calls. No login, ever.
@@ -40,14 +40,13 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-ux';
+var VERSION = '2026-09-05-plays';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
 var TICK_MS = 250;           // delay queue pump
 var FEED_MAX = 25;
 var MAX_DELAY = 90;          // streaming services can trail cable by more than a minute
-var FAST_MS = 4000;          // a call this quick, and right, counts as mastery
 var ASK_LOG_MAX = 400;
 
 var LEAGUES = {
@@ -61,7 +60,7 @@ var NFL_ALIAS = { LAR: 'LA', WSH: 'WAS', JAC: 'JAX' };
 
 var LS = {
   league: 'fc_league', game: 'fc_game_',
-  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag'
+  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag', shortHints: 'fc_short_hints'
 };
 var DIAG_MAX = 500;
 
@@ -72,8 +71,8 @@ function esc(s) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
 }
-function jget(url) {
-  return fetch(url, { cache: 'no-store' }).then(function (r) {
+function jget(url, signal) {
+  return fetch(url, { cache: 'no-store', signal: signal }).then(function (r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   });
@@ -95,6 +94,7 @@ var bus = makeBus();
 
 // ---------------------------------------------------------------- settings
 var league = lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
+var shortHints = lsGet(LS.shortHints) === '1';
 var delaySec = (function () {
   var n = parseInt(lsGet(LS.delay), 10);
   return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : 0;
@@ -115,11 +115,8 @@ function showErr(m) {
 }
 
 // ---------------------------------------------------------------- ledger
-// One record per concept. Exposure is kept because the card library needs to
-// know a word has been printed, but it is the weakest signal here: a concept
-// only reaches `familiar` on two consecutive correct calls made inside
-// FAST_MS, and a concept he has attempted and missed is held at `introduced`
-// no matter how often he has seen it.
+// Seeing a term and correctly guessing an outcome are different observations.
+// The ledger counts exposure only. Definitions shorten only at the user's request.
 var ledger = { concepts: {} };
 function loadLedger() {
   try {
@@ -128,57 +125,12 @@ function loadLedger() {
   } catch (e) { ledger = { concepts: {} }; }
 }
 function saveLedger() { lsSet(LS.ledger, JSON.stringify(ledger)); }
-function rec(c) {
-  var r = ledger.concepts[c];
-  if (!r) r = ledger.concepts[c] = {};
-  r.exposures = r.exposures || 0;
-  r.attempts = r.attempts || 0;
-  r.correct = r.correct || 0;
-  r.streak = r.streak || 0;
-  r.fast_ms = r.fast_ms || 0;
-  return r;
-}
-function conceptState(c) {
-  var r = ledger.concepts[c];
-  if (!r || !r.exposures) return 'unknown';
-  if (r.correct >= 1 && r.streak >= 2 && r.fast_ms > 0 && r.fast_ms <= FAST_MS) return 'familiar';
-  if (r.correct >= 1) return 'learning';
-  if ((r.attempts || 0) >= 2) return 'introduced';   // tried, not right yet
-  if (r.exposures >= 2) return 'learning';
-  return 'introduced';
-}
-function knows(c) {
-  var s = conceptState(c);
-  return s === 'learning' || s === 'familiar';
-}
 function bumpExposure(list) {
   if (!list || !list.length) return;
   var now = new Date().toISOString();
   for (var i = 0; i < list.length; i++) {
-    var r = rec(list[i]);
-    r.exposures += 1;
-    r.last_seen = now;
-    r.state = conceptState(list[i]);
-  }
-  saveLedger();
-}
-// Kellman: sequence on accuracy AND response time.
-function recordCall(list, ok, latencyMs) {
-  if (!list || !list.length) return;
-  var now = new Date().toISOString();
-  for (var i = 0; i < list.length; i++) {
-    var c = list[i], r = rec(c);
-    r.attempts += 1;
-    r.last_seen = now;
-    if (ok) {
-      r.correct += 1;
-      r.streak += 1;
-      // exponential moving average over correct calls only
-      r.fast_ms = r.fast_ms ? Math.round(0.6 * r.fast_ms + 0.4 * latencyMs) : latencyMs;
-    } else {
-      r.streak = 0;
-    }
-    r.state = conceptState(c);
+    var c = list[i];
+    ledger.concepts[c] = { exposures: ((ledger.concepts[c] || {}).exposures || 0) + 1, last_seen: now };
   }
   saveLedger();
 }
@@ -262,15 +214,16 @@ var shell = {
   bus: bus, esc: esc, $: $, jget: jget, lsGet: lsGet, lsSet: lsSet,
   LS: LS, LEAGUES: LEAGUES, API: API, NFL_ALIAS: NFL_ALIAS,
   POLL_MS: POLL_MS, SB_MS: SB_MS, STALE_MS: STALE_MS, TICK_MS: TICK_MS,
-  FEED_MAX: FEED_MAX, FAST_MS: FAST_MS,
+  FEED_MAX: FEED_MAX,
   showErr: showErr, seasonsLabel: seasonsLabel,
   distanceBand: distanceBand, fieldZone: fieldZone, bucketKey: bucketKey,
   sameSnap: sameSnap, delayMs: delayMs,
   league: function () { return league; },
   tend: function () { return TEND; },
   cards: function () { return CARDS; },
-  conceptState: conceptState, knows: knows,
-  bumpExposure: bumpExposure, recordCall: recordCall, logAsk: logAsk,
+  shortHints: function () { return shortHints; },
+  bumpExposure: bumpExposure, logAsk: logAsk,
+  calls: function () { return askLog; },
   diag: diag, VERSION: VERSION,
   ledger: function () { return ledger; },
   resetLedger: function () {
@@ -294,7 +247,6 @@ var st = {
   gap: 7,
   quiet: 'Pick a game to start.',
   hold: '',
-  openConcept: null,
   sig: '', asig: ''
 };
 
@@ -420,11 +372,13 @@ function fill(tpl, sit, rate) {
   return s.replace(/\b1 yards\b/g, '1 yard');
 }
 function useShortWatch(card) {
-  var cs = card.concepts || [];
-  if (!cs.length) return false;
-  for (var i = 0; i < cs.length; i++) if (!sh.knows(cs[i])) return false;
-  return true;
+  return sh.shortHints() && !!card.prime.watch_short;
 }
+sh.bus.on('hints', function () {
+  if (!st.card || !st.sit) return;
+  st.watchLine = fill(useShortWatch(st.card) ? st.card.prime.watch_short : st.card.prime.watch, st.sit, st.rate);
+  render();
+});
 
 // ---------------------------------------------------------------- the ask
 // Every ask is gradeable from the play feed alone. A question the feed cannot
@@ -447,30 +401,8 @@ var ASK_KINDS = {
     opts: [{ v: 'past', label: 'Past it' }, { v: 'short', label: 'Short' }]
   }
 };
-// Fallback ask table, keyed by card id. `cards.json` may ship its own `ask`
-// and `ask_priority` per card; when it does, the file wins and this is unused.
-var ASKS = {
-  lead_late_clock:          { kind: 'passrun', priority: 78 },
-  trail_late_deep_safeties: { kind: 'passrun', priority: 78 },
-  d4_short_go:              { kind: 'kickrunpass', priority: 85 },
-  d4_kick_likely:           { kind: 'gokick', priority: 85 },
-  d3_medium_sticks:         { kind: 'sticks', priority: 80 },
-  d3_long_safeties:         { kind: 'sticks', priority: 80 },
-  d3_short_line:            { kind: 'passrun', priority: 72 },
-  d1_run_lean_play_action:  { kind: 'passrun', priority: 72 },
-  d1_pass_lean_cushion:     { kind: 'passrun', priority: 70 },
-  d2_short_safety_creep:    { kind: 'passrun', priority: 66 },
-  goal_line_bodies:         { kind: 'passrun', priority: 62 },
-  d3_own_half_blitz:        { kind: 'passrun', priority: 60 },
-  two_minute_sideline:      { kind: 'passrun', priority: 56 },
-  red_zone_slot:            { kind: 'passrun', priority: 56 },
-  d2_long_zone_drop:        { kind: 'passrun', priority: 54 },
-  backed_up_pocket:         { kind: 'passrun', priority: 50 },
-  d2_medium_motion:         { kind: 'passrun', priority: 46 },
-  d1_box_count:             { kind: 'passrun', priority: 40 }
-};
 function askFor(card) {
-  var spec = card.ask || ASKS[card.id] || null;
+  var spec = card.ask;
   if (!spec) return null;
   var kind = ASK_KINDS[spec.kind];
   if (!kind) return null;
@@ -496,10 +428,12 @@ function askEligible(a) {
 
 // ---------------------------------------------------------------- grading
 function grade(kind, answer, r) {
-  // r: {kind:'pass'|'run'|'kick'|'other', gained, need}
+  // The result is an observed action, never an inferred play call.
+  if (r.voidReason) return { voided: r.voidReason };
   var K = r.kind;
   if (K === 'other') return { voided: 'This play could not be graded. Your pick does not count.' };
   if (kind === 'sticks') {
+    if (r.turnover) return { voided: 'Possession changed on this play. Your yardage pick does not count.' };
     if (K === 'kick') return { voided: 'They kicked. This question only counts on a pass.' };
     if (K === 'run') return { voided: 'They ran. This question only counts on a pass.' };
     if (typeof r.gained !== 'number' || typeof r.need !== 'number') {
@@ -541,14 +475,17 @@ sh.bus.on('hold', function (n) {
 // The drive ended: touchdown, made kick, end of period. There is no legal next
 // snap, so the card comes down rather than describing a down already played.
 sh.bus.on('nosnap', function (msg) {
+  closePending('The feed moved on before this pick could be graded.');
   st.quiet = msg || '';
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
-  st.ask = null; st.openConcept = null;
+  st.ask = null;
   render();
 });
 sh.bus.on('clear', function () {
+  window.FootballGlossary.close();
+  closePending('The game changed before this pick could be graded.');
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
-  st.ask = null; st.pending = null; st.res = null; st.openConcept = null;
+  st.ask = null; st.pending = null; st.res = null;
   st.sinceAsk = 99; st.sig = ''; st.asig = '';
   render();
 });
@@ -572,16 +509,14 @@ sh.bus.on('result', function (r) {
   sh.diag('grade', { sit: r.sitKey, kind: p.kind, answer: p.answer, play: r.kind,
                      ok: g.voided ? null : !!g.ok, latency_ms: p.latency });
   if (g.voided) {
-    st.res = { cls: 'void', head: '', body: g.voided, why: '' };
+    st.res = { cls: 'void', head: '', body: g.voided };
     logAskRow(p, null, true);
   } else {
     st.res = {
       cls: g.ok ? 'ok' : 'no',
       head: g.ok ? 'Good call.' : 'Not this time.',
-      body: g.truth,
-      why: p.explain || ''
+      body: g.truth
     };
-    sh.recordCall(p.concepts, g.ok, p.latency);
     logAskRow(p, g.ok, false);
   }
   render();
@@ -590,7 +525,7 @@ sh.bus.on('result', function (r) {
 function logAskRow(p, ok, voided) {
   sh.logAsk({
     t: new Date().toISOString(),
-    lg: sh.league(), game: p.game || '',
+    lg: p.league, game: p.game || '',
     card: p.cardId, ask: p.kind, bucket: p.bucket,
     down: p.down, distance: p.distance, yards_to_goal: p.ytg,
     answer: p.answer, correct: ok, voided: !!voided,
@@ -598,12 +533,22 @@ function logAskRow(p, ok, voided) {
   });
 }
 
-sh.bus.on('snap', function (sit) {
-  // An ask he ignored closes out silently. No nag, no second chance.
-  if (st.pending) {
-    if (st.pending.answer === null) logAskRow(st.pending, null, false);
-    st.pending = null;
+function closePending(reason) {
+  var p = st.pending;
+  if (!p) return;
+  logAskRow(p, null, p.answer !== null);
+  if (p.answer !== null) {
+    st.res = { cls: 'void', head: 'No grade.', body: reason };
+    sh.diag('grade', { sit: p.sitKey, kind: p.kind, answer: p.answer, ok: null, reason: reason });
   }
+  st.pending = null;
+  st.ask = null;
+  return p.answer !== null;
+}
+
+sh.bus.on('snap', function (sit) {
+  window.FootballGlossary.close();
+  var missedGrade = closePending('The feed moved on before this pick could be graded.');
 
   st.sit = sit;
   st.sitKey = sit.sitKey;
@@ -645,13 +590,11 @@ sh.bus.on('snap', function (sit) {
       st.askAt = Date.now();
       st.sinceAsk = 0;
       st.gap = drawGap();
-      st.res = null;                       // the new ask replaces the old result
+      if (!missedGrade) st.res = null;      // Keep a newly reported missing grade visible.
       sh.diag('ask', { sit: sit.sitKey, kind: a.kind, card: card.id });
       st.pending = {
         sitKey: sit.sitKey, cardId: card.id, kind: a.kind,
-        concepts: (card.concepts || []).slice(),
-        explain: card.explain_hint || '',
-        bucket: ten ? ten.bucket : '', game: sit.gameId || '',
+        bucket: ten ? ten.bucket : '', game: sit.gameId || '', league: sh.league(),
         down: sit.down, distance: sit.distance, ytg: sit.yardsToGoal,
         answer: null, latency: 0
       };
@@ -679,8 +622,6 @@ function quietPrime(msg) {
   $('pTen').textContent = '';
   $('pWatch').textContent = '';
   $('pFoot').innerHTML = '';
-  $('pDef').className = '';
-  $('pDef').textContent = '';
   $('fieldPosition').hidden = true;
 }
 
@@ -708,13 +649,13 @@ function renderField(sit) {
 function cardSig() {
   return [
     st.sitKey, st.card ? st.card.id : '', st.attributed ? 1 : 0, st.rate,
-    st.sitLine, st.tendLine, st.watchLine, st.quiet, st.openConcept || ''
+    st.sitLine, st.tendLine, st.watchLine, st.quiet, ''
   ].join('|');
 }
 function askSig() {
   return [
     st.ask ? st.ask.id : '', st.pending && st.pending.answer ? st.pending.answer : '',
-    st.res ? st.res.cls + '|' + st.res.head + '|' + st.res.body + '|' + st.res.why : ''
+    st.res ? st.res.cls + '|' + st.res.head + '|' + st.res.body : ''
   ].join('~');
 }
 function render() {
@@ -746,15 +687,14 @@ function render() {
     $('pQuiet').hidden = false;
     $('pQuiet').textContent = 'Waiting for the next situation.';
     $('pFoot').innerHTML = '';
-    $('pDef').className = '';
     $('prime').className = '';
     return;
   }
 
   // The down and distance already have their own heading.
-  $('pSit').textContent = /^(First|Second|Third|Fourth) and \d+\.$/.test(st.sitLine) ? '' : st.sitLine;
-  $('pTen').textContent = st.tendLine;
-  $('pWatch').textContent = st.watchLine;
+  $('pSit').innerHTML = /^(First|Second|Third|Fourth) and \d+\.$/.test(st.sitLine) ? '' : window.FootballGlossary.annotate(st.sitLine);
+  $('pTen').innerHTML = window.FootballGlossary.annotate(st.tendLine);
+  $('pWatch').innerHTML = window.FootballGlossary.annotate(st.watchLine);
   $('prime').className = st.attributed ? '' : 'low';
 
   // The source chip is attribution too. It carries the team name on exactly
@@ -769,21 +709,12 @@ function render() {
   }
   var cs = st.card.concepts || [];
   for (var i = 0; i < cs.length; i++) {
-    var s = sh.conceptState(cs[i]);
-    chips.push('<button class="chip' + (s === 'familiar' ? ' known' : '') +
-      '" data-c="' + esc(cs[i]) + '">' + esc(cs[i].replace(/_/g, ' ')) + '</button>');
+    if ($('prime').querySelector('.term-link[data-term="' + cs[i] + '"]')) continue;
+    chips.push('<button class="chip" data-term="' + esc(cs[i]) + '" aria-haspopup="dialog" aria-controls="termPopover">' + esc(cs[i].replace(/_/g, ' ')) + '</button>');
   }
   $('pFoot').innerHTML = chips.join('');
 
-  var def = $('pDef');
-  var C = sh.cards();
-  if (st.openConcept && C && C.concepts[st.openConcept] && cs.indexOf(st.openConcept) >= 0) {
-    def.className = 'on';
-    def.textContent = st.openConcept.replace(/_/g, ' ') + ': ' + C.concepts[st.openConcept];
-  } else {
-    def.className = '';
-    def.textContent = '';
-  }
+
 }
 function renderAsk() {
   var sig = askSig();
@@ -792,15 +723,14 @@ function renderAsk() {
   var res = $('pRes'), ask = $('pAsk'), lock = $('askLock'), btns = $('askBtns');
   if (st.res) {
     res.className = 'on ' + st.res.cls;
-    res.innerHTML = (st.res.head ? '<b>' + esc(st.res.head) + '</b> ' : '') + esc(st.res.body) +
-      (st.res.why ? '<span class="why">' + esc(st.res.why) + '</span>' : '');
+    res.innerHTML = (st.res.head ? '<b>' + esc(st.res.head) + '</b> ' : '') + esc(st.res.body);
   } else {
     res.className = '';
     res.innerHTML = '';
   }
   if (st.ask && st.pending) {
     ask.className = 'on';
-    $('askQ').textContent = st.ask.q;
+    $('askQ').innerHTML = window.FootballGlossary.annotate(st.ask.q);
     if (st.pending.answer === null) {
       var h = '';
       for (var i = 0; i < st.ask.opts.length; i++) {
@@ -836,39 +766,25 @@ $('askBtns').addEventListener('click', function (ev) {
   st.pending.latency = Math.max(0, Date.now() - st.askAt);
   render();
 });
-$('pFoot').addEventListener('click', function (ev) {
-  var b = ev.target.closest('button[data-c]');
-  if (!b) return;
-  st.openConcept = st.openConcept === b.dataset.c ? null : b.dataset.c;
-  render();
-});
-
 // ---------------------------------------------------------------- ledger view
 function renderLedger() {
   var L = sh.ledger().concepts;
   var names = Object.keys(L);
-  var order = { unknown: 0, introduced: 1, learning: 2, familiar: 3 };
   names.sort(function (a, b) {
-    var d = order[sh.conceptState(a)] - order[sh.conceptState(b)];
-    if (d) return d;
-    return (L[b].exposures || 0) - (L[a].exposures || 0);
+    return String(L[b].last_seen || '').localeCompare(String(L[a].last_seen || ''));
   });
   var h = '';
   for (var i = 0; i < names.length; i++) {
-    var n = names[i], r = L[n], s = sh.conceptState(n);
-    var score = r.attempts
-      ? r.correct + ' of ' + r.attempts + ' right' +
-        (r.fast_ms ? ', ' + (r.fast_ms / 1000).toFixed(1) + 's' : '')
-      : 'Seen ' + (r.exposures || 0) + ' times';
-    h += '<div class="lrow"><span class="nm">' + esc(n.replace(/_/g, ' ')) + '</span>' +
-      '<span class="stt ' + s + '">' + ({ unknown: 'New', introduced: 'Seen', learning: 'Practicing', familiar: 'Familiar' })[s] + '</span>' +
-      '<span class="sc">' + esc(score) + '</span></div>';
+    var n = names[i], count = L[n].exposures || 0;
+    h += '<div class="lrow"><span class="nm">' + window.FootballGlossary.annotate(n.replace(/_/g, ' ')) + '</span>' +
+      '<span class="sc">Seen ' + count + ' time' + (count === 1 ? '' : 's') + '</span></div>';
   }
   $('ledgerView').innerHTML = h ||
     '<div class="lrow"><span class="nm">Terms appear here as you watch.</span></div>';
-  $('ledgerNote').textContent = names.length
-    ? 'Your answers and the terms you have seen help decide when to shorten definitions.'
-    : 'Make a few calls during a game to start your practice history.';
+  var graded = sh.calls().filter(function (r) { return r.answer !== null && !r.voided && typeof r.correct === 'boolean'; });
+  var right = graded.filter(function (r) { return r.correct; }).length;
+  $('callSummary').textContent = graded.length ? right + ' of ' + graded.length + ' graded picks correct.' : 'No graded picks yet.';
+  $('ledgerNote').textContent = 'This records what you have seen. Hints keep their definitions unless you choose shorter hints.';
 }
 sh.bus.on('sheet', renderLedger);
 sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedger(); });
@@ -970,33 +886,6 @@ function collectPlays(sum) {
   }
   return out;
 }
-// pass / run / kick / other, matching how engine/ingest_*.py classify. A sack
-// or a scramble is a pass, because the call was a pass. Kneels, spikes,
-// penalties, timeouts and period markers are `other` and void any call.
-function classify(p) {
-  var t = ((p.type && p.type.text) || '').toLowerCase();
-  var raw = (p.text || '').toLowerCase();
-  if (p.isPenalty) return 'other';
-  if (/\bkneel|\bspike|kneel down/.test(raw)) return 'other';
-  if (t.indexOf('penalt') >= 0 || t.indexOf('timeout') >= 0 ||
-      t.indexOf('end ') === 0 || t.indexOf('end of') === 0 ||
-      t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0 ||
-      t.indexOf('official') >= 0 || t.indexOf('coin toss') >= 0 ||
-      t.indexOf('safety') === 0) return 'other';
-  if (t.indexOf('kickoff') >= 0 || t.indexOf('punt') >= 0 ||
-      t.indexOf('field goal') >= 0 || t.indexOf('extra point') >= 0 ||
-      t.indexOf('kick') >= 0) return 'kick';
-  if (t.indexOf('pass') >= 0 || t.indexOf('sack') >= 0 ||
-      t.indexOf('interception') >= 0 || t.indexOf('scramble') >= 0) return 'pass';
-  if (t.indexOf('rush') >= 0 || t.indexOf('run') >= 0) return 'run';
-  // A fumble is typed by its recovery, not by the play that lost the ball.
-  if (t.indexOf('fumble') >= 0) {
-    if (/\bpass\b|\bsack/.test(raw)) return 'pass';
-    if (/\brush\b|\brun\b/.test(raw)) return 'run';
-    return 'other';
-  }
-  return 'other';
-}
 // Timeouts, period ends and other markers are not snaps. ESPN writes stale or
 // zeroed start and end blocks on them (58 of 1,036 polls over six real games
 // had one as the last play), so the situation reader steps back past them and
@@ -1048,52 +937,6 @@ function fixSituation(b, offAbbr, defAbbr, newPossession, isEnd) {
 function sitKeyOf(fx, teamId) {
   return [fx.down, fx.distance, fx.yardsToGoal, String(teamId)].join('|');
 }
-function gainPhrase(y, need, down) {
-  var s = y > 0 ? 'Gained ' + y + ' yard' + (y === 1 ? '' : 's') + '.'
-    : y < 0 ? 'Lost ' + (-y) + ' yard' + (y === -1 ? '' : 's') + '.' : 'No gain.';
-  if (typeof need !== 'number' || !down) return s;
-  if (y >= need) return s + ' First down.';
-  if (down >= 4) return s;
-  return s + ' ' + (need - y) + ' short of the marker.';
-}
-// Deterministic. No generation, no model.
-function plainPlay(p) {
-  var t = ((p.type && p.type.text) || '').toLowerCase();
-  var raw = p.text || '';
-  var y = typeof p.statYardage === 'number' ? p.statYardage : null;
-  var start = p.start || {};
-  var need = typeof start.distance === 'number' ? start.distance : null;
-  var down = start.down;
-  var g = y === null ? '' : gainPhrase(y, need, down);
-
-  if (/kneel down|\bkneels\b/i.test(raw)) return { s: 'Took a knee to run down the clock.', k: '' };
-  if (t === 'rush') return { s: 'Run. ' + g, k: '' };
-  if (t === 'rushing touchdown') return { s: 'Run for a touchdown. Six points.', k: 'score' };
-  if (t === 'passing touchdown') return { s: 'Touchdown pass. Six points.', k: 'score' };
-  if (t === 'pass reception') return { s: 'Pass complete. ' + g, k: '' };
-  if (t === 'pass incompletion') return { s: 'Incomplete pass. No gain; the clock stops.', k: '' };
-  if (t === 'sack') {
-    return { s: 'The defense tackled the quarterback before he could throw' +
-      (y !== null && y < 0 ? ', ' + (-y) + ' yards back.' : '.'), k: '' };
-  }
-  if (t.indexOf('interception') >= 0 && t.indexOf('touchdown') >= 0) {
-    return { s: 'Interception returned for a touchdown. Six points for the defense.', k: 'score' };
-  }
-  if (t.indexOf('interception') >= 0) return { s: 'Interception. A defender caught the pass, so possession changes.', k: 'turn' };
-  if (t === 'fumble recovery (opponent)') return { s: 'The ball came loose and the other team fell on it.', k: 'turn' };
-  if (t === 'fumble recovery (own)') return { s: 'The ball came loose and they got it back.', k: '' };
-  if (t === 'punt' || t === 'punt return') return { s: 'Punt. Kicked the ball downfield to the other team.', k: '' };
-  if (t === 'field goal good') return { s: 'Field goal good. Three points.', k: 'score' };
-  if (t === 'field goal missed') return { s: 'Field goal missed. No points.', k: 'turn' };
-  if (t === 'blocked field goal') return { s: 'Field goal blocked. No points from the kick.', k: 'turn' };
-  if (t === 'kickoff' || t === 'kickoff return (offense)') return { s: 'Kickoff. New drive starting.', k: '' };
-  if (t === 'safety') return { s: 'Safety. Two points to the defense.', k: 'score' };
-  if (t === 'penalty') return { s: 'Penalty. The ball moves and the down may be replayed.', k: '' };
-  if (t === 'timeout') return { s: 'Timeout.', k: '' };
-  if (t.indexOf('end ') === 0 || t.indexOf('end of') === 0) return { s: raw || 'Period over.', k: '' };
-  if (t.indexOf('two-minute') === 0 || t.indexOf('two minute') === 0) return { s: 'Two-minute timeout.', k: '' };
-  return { s: (p.type && p.type.text) || 'Play.', k: '' };
-}
 function teamAbbrs(sum) {
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   var by = {}, cs = (comp && comp.competitors) || [];
@@ -1102,16 +945,17 @@ function teamAbbrs(sum) {
   }
   return by;
 }
-function feedRow(p, abbr) {
+function feedRow(p, abbr, facts) {
   var s = p.start || {};
-  var pl = plainPlay(p);
   return {
     id: String(p.id),
     dd: s.downDistanceText || '',
     off: s.team && s.team.id ? (abbr[String(s.team.id)] || '') : '',
     when: (p.period && p.period.number ? 'Q' + p.period.number + ' ' : '') +
           ((p.clock && p.clock.displayValue) || ''),
-    plain: pl.s, kind: pl.k, raw: p.text || '',
+    plain: facts.summary, kind: facts.kind, raw: facts.raw,
+    players: facts.players, facts: facts.facts, consequence: facts.consequence,
+    reportFirst: /[Ss]ee the play report/.test(facts.consequence),
     awayScore: typeof p.awayScore === 'number' ? p.awayScore : null,
     homeScore: typeof p.homeScore === 'number' ? p.homeScore : null,
     period: p.period && p.period.number ? p.period.number : null,
@@ -1148,7 +992,7 @@ function preSnap(sum, plays) {
   if (!comp) return null;
   var status = comp.status;
   if (!status || !status.type || status.type.state !== 'in') return null;
-  if (status.type.name === 'STATUS_HALFTIME') return null;
+  if (status.type.name === 'STATUS_HALFTIME' || status.type.name === 'STATUS_DELAYED') return null;
 
   var i = plays.length - 1;
   while (i >= 0 && isMarker(plays[i])) i--;
@@ -1222,7 +1066,7 @@ function pump() {
       if (!it.silent && !it.marker) {
         sh.bus.emit('result', {
           sitKey: it.sitKey, kind: it.cls,
-          gained: it.gained, need: it.need
+          gained: it.gained, need: it.need, turnover: it.turnover, voidReason: it.voidReason
         });
       }
     } else if (it.kind === 'snap') {
@@ -1262,13 +1106,13 @@ function applySummary(sum) {
     if (st.seen[id]) continue;
     st.seen[id] = 1;
     var backlog = first && i < last;
+    var facts = window.FootballPlay.describe(p, abbr);
     st.queue.push({
       kind: 'play', at: backlog ? 0 : now, silent: backlog, marker: isMarker(p),
-      row: feedRow(p, abbr),
-      cls: classify(p),
+      row: feedRow(p, abbr, facts),
+      cls: facts.outcome, turnover: facts.turnover, voidReason: facts.voidReason,
       sitKey: playSitKey(p, abbr),
-      gained: typeof p.statYardage === 'number' ? p.statYardage : null,
-      need: typeof (p.start || {}).distance === 'number' ? p.start.distance : null
+      gained: facts.gained, need: facts.need
     });
   }
   // plays already seen but not yet released stay queued; mark the rest seen so
@@ -1291,6 +1135,8 @@ function applySummary(sum) {
     // the drive ended: touchdown, made kick, end of period. Take the card down
     // on the same delay, so it does not vanish before he has seen the play.
     st.lastQueuedSit = '';
+    st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage() });
+  } else if (first) {
     st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage() });
   } else {
     sh.bus.emit('quiet', waitingMessage());
@@ -1324,9 +1170,10 @@ function renderHeader() {
     var hn = h && h.team ? (h.team.abbreviation || h.team.shortDisplayName) : '?';
     // With a delay set, the score bug would otherwise spoil a touchdown he has
     // not watched yet. Show the game as of the last play released to him.
-    var held = sh.delayMs() > 0 && st.shownPlay && st.shownPlay.awayScore !== null;
-    var as = held ? st.shownPlay.awayScore : (a ? a.score : '');
-    var hs = held ? st.shownPlay.homeScore : (h ? h.score : '');
+    var delayed = sh.delayMs() > 0;
+    var held = delayed && st.shownPlay && st.shownPlay.awayScore !== null && st.shownPlay.homeScore !== null;
+    var as = delayed ? (held ? st.shownPlay.awayScore : '—') : (a ? a.score : '');
+    var hs = delayed ? (held ? st.shownPlay.homeScore : '—') : (h ? h.score : '');
     $('score').innerHTML = '<span class="score-team">' + logoImage(teamLogo(a && a.team)) + '<span class="team-abbr">' + sh.esc(an) +
       '</span><span class="team-score">' + sh.esc(as) + '</span></span>' +
       '<span class="sep">AT</span><span class="score-team">' + logoImage(teamLogo(h && h.team)) + '<span class="team-abbr">' +
@@ -1334,14 +1181,14 @@ function renderHeader() {
     var status = comp.status || {};
     var detail = held
       ? (st.shownPlay.period ? 'Q' + st.shownPlay.period + ' ' + st.shownPlay.clock : '')
-      : ((status.type && (status.type.shortDetail || status.type.detail)) || '');
+      : delayed ? 'Waiting for TV delay' : ((status.type && (status.type.shortDetail || status.type.detail)) || '');
     $('hmeta').textContent = detail;
     st.gameLabel = an + ' at ' + hn;
   }
   paintConnection();
 }
 function paintConnection() {
-  var fresh = Date.now() - st.lastOk < sh.STALE_MS;
+  var fresh = Date.now() - st.lastOk < (st.gameState === 'post' ? 45000 : sh.STALE_MS);
   $('dot').className = 'dot' + (fresh ? ' ok' : '');
   $('connectionLabel').textContent = fresh ? 'Connected' : st.gameId ? 'Connecting' : 'No game';
 }
@@ -1352,17 +1199,27 @@ function renderFeed() {
     return;
   }
   var expanded = {};
-  el.querySelectorAll('details[open]').forEach(function (details) { expanded[details.dataset.play] = true; });
+  el.querySelectorAll('details[data-play]').forEach(function (details) { expanded[details.dataset.play] = details.open; });
   var h = '';
   for (var i = 0; i < st.rows.length; i++) {
     var r = st.rows[i];
+    var detailsOpen = expanded[r.id] === undefined ? r.reportFirst : expanded[r.id];
+    var facts = r.facts.map(function (fact) {
+      // Keep the feed's optional formation labels readable without a glossary.
+      var label = fact === 'Shotgun' ? 'Quarterback starts back from center' :
+        fact === 'No huddle' ? 'Offense lines up without a huddle' : fact;
+      return '<span class="play-fact">' + sh.esc(label) + '</span>';
+    }).join('');
     h += '<div class="play">' +
       '<div class="pl1">' + (r.off ? '<b>' + sh.esc(r.off) + '</b>' : '') +
       '<span>' + sh.esc(r.dd) + '</span>' +
       '<span class="t num">' + sh.esc(r.when) + '</span></div>' +
-      '<div class="pl2 ' + r.kind + '">' + sh.esc(r.plain) + '</div>' +
+      '<div class="pl2 ' + r.kind + '">' + window.FootballGlossary.annotate(r.plain) + '</div>' +
+      (r.players ? '<p class="play-players">' + sh.esc(r.players) + '</p>' : '') +
+      (facts ? '<div class="play-facts" aria-label="Details reported by ESPN">' + facts + '</div>' : '') +
+      (r.consequence ? '<p class="play-after">' + window.FootballGlossary.annotate(r.consequence) + '</p>' : '') +
       (r.raw ? '<details class="play-details" data-play="' + sh.esc(r.id) + '"' +
-        (expanded[r.id] ? ' open' : '') + '><summary>Play details</summary><p class="pl3">' +
+        (detailsOpen ? ' open' : '') + '><summary>ESPN play report</summary><p class="pl3">' +
         sh.esc(r.raw) + '</p></details>' : '') +
       '</div>';
   }
@@ -1402,29 +1259,45 @@ function renderPicker() {
 
 // ---------------------------------------------------------------- loop
 var pollTimer = null, sbTimer = null;
+var pollRequest = null, gameGeneration = 0, scoreboardGeneration = 0;
 function pollGame() {
   clearTimeout(pollTimer);
+  if (pollRequest) return;
   if (!st.gameId) { pollTimer = setTimeout(pollGame, sh.POLL_MS); return; }
   var t0 = Date.now();
-  sh.jget(summaryUrl(sh.league(), st.gameId)).then(function (sum) {
+  var request = { generation: gameGeneration, game: st.gameId, league: sh.league(), controller: new AbortController() };
+  pollRequest = request;
+  var timeout = setTimeout(function () { request.controller.abort(); }, 15000);
+  function current() {
+    return pollRequest === request && gameGeneration === request.generation &&
+      st.gameId === request.game && sh.league() === request.league;
+  }
+  sh.jget(summaryUrl(request.league, request.game), request.controller.signal).then(function (sum) {
+    if (!current()) return;
     st.lastOk = Date.now();
     sh.showErr('');
     applySummary(sum);
   }).catch(function (e) {
+    if (!current()) return;
     sh.diag('err', { where: 'feed', msg: e.message, ms: Date.now() - t0 });
     sh.showErr('Game feed unavailable. Retrying…');
     $('dot').className = 'dot';
   }).then(function () {
-    pollTimer = setTimeout(pollGame, sh.POLL_MS);
+    clearTimeout(timeout);
+    if (pollRequest !== request) return;
+    pollRequest = null;
+    pollTimer = setTimeout(pollGame, st.gameState === 'post' ? 30000 : sh.POLL_MS);
   });
 }
 function pollScoreboard(force) {
   clearTimeout(sbTimer);
-  if (!(force || st.sheet || !st.gameId)) {
+  if (!sh.tend() || !(force || st.sheet || !st.gameId)) {
     sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
     return;
   }
-  fetchGames(sh.league()).then(function (rows) {
+  var generation = ++scoreboardGeneration, requestedLeague = sh.league();
+  fetchGames(requestedLeague).then(function (rows) {
+    if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
     st.games = rows;
     if (!st.gameId) {
       var live = rows.filter(function (g) { return g.state === 'in'; });
@@ -1432,17 +1305,33 @@ function pollScoreboard(force) {
     }
     renderPicker();
   }).catch(function (e) {
+    if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
+    sh.diag('err', { where: 'scoreboard', msg: e.message });
     sh.showErr('Games could not be updated. Retrying…');
   }).then(function () {
+    if (generation !== scoreboardGeneration) return;
     sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
   });
 }
 function resetGame() {
+  gameGeneration += 1;
+  clearTimeout(pollTimer);
+  if (pollRequest) pollRequest.controller.abort();
+  pollRequest = null;
   st.sum = null; st.seen = {}; st.queue = []; st.rows = [];
   st.shownPlay = null; st.lastQueuedSit = ''; st.primed = false;
+  st.lastOk = 0; st.gameState = ''; st.statusName = '';
   sh.bus.emit('clear');
 }
+function clearLeague() {
+  scoreboardGeneration += 1;
+  st.gameId = null; st.games = []; st.gameLabel = '';
+  resetGame();
+  renderPicker(); renderFeed(); renderHeader();
+  sh.bus.emit('quiet', 'Loading games…');
+}
 function selectGame(id) {
+  if (!sh.tend()) return;
   st.gameId = String(id);
   sh.diag('game', { id: st.gameId, league: sh.league() });
   resetGame();
@@ -1452,6 +1341,7 @@ function selectGame(id) {
   renderPicker();
   sh.bus.emit('quiet', waitingMessage());
   renderFeed();
+  renderHeader();
   pollGame();
 }
 
@@ -1472,19 +1362,21 @@ $('games').addEventListener('click', function (ev) {
   selectGame(b.dataset.g);
   closeSheet();
 });
+sh.bus.on('leagueChanging', clearLeague);
 sh.bus.on('leagueChanged', function () {
-  st.gameId = null; st.games = []; st.gameLabel = '';
-  resetGame();
-  renderPicker(); renderFeed();
-  var saved = sh.lsGet(sh.LS.game + sh.league());
-  fetchGames(sh.league()).then(function (rows) {
+  var requestedLeague = sh.league(), generation = gameGeneration;
+  var saved = sh.lsGet(sh.LS.game + requestedLeague);
+  fetchGames(requestedLeague).then(function (rows) {
+    if (generation !== gameGeneration || requestedLeague !== sh.league()) return;
     st.games = rows;
     var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
                rows.filter(function (g) { return g.state === 'in'; })[0];
     renderPicker();
     if (pick) selectGame(pick.id);
     else sh.bus.emit('quiet', 'No live games. Open Games to see the schedule.');
-  }).catch(function (e) { sh.showErr('Games could not be loaded. Open Games to try again.'); });
+  }).catch(function (e) {
+    if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
+  });
 });
 sh.bus.on('delay', function () { pump(); renderHeader(); });
 
@@ -1496,8 +1388,10 @@ setInterval(paintConnection, 1000);
 
 sh.bus.on('boot', function () {
   renderPicker();
-  var saved = sh.lsGet(sh.LS.game + sh.league());
-  fetchGames(sh.league()).then(function (rows) {
+  var requestedLeague = sh.league(), generation = gameGeneration;
+  var saved = sh.lsGet(sh.LS.game + requestedLeague);
+  fetchGames(requestedLeague).then(function (rows) {
+    if (generation !== gameGeneration || requestedLeague !== sh.league()) return;
     st.games = rows;
     var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
                rows.filter(function (g) { return g.state === 'in'; })[0];
@@ -1505,7 +1399,7 @@ sh.bus.on('boot', function () {
     if (pick) selectGame(pick.id);
     else sh.bus.emit('quiet', 'No live games. Open Games to see the schedule.');
   }).catch(function (e) {
-    sh.showErr('Games could not be loaded. Open Games to try again.');
+    if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
   }).then(function () {
     pollGame();
     pollScoreboard(false);
@@ -1515,6 +1409,12 @@ sh.bus.on('boot', function () {
 })(shell);
 
 // ================================================================= shell wiring
+$('shortHints').checked = shortHints;
+$('shortHints').addEventListener('change', function () {
+  shortHints = this.checked;
+  lsSet(LS.shortHints, shortHints ? '1' : '0');
+  bus.emit('hints');
+});
 function paintDelay() {
   $('dVal').textContent = delaySec + 's';
   $('dSlide').value = String(delaySec);
@@ -1569,13 +1469,18 @@ document.querySelector('.seg').addEventListener('click', function (ev) {
   var b = ev.target.closest('button[data-lg]');
   if (!b || b.dataset.lg === league) return;
   league = b.dataset.lg;
+  var requestedLeague = league;
   lsSet(LS.league, league);
+  bus.emit('leagueChanging');
   TEND = null;
   bus.emit('tables');
   loadTables().then(function () {
+    if (requestedLeague !== league) return;
     bus.emit('tables');
     bus.emit('leagueChanged', league);
-  }).catch(function (e) { showErr('Football stats could not be loaded. Refresh to try again.'); });
+  }).catch(function (e) {
+    if (requestedLeague === league) showErr('Football stats could not be loaded. Refresh to try again.');
+  });
 });
 
 // keep the screen awake; harmless where unsupported
@@ -1588,7 +1493,8 @@ document.addEventListener('visibilitychange', function () {
 });
 
 function loadTables() {
-  return jget(LEAGUES[league].table).then(function (t) { TEND = t; });
+  var requestedLeague = league;
+  return jget(LEAGUES[requestedLeague].table).then(function (t) { if (requestedLeague === league) TEND = t; });
 }
 
 loadLedger();
@@ -1598,7 +1504,7 @@ diag('boot', { version: VERSION, league: league, delay: delaySec });
 paintDelay();
 
 Promise.all([
-  jget('cards.json').then(function (c) { CARDS = c; }),
+  jget('cards.json').then(function (c) { CARDS = c; window.FootballGlossary.configure(c.concepts); }),
   loadTables()
 ]).then(function () {
   bus.emit('tables');

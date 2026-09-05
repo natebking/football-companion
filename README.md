@@ -1,29 +1,34 @@
-# football-companion
+# Football Companion
 
-Second-screen companion for learning to read football from zero. Design docs, canonical as of Aug 6 2026:
+A second screen for following a football game and learning what to watch. [Open the companion](https://football-companion-rose.vercel.app/).
 
-- [docs/context-brief.md](docs/context-brief.md): what this is, the eye-training loop, coordinator-keyed tendency modeling, data sourcing
-- [docs/prompt-scaffold.md](docs/prompt-scaffold.md): the card generator spec (truth boundary, card types, curation, correction loop)
+The app shows the next down and field position, historical run/pass tendencies, a short watching suggestion, and recent plays. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default.
 
-## v0: feed-vs-broadcast instrument
+Choose a game, set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
 
-Live: https://football-companion-rose.vercel.app
+## Data and limits
 
-One static page that measures the margin between ESPN's live play-by-play feed and the TV broadcast. Open it on a phone during a game, tap the button when the TV shows the play at the top of the list, and it logs the feed's lead time. Samples stay in localStorage; there is no backend.
+The static app polls ESPN directly in the browser. Historical tendencies ship as JSON; they describe past situations, not the next play's formation or strategy. Richer live details vary by game. Missing routes, coverage, or assignments are not inferred. All explanations are deterministic, with no runtime AI calls or backend.
 
-Notes:
+Current shipped tables cover CFB 2023–2025 and NFL 2024. The successful refresh dry-run on September 5 did not publish newer data. See the [product review](docs/PRODUCT-REVIEW-2026-09-05.md) for evidence, decisions, and remaining limits.
 
-- The page polls `site.api.espn.com` directly from the browser. ESPN 403s datacenter IPs but serves `access-control-allow-origin: *`, so a serverless proxy is unnecessary and would only add latency to the number being measured.
-- It also flags batched arrivals (multiple plays landing in one poll), post-hoc play text revisions, and plays that arrived while the page was asleep (excluded from timing).
-- One-line play text is the full extent of what live feeds provide: no formations, no routes, no coverage. The teaching layers described in the brief get built on top of this.
+## Develop and verify
 
-## Deploy
+The live app is in `web/`. The root `index.html` is the frozen broadcast-timing instrument, published at `/stopwatch`.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the repository, Git identity,
-team scope, and deployment troubleshooting shared by Codex and Claude.
-
+```sh
+python3 -m http.server 8765 --bind 127.0.0.1 --directory web
+node --test tests/*.test.js
 ```
+
+The tests cover curated real ESPN plays, scoring and penalty edge cases, prediction grading, and request races. The interface also needs browser verification against a live game after changes.
+
+- [Build contract](docs/CONTRACT.md): interfaces, statistical validation, and truth boundaries.
+- [Context brief](docs/context-brief.md) and [prompt scaffold](docs/prompt-scaffold.md): original design and future ideas, including up to four feeds.
+- [Deployment](docs/DEPLOYMENT.md): shared Codex and Claude deployment setup and troubleshooting.
+
+```sh
 vercel deploy --prod --yes --scope nates-projects-925609f4
 ```
 
-Vercel project: `football-companion`.
+Vercel project: `football-companion`. Git pushes alone do not deploy this project.

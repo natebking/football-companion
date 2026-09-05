@@ -1,0 +1,720 @@
+{
+  "normalRun": {
+    "source": "final_401858432.json",
+    "abbr": {
+      "194": "OSU",
+      "2050": "BALL"
+    },
+    "play": {
+      "id": "40185843214",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "#25 B.Jackson rush middle for 4 yards gain to the OhioSt20 (#2 Q.Scandrett; #27 G.Forsha)",
+      "statYardage": 4,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 16,
+        "yardsToEndzone": 84,
+        "downDistanceText": "1st & 10 at OSU 16",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "OSU 16",
+        "team": {
+          "id": "194"
+        }
+      },
+      "end": {
+        "down": 2,
+        "distance": 6,
+        "yardLine": 20,
+        "yardsToEndzone": 80,
+        "downDistanceText": "2nd & 6 at OSU 20",
+        "shortDownDistanceText": "2nd & 6",
+        "possessionText": "OSU 20",
+        "team": {
+          "id": "194"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "normalPass": {
+    "source": "final_401858432.json",
+    "abbr": {
+      "194": "OSU",
+      "2050": "BALL"
+    },
+    "play": {
+      "id": "40185843228",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "Shotgun #6 K.Luster pass complete short middle to #10 J.McDougle caught at BallSt50, for 12 yards to the OhioSt49 (#6 D.Sanchez), 1ST DOWN",
+      "statYardage": 12,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 61,
+        "yardsToEndzone": 61,
+        "downDistanceText": "1st & 10 at BALL 39",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "BALL 39",
+        "team": {
+          "id": "2050"
+        }
+      },
+      "end": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 49,
+        "yardsToEndzone": 49,
+        "downDistanceText": "1st & 10 at OSU 49",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "OSU 49",
+        "team": {
+          "id": "2050"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "touchdownPass": {
+    "source": "final_401858432.json",
+    "abbr": {
+      "194": "OSU",
+      "2050": "BALL"
+    },
+    "play": {
+      "id": "40185843276",
+      "type": {
+        "id": "67",
+        "text": "Passing Touchdown",
+        "abbreviation": "TD"
+      },
+      "text": "#10 J.Sayin pass complete deep right to #4 J.Smith caught at BallSt00, for 48 yards to the BallSt00 TOUCHDOWN, clock 08:47, 1ST DOWN #96 C.Hawkins kick attempt good (H: #42 J.McGuire, LS: #55 D.Riggs)",
+      "statYardage": 48,
+      "start": {
+        "down": 2,
+        "distance": 6,
+        "yardLine": 52,
+        "yardsToEndzone": 48,
+        "downDistanceText": "2nd & 6 at BALL 48",
+        "shortDownDistanceText": "2nd & 6",
+        "possessionText": "BALL 48",
+        "team": {
+          "id": "194"
+        }
+      },
+      "end": {
+        "down": -1,
+        "distance": 0,
+        "yardLine": 100,
+        "yardsToEndzone": 0,
+        "team": {
+          "id": "194"
+        }
+      },
+      "scoringPlay": true,
+      "scoringType": {
+        "name": "touchdown",
+        "displayName": "Touchdown",
+        "abbreviation": "TD"
+      },
+      "pointAfterAttempt": {
+        "id": 61,
+        "text": "Extra Point Good",
+        "abbreviation": "Extra Point Good",
+        "value": 1
+      },
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "sack": {
+    "source": "final_401858432.json",
+    "abbr": {
+      "194": "OSU",
+      "2050": "BALL"
+    },
+    "play": {
+      "id": "401858432125",
+      "type": {
+        "id": "7",
+        "text": "Sack"
+      },
+      "text": "No Huddle-Shotgun #10 J.Sayin sacked for loss of 5 yards to the OhioSt37 (#14 A.Pinnace)",
+      "statYardage": -5,
+      "start": {
+        "down": 2,
+        "distance": 5,
+        "yardLine": 42,
+        "yardsToEndzone": 58,
+        "downDistanceText": "2nd & 5 at OSU 42",
+        "shortDownDistanceText": "2nd & 5",
+        "possessionText": "OSU 42",
+        "team": {
+          "id": "194"
+        }
+      },
+      "end": {
+        "down": 3,
+        "distance": 10,
+        "yardLine": 37,
+        "yardsToEndzone": 63,
+        "downDistanceText": "3rd & 10 at OSU 37",
+        "shortDownDistanceText": "3rd & 10",
+        "possessionText": "OSU 37",
+        "team": {
+          "id": "194"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "penalty": {
+    "source": "final_401858432.json",
+    "abbr": {
+      "194": "OSU",
+      "2050": "BALL"
+    },
+    "play": {
+      "id": "401858432163",
+      "type": {
+        "id": "8",
+        "text": "Penalty",
+        "abbreviation": "PEN"
+      },
+      "text": "PENALTY BallSt Delay Of Game  5 yards from BallSt25 to BallSt20. NO PLAY",
+      "statYardage": 5,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 75,
+        "yardsToEndzone": 75,
+        "downDistanceText": "1st & 10 at BALL 25",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "BALL 25",
+        "team": {
+          "id": "2050"
+        }
+      },
+      "end": {
+        "down": 1,
+        "distance": 15,
+        "yardLine": 80,
+        "yardsToEndzone": 80,
+        "downDistanceText": "1st & 15 at BALL 20",
+        "shortDownDistanceText": "1st & 15",
+        "possessionText": "BALL 20",
+        "team": {
+          "id": "2050"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": true,
+      "isTurnover": false
+    }
+  },
+  "fourthDown": {
+    "source": "final_401858432.json",
+    "abbr": {
+      "194": "OSU",
+      "2050": "BALL"
+    },
+    "play": {
+      "id": "401858432661",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "Shotgun #6 K.Luster pass complete short right to #3 J.Thompson Jr. caught at OhioSt41, for 7 yards to the OhioSt31 (#17 T.Alford), out of bounds, TURNOVER ON DOWNS",
+      "statYardage": 7,
+      "start": {
+        "down": 4,
+        "distance": 8,
+        "yardLine": 38,
+        "yardsToEndzone": 38,
+        "downDistanceText": "4th & 8 at OSU 38",
+        "shortDownDistanceText": "4th & 8",
+        "possessionText": "OSU 38",
+        "team": {
+          "id": "2050"
+        }
+      },
+      "end": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 31,
+        "yardsToEndzone": 69,
+        "downDistanceText": "1st & 10 at OSU 31",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "OSU 31",
+        "team": {
+          "id": "194"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "declinedPenalty": {
+    "source": "final_401858425.json",
+    "abbr": {
+      "84": "IU",
+      "249": "UNT"
+    },
+    "play": {
+      "id": "401858425447",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "(10:30) Shotgun #10 J.Hoover pass complete short right to #88 B.Schott caught at IND42, for 25 yards to the UNT35 (#0 B.Jones), out of bounds, 1ST DOWN, PENALTY UNT Holding declined",
+      "statYardage": 25,
+      "start": {
+        "down": 3,
+        "distance": 9,
+        "yardLine": 40,
+        "yardsToEndzone": 60,
+        "downDistanceText": "3rd & 9 at IU 40",
+        "shortDownDistanceText": "3rd & 9",
+        "possessionText": "IU 40",
+        "team": {
+          "id": "84"
+        }
+      },
+      "end": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 65,
+        "yardsToEndzone": 35,
+        "downDistanceText": "1st & 10 at UNT 35",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "UNT 35",
+        "team": {
+          "id": "84"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "automaticFirstDown": {
+    "source": "final_401858425.json",
+    "abbr": {
+      "84": "IU",
+      "249": "UNT"
+    },
+    "play": {
+      "id": "401858425482",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "(08:50) Shotgun #29 B.Haygood rush left for 8 yards gain to the UNT34 (#1 A.Ferrell) PENALTY IND Face Mask (#3 J.Bell) 15 yards from UNT34 to UNT49, 1ST DOWN",
+      "statYardage": 8,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 74,
+        "yardsToEndzone": 74,
+        "downDistanceText": "1st & 10 at UNT 26",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "UNT 26",
+        "team": {
+          "id": "249"
+        }
+      },
+      "end": {
+        "down": 2,
+        "distance": -13,
+        "yardLine": 51,
+        "yardsToEndzone": 51,
+        "downDistanceText": "2nd & -13 at UNT 49",
+        "shortDownDistanceText": "2nd & -13",
+        "possessionText": "UNT 49",
+        "team": {
+          "id": "249"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "interception": {
+    "source": "final_401858425.json",
+    "abbr": {
+      "84": "IU",
+      "249": "UNT"
+    },
+    "play": {
+      "id": "401858425696",
+      "type": {
+        "id": "26",
+        "text": "Pass Interception Return",
+        "abbreviation": "INTR"
+      },
+      "text": "(02:02) #2 T.Jackson pass intercepted by #13 J.Sanks at IND26 #13 J.Sanks return 31 yards to the UNT43 (#68 K.Johnson)",
+      "statYardage": 31,
+      "start": {
+        "down": 4,
+        "distance": 2,
+        "yardLine": 45,
+        "yardsToEndzone": 45,
+        "downDistanceText": "4th & 2 at IU 45",
+        "shortDownDistanceText": "4th & 2",
+        "possessionText": "IU 45",
+        "team": {
+          "id": "249"
+        }
+      },
+      "end": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 57,
+        "yardsToEndzone": 43,
+        "downDistanceText": "1st & 10 at UNT 43",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "UNT 43",
+        "team": {
+          "id": "84"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": true
+    }
+  },
+  "fumbleLost": {
+    "source": "final_401856778.json",
+    "abbr": {
+      "248": "HOU",
+      "204": "ORST"
+    },
+    "play": {
+      "id": "401856778200",
+      "type": {
+        "id": "29",
+        "text": "Fumble Recovery (Opponent)"
+      },
+      "text": "(15:00) No Huddle-Shotgun #21 M.Hughes rush left for 7 yards gain to the OSU32 fumbled by #21 M.Hughes at OSU33 forced by #36 D.Vickers recovered by OSU #8 S.Vadrawale III at OSU32, End Of Play",
+      "statYardage": 7,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 61,
+        "yardsToEndzone": 39,
+        "downDistanceText": "1st & 10 at ORST 39",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "ORST 39",
+        "team": {
+          "id": "248"
+        }
+      },
+      "end": {
+        "down": 2,
+        "distance": 10,
+        "yardLine": 68,
+        "yardsToEndzone": 68,
+        "downDistanceText": "2nd & 10 at ORST 32",
+        "shortDownDistanceText": "2nd & 10",
+        "possessionText": "ORST 32",
+        "team": {
+          "id": "204"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": true
+    }
+  },
+  "touchdownWithConversionPenalty": {
+    "source": "final_401856778.json",
+    "abbr": {
+      "248": "HOU",
+      "204": "ORST"
+    },
+    "play": {
+      "id": "401856778760",
+      "type": {
+        "id": "68",
+        "text": "Rushing Touchdown",
+        "abbreviation": "TD"
+      },
+      "text": "(05:01) No Huddle #1 C.Weigman rush middle for 1 yard gain to the OSU00 TOUCHDOWN, clock 05:01 #4 T.Walker pass attempt Successful PENALTY HOU Holding (#53 R.McLain) 10 yards from OSU03 to OSU13. NO PLAY #49 J.Dimas kick attempt good (H: #15 J.Sock, LS: #69 W.Edwards)",
+      "statYardage": 1,
+      "start": {
+        "down": 2,
+        "distance": 1,
+        "yardLine": 99,
+        "yardsToEndzone": 1,
+        "downDistanceText": "2nd & Goal at ORST 1",
+        "shortDownDistanceText": "2nd & Goal",
+        "possessionText": "ORST 1",
+        "team": {
+          "id": "248"
+        }
+      },
+      "end": {
+        "down": -1,
+        "distance": 0,
+        "yardLine": 100,
+        "yardsToEndzone": 0,
+        "team": {
+          "id": "248"
+        }
+      },
+      "scoringPlay": true,
+      "scoringType": {
+        "name": "touchdown",
+        "displayName": "Touchdown",
+        "abbreviation": "TD"
+      },
+      "pointAfterAttempt": {
+        "id": 61,
+        "text": "Extra Point Good",
+        "abbreviation": "Extra Point Good",
+        "value": 1
+      },
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "nullifiedTouchdown": {
+    "source": "final_401858430.json",
+    "abbr": {
+      "158": "NEB",
+      "195": "OHIO"
+    },
+    "play": {
+      "id": "401858430350",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "(01:54) No Huddle-Shotgun #10 A.Colandrea pass complete short left to #1 N.Hunter caught at NEB43, for 57 yards to the OHI00 TOUCHDOWN nullified by penalty, clock 01:46 PENALTY NEB Personal Foul (#2 J.Barney Jr.) 15 yards from OHI40 to NEB45",
+      "statYardage": 17,
+      "start": {
+        "down": 2,
+        "distance": 4,
+        "yardLine": 43,
+        "yardsToEndzone": 57,
+        "downDistanceText": "2nd & 4 at NEB 43",
+        "shortDownDistanceText": "2nd & 4",
+        "possessionText": "NEB 43",
+        "team": {
+          "id": "158"
+        }
+      },
+      "end": {
+        "down": 1,
+        "distance": 2,
+        "yardLine": 45,
+        "yardsToEndzone": 45,
+        "downDistanceText": "1st & 2 at NEB 45",
+        "shortDownDistanceText": "1st & 2",
+        "possessionText": "NEB 45",
+        "team": {
+          "id": "158"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "runWithPenalty": {
+    "source": "final_401858430.json",
+    "abbr": {
+      "158": "NEB",
+      "195": "OHIO"
+    },
+    "play": {
+      "id": "401858430473",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "(09:19) No Huddle-Shotgun #25 J.Rule rush right for 6 yards gain (6) to the NEB49, out of bounds at NEB49 PENALTY NEB Holding (#1 N.Hunter) 10 yards from NEB49 to NEB39",
+      "statYardage": 6,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 43,
+        "yardsToEndzone": 57,
+        "downDistanceText": "1st & 10 at NEB 43",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "NEB 43",
+        "team": {
+          "id": "158"
+        }
+      },
+      "end": {
+        "down": 2,
+        "distance": 14,
+        "yardLine": 39,
+        "yardsToEndzone": 39,
+        "downDistanceText": "2nd & 14 at NEB 39",
+        "shortDownDistanceText": "2nd & 14",
+        "possessionText": "NEB 39",
+        "team": {
+          "id": "158"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "legacyPass": {
+    "source": "final_401856634.json",
+    "abbr": {
+      "333": "ALA",
+      "151": "ECU"
+    },
+    "play": {
+      "id": "401856634101896401",
+      "type": {
+        "id": "24",
+        "text": "Pass Reception",
+        "abbreviation": "REC"
+      },
+      "text": "Keelon Russell pass complete to Daniel Hill for 7 yds to the ECU 28",
+      "statYardage": 7,
+      "start": {
+        "down": 2,
+        "distance": 21,
+        "yardLine": 65,
+        "yardsToEndzone": 35,
+        "downDistanceText": "2nd & 21 at ECU 35",
+        "shortDownDistanceText": "2nd & 21",
+        "possessionText": "ECU 35",
+        "team": {
+          "id": "333"
+        }
+      },
+      "end": {
+        "down": 3,
+        "distance": 14,
+        "yardLine": 72,
+        "yardsToEndzone": 28,
+        "downDistanceText": "3rd & 14 at ECU 28",
+        "shortDownDistanceText": "3rd & 14",
+        "possessionText": "ECU 28",
+        "team": {
+          "id": "333"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "liveZeroYardage": {
+    "source": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401856658",
+    "abbr": {
+      "61": "UGA",
+      "2634": "TNST"
+    },
+    "play": {
+      "id": "401856658640",
+      "type": {
+        "id": "5",
+        "text": "Rush",
+        "abbreviation": "RUSH"
+      },
+      "text": "(08:55) No Huddle-Shotgun #10 B.McNair rush middle for 5 yards gain to the TSU30, End Of Play",
+      "statYardage": 0,
+      "start": {
+        "down": 1,
+        "distance": 10,
+        "yardLine": 75,
+        "yardsToEndzone": 75,
+        "downDistanceText": "1st & 10 at TNST 25",
+        "shortDownDistanceText": "1st & 10",
+        "possessionText": "TNST 25",
+        "team": {
+          "id": "2634"
+        }
+      },
+      "end": {
+        "down": 2,
+        "distance": 5,
+        "yardLine": 70,
+        "yardsToEndzone": 70,
+        "downDistanceText": "2nd & 5 at TNST 30",
+        "shortDownDistanceText": "2nd & 5",
+        "possessionText": "TNST 30",
+        "team": {
+          "id": "2634"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": false,
+      "isTurnover": false
+    }
+  },
+  "liveDeclinedSack": {
+    "source": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401856658",
+    "abbr": {
+      "61": "UGA",
+      "2634": "TNST"
+    },
+    "play": {
+      "id": "401856658694",
+      "type": {
+        "id": "8",
+        "text": "Penalty",
+        "abbreviation": "PEN"
+      },
+      "text": "(01:12) No Huddle-Shotgun #2 M.Tate sacked for loss of 10 yards to the UGA43 (#35 E.Littlejohn) PENALTY TSU Holding declined",
+      "statYardage": 0,
+      "start": {
+        "down": 3,
+        "distance": 10,
+        "yardLine": 33,
+        "yardsToEndzone": 33,
+        "downDistanceText": "3rd & 10 at UGA 33",
+        "shortDownDistanceText": "3rd & 10",
+        "possessionText": "UGA 33",
+        "team": {
+          "id": "2634"
+        }
+      },
+      "end": {
+        "down": 3,
+        "distance": 20,
+        "yardLine": 43,
+        "yardsToEndzone": 43,
+        "downDistanceText": "3rd & 20 at UGA 43",
+        "shortDownDistanceText": "3rd & 20",
+        "possessionText": "UGA 43",
+        "team": {
+          "id": "2634"
+        }
+      },
+      "scoringPlay": false,
+      "isPenalty": true,
+      "isTurnover": false
+    }
+  }
+}

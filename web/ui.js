@@ -20,6 +20,16 @@
   window.addEventListener('resize', measure);
   measure();
 
+  var howSheet = document.getElementById('howSheet');
+  document.getElementById('howItWorks').addEventListener('click', function () {
+    howSheet.classList.add('on');
+  });
+  function closeHow() { howSheet.classList.remove('on'); }
+  document.getElementById('closeHow').addEventListener('click', closeHow);
+  howSheet.addEventListener('click', function (event) {
+    if (event.target === howSheet) closeHow();
+  });
+
   document.querySelectorAll('.sheet').forEach(function (sheet) {
     new MutationObserver(function () {
       var open = sheet.classList.contains('on');
@@ -41,6 +51,17 @@
   });
 
   document.addEventListener('keydown', function (event) {
+    var definition = document.querySelector('#termPopover:popover-open');
+    if (definition) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        window.FootballGlossary.close(true);
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        definition.querySelector('button').focus();
+      }
+      return;
+    }
     if (!active) return;
     if (event.key === 'Escape') {
       event.preventDefault();

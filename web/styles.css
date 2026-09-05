@@ -93,9 +93,6 @@ html[data-read-fits="true"] .read-column { position: sticky; }
 .chip.src { background: var(--accent-bg); color: var(--accent); }
 .chip.srcl { background: transparent; color: var(--dim); border: 1px solid var(--line); }
 button.chip { border: 1px solid var(--line); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; min-height: 36px; }
-button.chip.known { color: var(--accent); }
-#pDef { display: none; color: var(--dim); font-size: .875rem; margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: var(--surface); }
-#pDef.on { display: block; }
 .pQuiet { font-size: 1.5rem; font-weight: 600; letter-spacing: -.03em; padding: 22px 0 30px; text-wrap: pretty; }
 .pHold { color: var(--dim); font-size: .75rem; margin-top: 16px; }
 .pHold:empty { display: none; }
@@ -124,6 +121,10 @@ button.chip.known { color: var(--accent); }
 .pl2 { margin-top: 9px; font-size: 1rem; line-height: 1.5; text-wrap: pretty; }
 .pl2.score { color: var(--accent); font-weight: 600; }
 .pl2.turn { color: var(--warn); }
+.play-players { margin-top: 6px; color: var(--dim); font-size: .8125rem; }
+.play-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.play-fact { font-size: .6875rem; color: var(--dim); background: var(--surface); border-radius: 5px; padding: 3px 7px; }
+.play-after { margin-top: 9px; padding-left: 10px; border-left: 2px solid var(--line); font-size: .875rem; color: var(--text); }
 .play-details { margin-top: 9px; }
 .play-details summary { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; color: var(--faint); cursor: pointer; list-style: none; min-height: 28px; }
 .play-details summary::-webkit-details-marker { display: none; }
@@ -149,7 +150,6 @@ button.chip.known { color: var(--accent); }
 #pRes.no { border-color: var(--bad); }
 #pRes.ok b { color: var(--accent); }
 #pRes.no b { color: var(--bad); }
-#pRes .why { display: block; margin-top: 5px; font-size: .8125rem; color: var(--dim); }
 #pRes.on + #pAsk.on { margin-top: 10px; }
 #pickBtn { display: flex; align-items: center; gap: 8px; padding: 9px 12px; min-height: 44px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 9px; font-size: .8125rem; font-weight: 600; flex: none; }
 
@@ -174,12 +174,13 @@ button.chip.known { color: var(--accent); }
 .gbtn.sel { background: var(--accent-bg); border-color: var(--accent); }
 .gbtn.sel::after { content: "✓"; position: absolute; right: 15px; top: 18px; color: var(--accent); }
 .theme-options button { flex: 1; }
+.hint-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); cursor: pointer; }
+.hint-option b { display: block; font-size: .875rem; font-weight: 600; }
+.hint-option small { display: block; font-size: .75rem; color: var(--dim); margin-top: 3px; }
+.hint-option input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .ledger { display: flex; flex-direction: column; }
 .lrow { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: .875rem; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .lrow .nm { font-weight: 600; }
-.lrow .stt { font-size: .6875rem; padding: 3px 6px; border-radius: 4px; background: var(--surface); color: var(--dim); }
-.lrow .stt.learning { color: var(--warn); background: var(--warn-bg); }
-.lrow .stt.familiar { color: var(--accent); background: var(--accent-bg); }
 .lrow .sc { font-size: .75rem; color: var(--dim); margin-left: auto; font-variant-numeric: tabular-nums; }
 .note { margin: 12px 0; color: var(--dim); font-size: .875rem; line-height: 1.6; text-wrap: pretty; }
 .btnRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
@@ -293,4 +294,21 @@ button.chip.known { color: var(--accent); }
   .t-icon-swap .t-icon { transition: none !important; }
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
   .ansb:active { transform: none; }
+}
+
+/* Definitions open only on request and stay near the selected word. */
+.term-link { display: inline; padding: 0; border: 0; border-radius: 2px; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: inherit; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: var(--dim); text-underline-offset: .17em; cursor: pointer; }
+.term-link:hover, .term-link:focus-visible { text-decoration-style: solid; color: var(--accent); }
+#termPopover { position: fixed; inset: auto; margin: 0; width: min(320px, calc(100vw - 24px)); padding: 15px 17px 17px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); box-shadow: 0 8px 32px #0003; }
+.term-heading { display: flex; align-items: center; gap: 12px; }
+.term-heading strong { font-size: 1rem; text-transform: capitalize; }
+.term-heading button { margin-left: auto; width: 32px; height: 32px; flex: none; border: 0; background: var(--surface); color: var(--dim); border-radius: 50%; font-size: 1.25rem; }
+#termPopover p { margin-top: 7px; font-size: .875rem; line-height: 1.55; }
+.help-link { border: 0; background: none; padding: 8px 0; min-height: 44px; color: var(--dim); font: inherit; font-size: .75rem; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.help-link:hover { color: var(--text); }
+#howSheet .note { margin: 0 0 18px; font-size: .9375rem; line-height: 1.6; color: var(--dim); }
+@media (max-width: 759px) {
+  .masthead { gap: 8px; }
+  .help-link { width: 48px; white-space: normal; line-height: 1.25; text-decoration: none; font-size: .6875rem; }
+  #pickBtn { gap: 4px; padding: 8px; font-size: .75rem; }
 }

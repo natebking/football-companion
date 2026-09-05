@@ -22,6 +22,7 @@
       </div>
       <div class="mast-actions">
         <span class="connection"><span class="dot" id="dot"></span><span id="connectionLabel">Connecting</span></span>
+        <button id="howItWorks" class="help-link" type="button" aria-haspopup="dialog" aria-controls="howSheet">How it works</button>
         <button id="pickBtn" type="button" aria-haspopup="dialog" aria-label="Choose a game">Games <span aria-hidden="true">⌄</span></button>
         <button id="themeToggle" class="icon-button" type="button" aria-label="Switch to dark mode">
           <span class="t-icon-swap" data-state="b" aria-hidden="true">
@@ -49,7 +50,6 @@
       <div class="tendency-block"><p id="pSit"></p><p id="pTen"></p></div>
       <div class="watch-block"><div class="watch-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Where to look</div><p id="pWatch"></p></div>
       <div class="pFoot" id="pFoot"></div>
-      <div id="pDef"></div>
       <div id="fieldPosition" class="field-position" hidden>
         <div class="field-caption"><span>Field position</span><span id="fieldDirection"></span></div>
         <svg id="fieldGraphic" viewBox="0 0 500 64" role="img" aria-label="Field position">
@@ -83,6 +83,19 @@
   </section>
 </main>
 
+<div id="howSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="howTitle" inert>
+  <div class="sheetInner">
+    <div class="sheetTop">
+      <span class="ttl" id="howTitle">How it works</span>
+      <button id="closeHow" class="closex" type="button">Close</button>
+    </div>
+    <p class="note">Pick a game, then keep watching on TV. Before the snap, a hint suggests where to look. Tap an underlined football term for a definition.</p>
+    <p class="note">The percentages come from past run and pass choices in similar situations. They do not tell us the next play or how anyone is lined up. The app does not watch your TV picture.</p>
+    <p class="note">Recent plays explains what happened and what changed. Player names, formations, and direction appear when the feed reports them. Updates can arrive late or be corrected.</p>
+    <p class="note">If the app gets ahead of your TV, use <b>TV delay</b> to hold cards, plays, and scores by 0–90 seconds. Adjust it as you watch. Your occasional picks are practice: a correct prediction does not measure your understanding of a football concept.</p>
+  </div>
+</div>
+
 <div id="sheet" class="sheet" role="dialog" aria-modal="true" aria-label="Choose a game" inert>
   <div class="sheetInner">
     <div class="sheetTop">
@@ -101,7 +114,12 @@
         <button data-theme-choice="dark" aria-pressed="false">Dark</button>
       </div>
     </div>
-    <div class="grouphead">Practice history</div>
+    <div class="grouphead">Hints</div>
+    <label class="hint-option"><span><b>Shorter hints</b><small>Leave out definitions. You can still tap a term to look it up.</small></span><input type="checkbox" id="shortHints"></label>
+    <div class="grouphead">Your calls</div>
+    <p class="note" id="callSummary">No graded picks yet.</p>
+    <p class="note">These scores track your predictions, not your understanding of the terms below.</p>
+    <div class="grouphead">Terms you have seen</div>
     <div class="ledger" id="ledgerView"></div>
     <p class="note" id="ledgerNote"></p>
     <div class="btnRow">
@@ -131,6 +149,8 @@
   </div>
 </div>
 
+<script src="play-facts.js"></script>
+<script src="glossary.js"></script>
 <script src="app.js"></script>
 <script src="ui.js"></script>
 </body>
