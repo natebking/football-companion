@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05a';
+var VERSION = '2026-09-05b';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -635,7 +635,11 @@ sh.bus.on('snap', function (sit) {
   if (card) {
     // Copy register and variant are frozen here, once, for this snap. Nothing
     // may rewrite the sentence he is halfway through reading.
-    st.attributed = !!(ten && ten.can_attribute);
+    // A card that prints no team number (prints_number false) states a
+    // league-wide fact, so it may not name the team however attributable the
+    // pass-rate cell happens to be. Measured: 65 of 1,034 real snaps drew the
+    // chip beside a sentence no team number produced.
+    st.attributed = !!(ten && ten.can_attribute && card.prints_number !== false);
     var pr = card.prime;
     var tendTpl = st.attributed ? pr.tendency : (pr.tendency_low || pr.tendency);
     var watchTpl = useShortWatch(card) ? (pr.watch_short || pr.watch) : pr.watch;
@@ -743,7 +747,7 @@ function render() {
   // the snaps the copy is allowed to, and never on the rest.
   var chips = [];
   var ten = st.ten;
-  if (ten && ten.can_attribute) {
+  if (st.attributed && ten) {
     chips.push('<span class="chip src">' + esc(ten.team) + ' · ' + sh.seasonsLabel() +
       ' · n=' + ten.sample_size + '</span>');
   } else {
