@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05b';
+var VERSION = '2026-09-05-design';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -689,6 +689,25 @@ function quietPrime(msg) {
   $('pFoot').innerHTML = '';
   $('pDef').className = '';
   $('pDef').textContent = '';
+  $('fieldPosition').hidden = true;
+}
+
+// A diagram of the same pre-snap whitelist the card reads. Offense always
+// moves left to right; neither the diagram nor its labels can see a result.
+function renderField(sit) {
+  var ball = 30 + (100 - sit.yardsToGoal) * 4.4;
+  var target = 30 + Math.min(100, 100 - sit.yardsToGoal + sit.distance) * 4.4;
+  var goal = sit.distance >= sit.yardsToGoal;
+  $('fieldPosition').hidden = false;
+  $('ballLine').setAttribute('x1', ball);
+  $('ballLine').setAttribute('x2', ball);
+  $('ballMarker').setAttribute('cx', ball);
+  $('firstDownLine').setAttribute('x1', target);
+  $('firstDownLine').setAttribute('x2', target);
+  $('fieldDirection').textContent = (sit.offenseTeam.abbreviation || '') + ' possession →';
+  $('fieldTargetLabel').textContent = goal ? 'Goal line' : 'First down';
+  $('fieldGraphic').setAttribute('aria-label', sit.yardsToGoal + ' yards from the end zone, ' +
+    sit.distance + ' yards to ' + (goal ? 'score.' : 'a first down.') + ' Offense moves left to right.');
 }
 // Two signatures, two redraws, deliberately separate. The card above and the
 // ask below are torn down only when their own content changed, so a poll, a
@@ -725,6 +744,8 @@ function render() {
   $('pSpot').textContent = (sit.spotText ? 'at ' + sit.spotText + ' · ' : '') +
     sit.yardsToGoal + ' to the end zone';
   $('pHold').textContent = st.hold;
+
+  renderField(sit);
 
   if (!st.card) {
     $('pSit').textContent = '';
@@ -1294,8 +1315,10 @@ function renderHeader() {
     var held = sh.delayMs() > 0 && st.shownPlay && st.shownPlay.awayScore !== null;
     var as = held ? st.shownPlay.awayScore : (a ? a.score : '');
     var hs = held ? st.shownPlay.homeScore : (h ? h.score : '');
-    $('score').innerHTML = sh.esc(an) + ' <span class="num">' + sh.esc(as) + '</span>' +
-      '<span class="sep">at</span>' + sh.esc(hn) + ' <span class="num">' + sh.esc(hs) + '</span>';
+    $('score').innerHTML = '<span class="score-team"><span class="team-abbr">' + sh.esc(an) +
+      '</span><span class="team-score">' + sh.esc(as) + '</span></span>' +
+      '<span class="sep">AT</span><span class="score-team"><span class="team-abbr">' +
+      sh.esc(hn) + '</span><span class="team-score">' + sh.esc(hs) + '</span></span>';
     var status = comp.status || {};
     var detail = held
       ? (st.shownPlay.period ? 'Q' + st.shownPlay.period + ' ' + st.shownPlay.clock : '')
@@ -1303,14 +1326,21 @@ function renderHeader() {
     $('hmeta').textContent = detail;
     st.gameLabel = an + ' at ' + hn;
   }
-  $('dot').className = 'dot' + (Date.now() - st.lastOk < sh.STALE_MS ? ' ok' : '');
+  paintConnection();
+}
+function paintConnection() {
+  var fresh = Date.now() - st.lastOk < sh.STALE_MS;
+  $('dot').className = 'dot' + (fresh ? ' ok' : '');
+  $('connectionLabel').textContent = fresh ? 'Connected' : st.gameId ? 'Connecting' : 'No game';
 }
 function renderFeed() {
   var el = $('feed');
   if (!st.rows.length) {
-    el.innerHTML = '<div class="empty">Nothing yet.</div>';
+    el.innerHTML = '<div class="empty">Plays will appear here once your game gets going.</div>';
     return;
   }
+  var expanded = {};
+  el.querySelectorAll('details[open]').forEach(function (details) { expanded[details.dataset.play] = true; });
   var h = '';
   for (var i = 0; i < st.rows.length; i++) {
     var r = st.rows[i];
@@ -1319,7 +1349,9 @@ function renderFeed() {
       '<span>' + sh.esc(r.dd) + '</span>' +
       '<span class="t num">' + sh.esc(r.when) + '</span></div>' +
       '<div class="pl2 ' + r.kind + '">' + sh.esc(r.plain) + '</div>' +
-      (r.raw ? '<div class="pl3">' + sh.esc(r.raw) + '</div>' : '') +
+      (r.raw ? '<details class="play-details" data-play="' + sh.esc(r.id) + '"' +
+        (expanded[r.id] ? ' open' : '') + '><summary>Play details</summary><p class="pl3">' +
+        sh.esc(r.raw) + '</p></details>' : '') +
       '</div>';
   }
   el.innerHTML = h;
@@ -1333,6 +1365,7 @@ function renderPicker() {
   var segs = document.querySelectorAll('.seg button');
   for (var i = 0; i < segs.length; i++) {
     segs[i].className = segs[i].dataset.lg === sh.league() ? 'on' : '';
+    segs[i].setAttribute('aria-pressed', String(segs[i].dataset.lg === sh.league()));
   }
   var groups = [
     ['Live now', st.games.filter(function (g) { return g.state === 'in'; })],
@@ -1447,9 +1480,7 @@ document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'visible') pollGame();
 });
 setInterval(pump, sh.TICK_MS);
-setInterval(function () {
-  $('dot').className = 'dot' + (Date.now() - st.lastOk < sh.STALE_MS ? ' ok' : '');
-}, 1000);
+setInterval(paintConnection, 1000);
 
 sh.bus.on('boot', function () {
   renderPicker();

@@ -272,6 +272,19 @@ Rules, non-negotiable:
 { "concepts": { "sticks": { "exposures": 3, "last_seen": "2026-08-29T20:12:00Z", "state": "learning" } } }
 ```
 
+## Presentation
+
+The companion has light and dark themes, with System as the default. `web/theme.js`
+applies the saved `fc_theme` preference before the stylesheet loads; this preference
+is local to the device and independent of the game, delay, and learning ledger.
+`web/styles.css` owns the responsive layout. `web/ui.js` measures the fixed controls
+and manages dialog focus and keyboard dismissal without accessing feed state.
+
+The field-position diagram in PRIME reads only the existing pre-snap whitelist.
+Offense always moves left to right, with the ball and first-down or goal line shown.
+The raw play description remains available under each play's disclosure. No card
+copy, attribution rule, grading rule, or broadcast-delay rule changes with the theme.
+
 ## File ownership
 
 One owner per file, so parallel work never collides.
