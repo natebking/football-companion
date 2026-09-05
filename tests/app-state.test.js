@@ -148,20 +148,20 @@ test('a pick closed after switching leagues retains its original league', () => 
   assert.equal(rows[0].voided, true);
 });
 
-function liveQueue() {
-  const events = [];
+function liveQueue(delay = 10000) {
+  const events = [], diagnostics = [];
   let now = 100000;
   const context = vm.createContext({
     window: { FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js') },
     Date: { now: () => now },
-    st: { gameId: 'A', seen: {}, queue: [], rows: [], primed: false, lastQueuedSit: '' },
-    sh: { FEED_MAX: 25, delayMs: () => 10000, diag: () => {}, bus: { emit: (name, value) => events.push({ name, value }) } },
+    st: { gameId: 'A', seen: {}, queue: [], rows: [], primed: false, lastQueuedSit: '', lastOk: 0, timingBreak: null },
+    sh: { FEED_MAX: 25, STALE_MS: 9000, delayMs: () => delay, diag: (name, value) => diagnostics.push({ name, value }), bus: { emit: (name, value) => events.push({ name, value }) } },
     renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}
   });
   const start = source.indexOf('function collectPlays(');
   const end = source.indexOf('// ---------------------------------------------------------------- render', start);
   vm.runInContext(source.slice(start, end), context);
-  return { context, events, tick: value => { now = value; context.pump(); } };
+  return { context, events, diagnostics, setNow: value => { now = value; }, tick: value => { now = value; context.pump(); } };
 }
 
 test('reported play facts and the next hint both wait behind the TV delay', () => {
@@ -351,7 +351,7 @@ function syncControls() {
   let now = 120000;
   const context = vm.createContext({
     Date: { now: () => now },
-    st: { rows: [], syncCandidate: null, syncSample: null, gameId: 'A', lastOk: 100000, lastChange: 100000 },
+    st: { rows: [], syncCandidate: null, syncSample: null, timingBreak: null, gameId: 'A', lastOk: 100000, lastChange: 100000 },
     $: id => elements[id] || (elements[id] = { classList: { contains: () => true }, addEventListener: (name, fn) => { handlers[id] = fn; } }),
     sh: { delayMs: () => 10000, diag: () => {}, bus: { on: () => {}, emit: (name, value) => events.push({ name, value }) } }
   });
@@ -380,10 +380,11 @@ test('a timing sample invalidates when its selected report changes', () => {
   const h = syncControls();
   h.context.st.rows = [{ id: 'new', version: 1, observedAt: 100000 }];
   h.context.refreshSyncCandidate(); h.handlers.syncSaw();
-  h.context.st.rows = [{ id: 'new', version: 2, observedAt: 100000 }];
+  h.context.st.rows = [{ id: 'new', version: 2, observedAt: 100000, timingIssue: 'revision' }];
   h.context.refreshSyncCandidate();
   assert.equal(h.context.st.syncSample, null);
   assert.equal(h.elements.syncApply.hidden, true);
+  assert.equal(h.elements.syncSaw.disabled, true);
 });
 
 test('TV-ahead remains independent of a candidate and applying survives synchronous queue changes', () => {
@@ -412,4 +413,217 @@ test('correcting a queued drive-ending play still clears the old card when the r
   assert.equal(h.events.filter(e => e.name === 'nosnap').length, 0);
   h.tick(125000);
   assert.equal(h.events.filter(e => e.name === 'nosnap').length, 1);
+});
+
+// Synthetic three-play drive used only to control arrival timing. The names,
+// identifiers and timestamps below are test inputs, not captured game evidence.
+function syntheticTimedRun(id, step = 0) {
+  const play = runPlay(), from = 16 + step * 4, to = from + 4;
+  const down = [1, 2, 3][step], distance = [10, 6, 2][step];
+  const nextDown = [2, 3, 1][step], nextDistance = [6, 2, 10][step];
+  play.id = id;
+  play.text = 'Test Runner rush for 4 yards to OSU ' + to + '.';
+  play.clock = { displayValue: ['9:59', '9:56', '9:53'][step] };
+  play.start = { ...play.start, down, distance, yardsToEndzone: 100 - from,
+    possessionText: 'OSU ' + from, downDistanceText: down + ' & ' + distance + ' at OSU ' + from };
+  play.end = { ...play.end, down: nextDown, distance: nextDistance, yardsToEndzone: 100 - to,
+    possessionText: 'OSU ' + to, shortDownDistanceText: nextDown + ' & ' + nextDistance };
+  return play;
+}
+
+test('two forward plays received together are ineligible for TV timing', () => {
+  const h = liveQueue(0), history = syntheticTimedRun('synthetic-history');
+  h.context.applySummary(summaryOf([history]));
+  assert.equal(h.context.st.rows[0].observedAt, null);
+  const b = syntheticTimedRun('synthetic-batch-b', 1), c = syntheticTimedRun('synthetic-batch-c', 2);
+  h.tick(103000); h.context.applySummary(summaryOf([history, b, c]));
+  assert.equal(h.context.st.timingBreak.reason, 'batch');
+  assert.equal(h.context.st.timingBreak.at, 103000);
+  for (const id of [b.id, c.id]) assert.equal(h.context.st.rows.find(row => row.id === id).timingIssue, 'batch');
+  const sync = syncControls();
+  sync.context.st.rows = h.context.st.rows; sync.context.st.timingBreak = h.context.st.timingBreak;
+  sync.context.refreshSyncCandidate();
+  assert.equal(sync.context.st.syncCandidate, null);
+  assert.equal(sync.elements.syncSaw.disabled, true);
+});
+
+test('a single new play followed by a timeout is still eligible for timing', () => {
+  const h = liveQueue(0), play = syntheticTimedRun('synthetic-single');
+  const marker = { id: 'synthetic-timeout', type: { text: 'Timeout' }, period: { number: 1 }, clock: { displayValue: '9:59' } };
+  h.context.applySummary(summaryOf([]));
+  h.tick(103000); h.context.applySummary(summaryOf([play, marker]));
+  assert.equal(h.context.st.rows.find(row => row.id === play.id).timingIssue, null);
+  assert.equal(h.context.st.timingBreak, null);
+  const release = h.diagnostics.find(event => event.name === 'queue_release').value;
+  assert.equal(release.trigger, 'poll');
+  assert.equal(release.count, 1);
+  assert.equal(release.max_overdue_ms, 0);
+  const sync = syncControls(); sync.context.st.rows = h.context.st.rows;
+  sync.context.refreshSyncCandidate();
+  assert.equal(sync.context.st.syncCandidate.id, play.id);
+  assert.equal(sync.elements.syncSaw.disabled, false);
+});
+
+test('a response gap excludes its first update but a subsequent clean update can be timed', () => {
+  const h = liveQueue(0), a = syntheticTimedRun('synthetic-before-gap');
+  const b = syntheticTimedRun('synthetic-after-gap', 1), c = syntheticTimedRun('synthetic-clean-followup', 2);
+  h.context.applySummary(summaryOf([a]));
+  assert.equal(h.context.st.lastOk, 100000);
+  h.tick(110000); h.context.applySummary(summaryOf([a, b]));
+  assert.equal(h.context.st.lastOk, 110000);
+  assert.equal(h.context.st.timingBreak.reason, 'response_gap');
+  assert.equal(h.context.st.timingBreak.at, 110000);
+  assert.equal(h.context.st.rows[0].timingIssue, 'response_gap');
+  const sync = syncControls();
+  sync.context.st.rows = h.context.st.rows; sync.context.st.timingBreak = h.context.st.timingBreak;
+  sync.context.refreshSyncCandidate();
+  assert.equal(sync.context.st.syncCandidate, null);
+  h.tick(113000); h.context.applySummary(summaryOf([a, b, c]));
+  assert.equal(h.context.st.rows[0].timingIssue, null);
+  assert.ok(h.context.st.rows[0].observedAt > h.context.st.timingBreak.at);
+  sync.context.st.rows = h.context.st.rows; sync.context.refreshSyncCandidate();
+  assert.equal(sync.context.st.syncCandidate.id, c.id);
+});
+
+test('timing selection never falls back from an uncertain latest play to an older clean play', () => {
+  const h = syncControls();
+  h.context.st.rows = [
+    { id: 'synthetic-latest', version: 1, observedAt: 115000, timingIssue: 'batch' },
+    { id: 'synthetic-old-clean', version: 1, observedAt: 100000, timingIssue: null }
+  ];
+  h.context.refreshSyncCandidate();
+  assert.equal(h.context.st.syncCandidate, null);
+  assert.equal(h.elements.syncSaw.disabled, true);
+});
+
+for (const reason of ['batch', 'response_gap', 'queue_catchup']) {
+  test('a ' + reason + ' invalidates an already measured timing sample', () => {
+    const h = syncControls();
+    const selected = { id: 'synthetic-selected', version: 1, observedAt: 100000, timingIssue: null };
+    h.context.st.rows = [selected]; h.context.refreshSyncCandidate(); h.handlers.syncSaw();
+    assert.equal(h.context.st.syncSample, 20);
+    h.context.st.timingBreak = { at: 121000, reason };
+    h.context.st.rows.unshift({ id: 'synthetic-uncertain-new', version: 1, observedAt: 121000, timingIssue: reason });
+    h.context.refreshSyncCandidate();
+    assert.equal(h.context.st.syncSample, null);
+    assert.equal(h.context.st.syncCandidate, null);
+    assert.equal(h.elements.syncApply.hidden, true);
+    assert.equal(h.elements.syncSaw.disabled, true);
+  });
+}
+
+test('queue catch-up processes every result but shows only the final next-snap card', () => {
+  const h = liveQueue(), a = syntheticTimedRun('synthetic-catchup-a');
+  const b = syntheticTimedRun('synthetic-catchup-b', 1), c = syntheticTimedRun('synthetic-catchup-c', 2);
+  h.context.applySummary(summaryOf([]));
+  h.tick(103000); h.context.applySummary(summaryOf([a]));
+  h.tick(106000); h.context.applySummary(summaryOf([a, b]));
+  h.tick(109000); h.context.applySummary(summaryOf([a, b, c]));
+  assert.equal(h.events.filter(event => ['snap', 'nosnap', 'result'].includes(event.name)).length, 0);
+  h.tick(130000);
+  const snaps = h.events.filter(event => event.name === 'snap');
+  assert.equal(snaps.length, 1);
+  assert.equal(snaps[0].value.down, c.end.down);
+  assert.equal(snaps[0].value.yardsToGoal, c.end.yardsToEndzone);
+  assert.equal(h.events.filter(event => event.name === 'nosnap').length, 0);
+  assert.deepEqual(h.events.filter(event => event.name === 'result').map(event => event.value.playId), [a.id, b.id, c.id]);
+  assert.equal(h.context.st.timingBreak.reason, 'queue_catchup');
+  assert.equal(h.context.st.timingBreak.at, 130000);
+  const release = h.diagnostics.find(event => event.name === 'queue_release').value;
+  assert.equal(release.trigger, 'tick');
+  assert.equal(release.count, 3);
+  assert.equal(release.max_overdue_ms, 17000);
+  assert.equal(release.delay_ms, 10000);
+});
+
+test('an intentional delay reduction is recorded without treating it as an interruption', () => {
+  const h = liveQueue(), a = syntheticTimedRun('synthetic-delay-a'), b = syntheticTimedRun('synthetic-delay-b', 1);
+  h.context.applySummary(summaryOf([]));
+  h.tick(103000); h.context.applySummary(summaryOf([a]));
+  h.tick(106000); h.context.applySummary(summaryOf([a, b]));
+  h.setNow(130000); h.context.sh.delayMs = () => 0;
+  h.context.pump('delay_change');
+  const release = h.diagnostics.find(event => event.name === 'queue_release').value;
+  assert.equal(release.trigger, 'delay_change');
+  assert.equal(release.count, 2);
+  assert.equal(release.max_overdue_ms, 27000);
+  assert.equal(release.delay_ms, 0);
+  assert.equal(h.context.st.timingBreak, null);
+  assert.equal(h.events.filter(event => event.name === 'snap').length, 1);
+});
+
+test('queue catch-up ending in a touchdown clears the card without showing intermediate snaps', () => {
+  const h = liveQueue(), a = syntheticTimedRun('synthetic-before-score');
+  const score = structuredClone(require('./fixtures/play-facts.json').touchdownPass.play);
+  score.id = 'synthetic-catchup-score';
+  h.context.applySummary(summaryOf([]));
+  h.tick(103000); h.context.applySummary(summaryOf([a]));
+  h.tick(106000); h.context.applySummary(summaryOf([a, score]));
+  h.tick(130000);
+  assert.equal(h.events.filter(event => event.name === 'snap').length, 0);
+  assert.equal(h.events.filter(event => event.name === 'nosnap').length, 1);
+  assert.deepEqual(h.events.filter(event => event.name === 'result').map(event => event.value.playId), [a.id, score.id]);
+});
+
+test('an intermediate queue transition closes an old pick before a later play repeats its situation', () => {
+  // Synthetic catch-up: halftime occurred, then a later possession returned to
+  // the same down, distance and field position as an unresolved pick.
+  const h = liveQueue(), handlers = {}, records = [], exposures = [];
+  const oldKey = '1|10|84|194', finalKey = '2|6|80|194';
+  const card = { id: 'synthetic-final-card', concepts: ['box'], prime: {
+    situation: 'Second and 6.', tendency: '', watch: 'Watch the box.'
+  } };
+  const prime = vm.createContext({
+    Date, window: { FootballGlossary: { close: () => {} } },
+    st: {
+      pending: { sitKey: oldKey, game: 'A', league: 'cfb', cardId: 'synthetic-old-card',
+        kind: 'passrun', answer: 'run', latency: 1500, down: 1, distance: 10, ytg: 84 },
+      sit: { sitKey: oldKey }, sitKey: oldKey, res: null, ask: null, sinceAsk: 99, skippedGrade: false
+    },
+    sh: {
+      bus: { on: (name, handler) => { (handlers[name] || (handlers[name] = [])).push(handler); } },
+      logAsk: record => records.push(record), diag: () => {}, invalidateCalls: () => {}, league: () => 'cfb',
+      bumpExposure: concepts => exposures.push(concepts)
+    },
+    resolveTeam: () => null, lookupTendency: () => null, printedRate: () => null,
+    pickCard: () => card, fill: text => text, useShortWatch: () => false,
+    askFor: () => ({ id: 'synthetic-final-ask', kind: 'passrun' }), askEligible: () => true, drawGap: () => 7,
+    render: () => {}, renderLedger: () => {}, flash: () => {}, $: () => ({ textContent: '' })
+  });
+  const sameSnapStart = source.indexOf('function sameSnap(');
+  vm.runInContext(source.slice(sameSnapStart, source.indexOf('var shell =', sameSnapStart)), prime);
+  prime.sh.sameSnap = prime.sameSnap;
+  const eventsStart = source.indexOf('// ---------------------------------------------------------------- events');
+  vm.runInContext(grading + '\n' + source.slice(eventsStart, source.indexOf('// ---------------------------------------------------------------- render', eventsStart)), prime);
+  const captureLiveEvent = h.context.sh.bus.emit;
+  h.context.sh.bus.emit = (name, value) => {
+    captureLiveEvent(name, value);
+    for (const handler of handlers[name] || []) handler(value);
+  };
+  const playId = 'synthetic-later-same-situation';
+  h.context.st.order = { [playId]: 1 };
+  h.context.st.seen = { [playId]: { version: 1 } };
+  h.context.st.queue = [
+    { kind: 'nosnap', at: 100000, msg: 'Halftime.', basis: 'synthetic-earlier-play', version: 1 },
+    { kind: 'play', at: 100000, wasReleased: false, silent: false, marker: false,
+      row: { id: playId, version: 1, observedAt: 100000, gradeKey: 'synthetic-grade' },
+      cls: 'run', sitKey: oldKey, gained: 4, need: 10, turnover: false, voidReason: null },
+    { kind: 'snap', at: 100000, basis: playId, version: 1, sit: {
+      sitKey: finalKey, gameId: 'A', down: 2, distance: 6, yardsToGoal: 80,
+      offenseTeam: { id: '194' }, defenseTeam: { id: '2050' }
+    } }
+  ];
+  h.tick(110000);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].correct, null);
+  assert.equal(records[0].voided, true);
+  assert.equal(records[0].play_id, null);
+  assert.equal(records[0].card, 'synthetic-old-card');
+  assert.equal(prime.st.res.head, 'No grade.');
+  assert.equal(prime.st.pending.sitKey, finalKey);
+  assert.equal(prime.st.pending.answer, null);
+  assert.equal(exposures.length, 1);
+  assert.equal(h.events.filter(event => event.name === 'snap').length, 1);
+  assert.equal(h.events.filter(event => event.name === 'nosnap').length, 0);
+  assert.equal(h.events.filter(event => event.name === 'result').length, 1);
 });

@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-timing';
+var VERSION = '2026-09-05-arrivals';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -254,6 +254,7 @@ var st = {
   askAt: 0,
   pending: null,      // {sitKey, cardId, askId, kind, concepts, answer, latency}
   res: null,          // resolution strip
+  skippedGrade: false,
   sinceAsk: 99,       // start high so the mechanic shows itself on the first card
   gap: 7,
   quiet: 'Pick a game to start.',
@@ -483,10 +484,16 @@ sh.bus.on('hold', function (n) {
   var s = n > 0 ? 'TV delay: next update in ' + n + 's.' : '';
   if (s !== st.hold) { st.hold = s; $('pHold').textContent = s; }
 });
+sh.bus.on('transition', function () {
+  // A catch-up still closes the old pick at its original boundary, even when
+  // the intermediate card itself is never displayed.
+  if (closePending('The feed moved on before this pick could be graded.')) st.skippedGrade = true;
+});
 // The drive ended: touchdown, made kick, end of period. There is no legal next
 // snap, so the card comes down rather than describing a down already played.
 sh.bus.on('nosnap', function (msg) {
   closePending('The feed moved on before this pick could be graded.');
+  st.skippedGrade = false;
   st.quiet = msg || '';
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
   st.ask = null;
@@ -497,6 +504,7 @@ sh.bus.on('clear', function () {
   closePending('The game changed before this pick could be graded.');
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
   st.ask = null; st.pending = null; st.res = null;
+  st.skippedGrade = false;
   st.sinceAsk = 99; st.sig = ''; st.asig = '';
   render();
 });
@@ -569,7 +577,8 @@ function closePending(reason) {
 
 sh.bus.on('snap', function (sit) {
   window.FootballGlossary.close();
-  var missedGrade = closePending('The feed moved on before this pick could be graded.');
+  var missedGrade = closePending('The feed moved on before this pick could be graded.') || st.skippedGrade;
+  st.skippedGrade = false;
 
   st.sit = sit;
   st.sitKey = sit.sitKey;
@@ -820,7 +829,7 @@ var st = {
   gameId: null, games: [], gameLabel: '', gameState: '',
   sum: null,                 // latest raw summary, this scope only
   seen: {}, order: {}, queue: [], rows: [], shownPlay: null,
-  health: null, lastQueuedHealth: '', lastChange: 0, syncCandidate: null, syncSample: null,
+  health: null, lastQueuedHealth: '', lastChange: 0, syncCandidate: null, syncSample: null, timingBreak: null,
   lastQueuedSit: '', lastQueuedBasis: '', primed: false, lastOk: 0, sheet: false
 };
 
@@ -1076,12 +1085,17 @@ function playSitKey(p, abbr) {
 
 // ---------------------------------------------------------------- delay queue
 function due(item) { return item.at === 0 ? 0 : item.at + sh.delayMs(); }
-function pump() {
-  var now = Date.now(), moved = false;
+function pump(trigger) {
+  var now = Date.now(), moved = false, nextSnap = null;
+  var released = [], maxOverdue = 0;
   while (st.queue.length && due(st.queue[0]) <= now) {
     var it = st.queue.shift();
     moved = true;
     if (it.kind === 'play') {
+      if (!it.wasReleased && !it.silent && !it.marker && !it.row.revised && it.row.observedAt !== null) {
+        released.push(it.row.id);
+        maxOverdue = Math.max(maxOverdue, now - due(it));
+      }
       var index = st.rows.findIndex(function (row) { return row.id === it.row.id; });
       var prior = index >= 0 ? st.rows[index] : null;
       if (index >= 0) st.rows[index] = it.row; else st.rows.push(it.row);
@@ -1101,15 +1115,27 @@ function pump() {
       }
       sh.diag('release', { id: it.row.id, version: it.row.version, revised: !!prior,
         observed_at: it.at, released_at: now, display_id: st.shownPlay && st.shownPlay.id });
-    } else if (it.kind === 'snap') {
-      sh.diag('snap', { sit: it.sit.sitKey, basis: it.basis, version: it.version });
-      sh.bus.emit('snap', it.sit);
-    } else if (it.kind === 'nosnap') {
-      sh.diag('nosnap', it.msg);
-      sh.bus.emit('nosnap', it.msg);
+    } else if (it.kind === 'snap' || it.kind === 'nosnap') {
+      sh.bus.emit('transition');
+      nextSnap = it;
     } else if (it.kind === 'health') {
       st.health = it.health;
     }
+  }
+  // Catch-up can release several situations in one turn. Only the final one
+  // was actually available to read; intermediate hints must not log learning
+  // exposures or open predictions about plays whose results are already here.
+  if (nextSnap) {
+    sh.diag(nextSnap.kind, nextSnap.kind === 'snap' ?
+      { sit: nextSnap.sit.sitKey, basis: nextSnap.basis, version: nextSnap.version } : nextSnap.msg);
+    sh.bus.emit(nextSnap.kind, nextSnap.kind === 'snap' ? nextSnap.sit : nextSnap.msg);
+  }
+  if (released.length) sh.diag('queue_release', {
+    trigger: trigger || 'tick', ids: released, count: released.length,
+    max_overdue_ms: maxOverdue, delay_ms: sh.delayMs()
+  });
+  if (released.length > 1 && maxOverdue > sh.STALE_MS && trigger !== 'delay_change') {
+    st.timingBreak = { at: now, reason: 'queue_catchup' };
   }
   if (moved) { renderFeed(); renderHeader(); refreshSyncCandidate(); }
   var head = st.queue.length ? Math.ceil((due(st.queue[0]) - now) / 1000) : 0;
@@ -1130,6 +1156,9 @@ function applySummary(sum) {
   var plays = collectPlays(sum), abbr = teamAbbrs(sum);
   var health = window.FootballFeed.inspectClocks(plays, status || {});
   var first = !st.primed, now = Date.now(), last = plays.length - 1;
+  var responseGap = st.lastOk ? now - st.lastOk : null;
+  var resumed = !first && responseGap > sh.STALE_MS;
+  st.lastOk = now;
   var startAt = first ? Math.max(0, plays.length - sh.FEED_MAX) : 0;
   var added = 0, revised = 0, newestKnown = -1;
   st.order = {};
@@ -1137,6 +1166,14 @@ function applySummary(sum) {
     st.order[String(p.id)] = i;
     if (st.seen[String(p.id)]) newestKnown = i;
   });
+  var freshIds = first ? [] : plays.filter(function (p, i) {
+    return i > newestKnown && !st.seen[String(p.id)] && !isMarker(p);
+  }).map(function (p) { return String(p.id); });
+  // Receipt time is not play time. A group of new reports or the first response
+  // after an interruption cannot establish a dependable broadcast delay.
+  if (resumed || freshIds.length > 1) {
+    st.timingBreak = { at: now, reason: resumed ? 'response_gap' : 'batch' };
+  }
   for (var i = startAt; i < plays.length; i++) {
     var p = plays[i], id = String(p.id), previous = st.seen[id];
     var fingerprint = playFingerprint(p);
@@ -1147,6 +1184,8 @@ function applySummary(sum) {
     var row = feedRow(p, abbr, facts);
     row.version = previous ? previous.version + 1 : 1;
     row.observedAt = previous ? previous.observedAt : first || backfill ? null : now;
+    row.timingIssue = previous ? 'revision' : first ? 'history' : backfill ? 'backfill' :
+      resumed ? 'response_gap' : freshIds.length > 1 ? 'batch' : null;
     row.revised = !!previous;
     row.marker = isMarker(p);
     row.gradeKey = JSON.stringify([facts.outcome, facts.gained, facts.need, facts.turnover, facts.voidReason, playSitKey(p, abbr)]);
@@ -1180,6 +1219,8 @@ function applySummary(sum) {
   var tail = last >= 0 ? plays[last] : null;
   sh.diag('poll', {
     plays: plays.length, added: added, revised: revised, q: st.queue.length,
+    received_at: now, response_gap_ms: responseGap, resumed: resumed,
+    new_play_ids: freshIds, batch_size: freshIds.length,
     source_id: tail && String(tail.id), basis_id: basis, source_version: version,
     displayed_id: st.shownPlay && st.shownPlay.id, displayed_version: st.shownPlay && st.shownPlay.version,
     last: tail ? ((tail.type || {}).text || '') : '', sit: sit ? sit.sitKey : null,
@@ -1205,8 +1246,9 @@ function applySummary(sum) {
     st.queue.push({ kind: 'health', at: now, health: health });
   }
   st.primed = true;
-  pump();
+  pump('poll');
   renderHeader();
+  if (resumed || freshIds.length > 1) refreshSyncCandidate();
 }
 function waitingMessage() {
   if (!st.gameId) return 'Pick a game to start.';
@@ -1308,17 +1350,23 @@ function refreshSyncCandidate() {
   if (!$('dsheet').classList.contains('on')) return;
   if (st.syncCandidate) {
     var current = st.rows.find(function (row) { return row.id === st.syncCandidate.id; });
-    if (!current || current.version !== st.syncCandidate.version) {
+    var interrupted = st.timingBreak && st.syncCandidate.observedAt <= st.timingBreak.at;
+    if (!current || current.version !== st.syncCandidate.version || interrupted) {
       st.syncCandidate = null; st.syncSample = null;
-      $('syncResult').textContent = 'That report changed. Match the updated play below.';
+      $('syncResult').textContent = interrupted ? 'Check a fresh play before setting a delay.' :
+        'That report changed. Wait for a fresh play to check TV timing.';
       $('syncApply').hidden = true;
     }
   }
-  if (!st.syncCandidate && st.syncSample === null) {
-    st.syncCandidate = st.rows.find(function (row) { return row.observedAt !== null && row.observedAt !== undefined && !row.marker; }) || null;
-  }
+  var latest = st.rows.find(function (row) { return !row.marker; });
+  var issue = latest && latest.timingIssue;
+  if (st.timingBreak && (!latest || !latest.observedAt || latest.observedAt <= st.timingBreak.at)) issue = st.timingBreak.reason;
+  if (!st.syncCandidate && st.syncSample === null && latest && !issue && latest.observedAt != null) st.syncCandidate = latest;
   var row = st.syncCandidate;
-  $('syncPlay').textContent = row ? row.off + ' · ' + row.plain + (row.players ? ' ' + row.players : '') : 'Waiting for a newly received play.';
+  var waiting = issue === 'batch' ? 'Several plays arrived together. Waiting for a fresh play to check TV timing.' :
+    issue === 'response_gap' ? 'Updates resumed after a gap. Waiting for a fresh play to check TV timing.' :
+    issue === 'queue_catchup' ? 'The app caught up with several updates. Waiting for a fresh play to check TV timing.' : 'Waiting for a newly received play.';
+  $('syncPlay').textContent = row ? row.off + ' · ' + row.plain + (row.players ? ' ' + row.players : '') : waiting;
   $('syncSaw').disabled = !row || st.syncSample !== null;
   paintFeedStatus();
 }
@@ -1408,7 +1456,6 @@ function pollGame() {
   }
   sh.jget(summaryUrl(request.league, request.game), request.controller.signal).then(function (sum) {
     if (!current()) return;
-    st.lastOk = Date.now();
     sh.showErr('');
     applySummary(sum);
   }).catch(function (e) {
@@ -1454,7 +1501,7 @@ function resetGame() {
   pollRequest = null;
   st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = [];
   st.health = null; st.lastQueuedHealth = ''; st.lastChange = 0;
-  st.syncCandidate = null; st.syncSample = null;
+  st.syncCandidate = null; st.syncSample = null; st.timingBreak = null;
   $('syncApply').hidden = true; $('syncResult').textContent = '';
   st.shownPlay = null; st.lastQueuedSit = ''; st.lastQueuedBasis = ''; st.primed = false;
   st.lastOk = 0; st.gameState = ''; st.statusName = '';
@@ -1515,7 +1562,7 @@ sh.bus.on('leagueChanged', function () {
     if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
   });
 });
-sh.bus.on('delay', function () { pump(); renderHeader(); });
+sh.bus.on('delay', function () { pump('delay_change'); renderHeader(); });
 
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'visible') pollGame();

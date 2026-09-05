@@ -262,6 +262,8 @@ Play IDs are versioned by content. Corrections replace their existing rows throu
 
 Repeated source clocks across three eligible scrimmage plays are marked unreliable by `web/feed-health.js`. Do not infer a ticking clock or a TV offset from those values. The TV-delay panel measures first receipt to a viewer tap for newly received plays; applying that measured delay is explicit. Request success and the age of the last play update are separate diagnostics. See [the timing incident](TIMING-INCIDENT-2026-09-05.md).
 
+Timing samples exclude revised reports, batches of multiple new forward non-marker plays, and the first updates after a response gap longer than the nine-second freshness window. An interruption invalidates an existing sample; selection must use the latest non-marker row without falling back to an older eligible play. Poll and queue-release diagnostics distinguish arrival batches, response gaps, overdue local releases, and intentional delay changes. A pump publishes only its final due snap/nosnap, so intermediate catch-up situations cannot create learning exposures or predictions. Each logical transition still closes an unmatched pending pick before later results can grade it. Multiple releases more than nine seconds overdue require a fresh timing sample unless triggered by an intentional delay change.
+
 A selected game has at most one active summary request, with a 15-second timeout. A game or league change aborts and invalidates old requests and clears the old queue before new tables load. Summary refreshes are three seconds during play and thirty seconds after a final; stale scoreboard responses are also ignored.
 
 ## Concept exposure and prediction history

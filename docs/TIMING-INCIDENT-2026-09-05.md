@@ -21,10 +21,18 @@ The large down-and-distance heading now uses the same normalized numbers as its 
 
 “Feed responding” describes request success. TV delay shows the age of the last successful response separately from the last new or revised play. Diagnostics record source/displayed play IDs and versions, next-card source, label mismatches, revision counts, observation/release times, and configured delay.
 
-The TV-delay panel can measure a newly received play: tap when it finishes on TV, then explicitly apply the measured delay. Initial history and late backfills cannot be sampled. The selected play stays fixed while being compared; a corrected report invalidates its sample. “My TV is ahead” explains that added delay cannot speed up ESPN and offers 0 seconds.
+The TV-delay panel can measure a newly received play: tap when it finishes on TV, then explicitly apply the measured delay. Initial history, late backfills, revised reports, and multiple new plays received in one response cannot be sampled. A gap longer than the feed's nine-second freshness window also requires a fresh subsequent play. The selected play stays fixed through ordinary updates; a corrected report or interrupted updates invalidate its sample. The sampler never skips an ineligible latest play to select an older one. “My TV is ahead” explains that added delay cannot speed up ESPN and offers 0 seconds.
+
+## Follow-up: plays appearing during commercials
+
+The user clarified that several plays appeared in quick succession while TV showed no action or a commercial. This observation alone does not establish which side was ahead. The captured response pairs contained one new play in 37 seconds and no new or revised plays in a later 20-second interval; neither captured the reported burst. Late source delivery, browser catch-up, and a broadcast behind the feed remain possible explanations.
+
+Polling diagnostics now record the IDs of new forward non-marker plays, their response's batch size, receipt time, and the gap since the previous successful response. Separate queue-release diagnostics record the trigger, released IDs, and how overdue those updates were. An intentional delay reduction is identified separately from a normal timer or response. These observations distinguish arrival batching from local queue catch-up without claiming to know when the plays happened on TV.
+
+When multiple queued situations are ready together, only the final hint is published. All play reports and relevant result corrections still reconcile, but intermediate situations cannot record learning exposures or create predictions for already reported plays. Each logical transition still closes an unmatched pick immediately, so a later identical situation cannot grade a pick from before a game break. A catch-up releasing multiple plays more than nine seconds overdue also requires a fresh timing sample, except when the release was caused by intentionally changing the delay. No artificial play spacing is introduced.
 
 ## Limits and validation
 
 This handles app reconciliation and makes source uncertainty visible. It cannot make ESPN publish sooner or reconstruct a missing official clock. Timing samples depend on the viewer matching the correct play and tapping near its end; several samples are preferable to treating one as exact.
 
-Regression checks cover repeated clocks and recovery, delayed revisions, superseded next cards, older backfills, grade invalidation, normalized headings, and timing-control edge cases. Browser verification uses the live college feed and the TV-delay dialog.
+Regression checks cover repeated clocks and recovery, delayed revisions, superseded next cards, older backfills, grade invalidation, normalized headings, batching, resumed updates, queue catch-up, and timing-control edge cases. Browser verification uses the live college feed and the TV-delay dialog. Burst scenarios in automated checks are constructed inputs, not a reproduction of the user's exact TV session.
