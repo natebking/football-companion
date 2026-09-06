@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-understand';
+var VERSION = '2026-09-05-stable-logos';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -863,9 +863,9 @@ function teamLogo(team) {
   return /^https:\/\/a\.espncdn\.com\//.test(url) ? url : '';
 }
 var unavailableLogos = new Set();
-function logoImage(url) {
+function logoImage(url, eager) {
   if (!url || unavailableLogos.has(url)) return '';
-  return '<img class="team-logo" src="' + sh.esc(url) + '" width="32" height="32" alt="" aria-hidden="true" loading="lazy" decoding="async">';
+  return '<img class="team-logo" src="' + sh.esc(url) + '" width="32" height="32" alt="" aria-hidden="true" loading="' + (eager ? 'eager' : 'lazy') + '" decoding="async">';
 }
 document.addEventListener('error', function (event) {
   var img = event.target;
@@ -1274,6 +1274,7 @@ function renderHeader() {
   var sum = st.sum;
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   if (!comp) {
+    st.scoreTeams = '';
     $('score').textContent = st.gameId ? 'Loading game…' : 'Choose a game';
     $('hmeta').textContent = '';
   } else {
@@ -1288,10 +1289,21 @@ function renderHeader() {
     var held = delayed && st.shownPlay && st.shownPlay.awayScore !== null && st.shownPlay.homeScore !== null;
     var as = delayed ? (held ? st.shownPlay.awayScore : '—') : (a ? a.score : '');
     var hs = delayed ? (held ? st.shownPlay.homeScore : '—') : (h ? h.score : '');
-    $('score').innerHTML = '<span class="score-team">' + logoImage(teamLogo(a && a.team)) + '<span class="team-abbr">' + sh.esc(an) +
-      '</span><span class="team-score">' + sh.esc(as) + '</span></span>' +
-      '<span class="sep">AT</span><span class="score-team">' + logoImage(teamLogo(h && h.team)) + '<span class="team-abbr">' +
-      sh.esc(hn) + '</span><span class="team-score">' + sh.esc(hs) + '</span></span>';
+    var awayLogo = teamLogo(a && a.team), homeLogo = teamLogo(h && h.team);
+    var teamsKey = JSON.stringify([an, hn, awayLogo, homeLogo]);
+    // Keep decoded images attached across polls, clock changes and delayed
+    // releases. Only a different team label or logo needs new team markup.
+    if (teamsKey !== st.scoreTeams) {
+      $('score').innerHTML = '<span class="score-team">' + logoImage(awayLogo, true) + '<span class="team-abbr">' + sh.esc(an) +
+        '</span><span class="team-score">' + sh.esc(as) + '</span></span>' +
+        '<span class="sep">AT</span><span class="score-team">' + logoImage(homeLogo, true) + '<span class="team-abbr">' +
+        sh.esc(hn) + '</span><span class="team-score">' + sh.esc(hs) + '</span></span>';
+      st.scoreTeams = teamsKey;
+    } else {
+      var scores = $('score').querySelectorAll('.team-score');
+      scores[0].textContent = as == null ? '' : String(as);
+      scores[1].textContent = hs == null ? '' : String(hs);
+    }
     var status = comp.status || {};
     var detail = held
       ? (st.shownPlay.period ? 'Q' + st.shownPlay.period + ' ' + st.shownPlay.clock : '')
@@ -1442,22 +1454,55 @@ function renderPicker() {
     ['Coming up', st.games.filter(function (g) { return g.state === 'pre'; })],
     ['Final', st.games.filter(function (g) { return g.state === 'post'; })]
   ];
-  var h = '';
+  // Reuse game buttons by ID. Refreshing scores or opening the picker must
+  // not restart image loading or replace a button that has keyboard focus.
+  var el = $('games'), buttons = new Map(), headings = new Map(), children = [];
+  el.querySelectorAll('button[data-g]').forEach(function (button) { buttons.set(button.dataset.g, button); });
+  el.querySelectorAll('.grouphead').forEach(function (heading) { headings.set(heading.textContent, heading); });
   for (var gi = 0; gi < groups.length; gi++) {
     var rows = groups[gi][1];
     if (!rows.length) continue;
-    h += '<div class="grouphead">' + groups[gi][0] + '</div>';
+    var heading = headings.get(groups[gi][0]);
+    if (!heading) {
+      heading = document.createElement('div');
+      heading.className = 'grouphead';
+      heading.textContent = groups[gi][0];
+    }
+    children.push(heading);
     for (var j = 0; j < rows.length; j++) {
       var g = rows[j];
       var sub = g.state === 'pre' ? g.detail
         : g.away + ' ' + g.awayScore + '  ·  ' + g.home + ' ' + g.homeScore + '  ·  ' + g.detail;
-      h += '<button class="gbtn' + (g.id === st.gameId ? ' sel' : '') + '" data-g="' + sh.esc(g.id) + '">' +
-        '<span class="game-teams"><span class="game-team">' + logoImage(g.awayLogo) + '<b>' + sh.esc(g.away) +
-        '</b></span><span class="game-versus">at</span><span class="game-team">' + logoImage(g.homeLogo) + '<b>' + sh.esc(g.home) +
-        '</b></span></span><small>' + sh.esc(sub) + '</small></button>';
+      var button = buttons.get(g.id);
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.g = g.id;
+      }
+      var teamsKey = JSON.stringify([g.away, g.home, g.awayLogo, g.homeLogo]);
+      if (button.dataset.teams !== teamsKey) {
+        button.innerHTML = '<span class="game-teams"><span class="game-team">' + logoImage(g.awayLogo) + '<b>' + sh.esc(g.away) +
+          '</b></span><span class="game-versus">at</span><span class="game-team">' + logoImage(g.homeLogo) + '<b>' + sh.esc(g.home) +
+          '</b></span></span><small></small>';
+        button.dataset.teams = teamsKey;
+      }
+      button.className = 'gbtn' + (g.id === st.gameId ? ' sel' : '');
+      var detail = button.querySelector('small');
+      if (detail.textContent !== sub) detail.textContent = sub;
+      children.push(button);
     }
   }
-  $('games').innerHTML = h || '<div class="empty">No games on the schedule today.</div>';
+  if (!children.length) {
+    var empty = el.querySelector('.empty') || document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'No games on the schedule today.';
+    children.push(empty);
+  }
+  // Leave unchanged rows attached; move a row only if the schedule reordered it.
+  for (var ci = 0; ci < children.length; ci++) {
+    if (el.children[ci] !== children[ci]) el.insertBefore(children[ci], el.children[ci] || null);
+  }
+  while (el.children.length > children.length) el.lastElementChild.remove();
 }
 
 // ---------------------------------------------------------------- loop

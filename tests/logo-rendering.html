@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team logo browser regression checks</title>
+<style>
+  body { max-width: 880px; margin: 32px auto; padding: 0 20px; font: 16px/1.5 system-ui; }
+  .pass { color: #166534; } .fail { color: #b91c1c; }
+  #fixture { border-top: 1px solid #ccc; margin-top: 24px; padding-top: 16px; }
+  .team-logo { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
+  .gbtn { display: block; padding: 8px; margin: 6px 0; } small { display: block; }
+</style>
+<h1 id="result">Running browser checks...</h1>
+<p>Checks the production rendering functions in a real browser using synthetic scores and schedules. Serve the repository root and open <code>/tests/logo-rendering.html</code>. No dependencies required.</p>
+<ul id="checks"></ul>
+<div id="fixture"></div>
+<script>
+'use strict';
+(async function () {
+  const response = await fetch(new URLSearchParams(location.search).get('source') || '../web/app.js');
+  if (!response.ok) throw new Error('Could not load the app source.');
+  const source = await response.text();
+  function between(start, end) {
+    const from = source.indexOf(start), to = source.indexOf(end, from);
+    if (from < 0 || to < 0) throw new Error('Rendering function boundary not found: ' + start);
+    return source.slice(from, to);
+  }
+  // Match the existing Node tests' source extraction, with a real DOM here so
+  // node identity, focus, image error events and element ordering are exercised.
+  const createRenderer = new Function('document', 'sh', 'st', '$', 'paintConnection',
+    between('function teamLogo(', 'function eventRow(') + '\n' +
+    between('function renderHeader(', 'function paintConnection(') + '\n' +
+    between('function renderPicker(', '// ---------------------------------------------------------------- loop') + '\n' +
+    'return { header: renderHeader, picker: renderPicker };');
+  const logos = ['https://a.espncdn.com/i/teamlogos/ncaa/500/2655.png',
+    'https://a.espncdn.com/i/teamlogos/ncaa/500/150.png'];
+  const byId = id => document.getElementById(id);
+  const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g,
+    char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  function setup() {
+    byId('fixture').innerHTML = '<div id="score"></div><div id="hmeta"></div>' +
+      '<button id="pickBtn">Games</button><div class="seg"><button data-lg="cfb">College</button><button data-lg="nfl">NFL</button></div><div id="games"></div>';
+    const state = {
+      gameId: 'test-a', gameLabel: '', delay: 0, league: 'cfb', shownPlay: null,
+      sum: { header: { competitions: [{ competitors: [
+        { homeAway: 'away', score: 3, team: { abbreviation: 'TULN', logos: [{ href: logos[0], rel: ['default'] }] } },
+        { homeAway: 'home', score: 17, team: { abbreviation: 'DUKE', logos: [{ href: logos[1], rel: ['default'] }] } }
+      ], status: { type: { shortDetail: '10:00 - 1st' } } }] } },
+      games: [game('test-a', 'in'), game('test-b', 'pre')]
+    };
+    const render = createRenderer(document, { esc, delayMs: () => state.delay, league: () => state.league }, state, byId, () => {});
+    return { state, ...render };
+  }
+  function game(id, state) {
+    return { id, state, name: 'Test matchup', away: 'Tulane', home: 'Duke',
+      awayLogo: logos[0], homeLogo: logos[1], awayScore: 3, homeScore: 17, detail: 'Test clock' };
+  }
+  const images = selector => Array.from(document.querySelectorAll(selector + ' .team-logo'));
+  const scores = () => Array.from(document.querySelectorAll('#score .team-score'), el => el.textContent).join(',');
+  function assert(value, message) { if (!value) throw new Error(message); }
+  function sameImages(before, selector) {
+    const after = images(selector);
+    assert(before.length > 0 && before.length === after.length, 'Logo count changed.');
+    assert(before.every((img, i) => img === after[i] && img.isConnected), 'Existing logo elements were replaced or detached.');
+  }
+  let passed = 0, failed = 0;
+  function check(name, run) {
+    const row = document.createElement('li');
+    try { run(); passed++; row.className = 'pass'; row.textContent = 'PASS: ' + name; }
+    catch (error) { failed++; row.className = 'fail'; row.textContent = 'FAIL: ' + name + ' - ' + error.message; }
+    byId('checks').append(row);
+  }
+  check('100 unchanged header refreshes retain both logo elements', () => {
+    const h = setup(); h.header(); const before = images('#score');
+    for (let i = 0; i < 100; i++) h.header();
+    sameImages(before, '#score');
+  });
+  check('Changed scores and clock update without replacing logos', () => {
+    const h = setup(); h.header(); const before = images('#score');
+    const comp = h.state.sum.header.competitions[0];
+    comp.competitors[0].score = 10; comp.competitors[1].score = 24;
+    comp.status.type.shortDetail = '9:20 - 2nd'; h.header();
+    assert(scores() === '10,24', 'Scores did not update.');
+    assert(byId('hmeta').textContent === '9:20 - 2nd', 'Clock did not update.');
+    sameImages(before, '#score');
+  });
+  check('TV delay holds scores and releases them without replacing logos', () => {
+    const h = setup(); h.state.delay = 10000; h.header(); const before = images('#score');
+    assert(scores() === '—,—', 'A held score was revealed early.');
+    assert(byId('hmeta').textContent === 'Waiting for TV delay', 'Missing delay label.');
+    h.state.shownPlay = { id: 'released', awayScore: 0, homeScore: 7, period: 1, clock: '12:00' }; h.header();
+    assert(scores() === '0,7', 'Released scores did not appear.');
+    h.state.delay = 0; h.header();
+    assert(scores() === '3,17', 'Live scores did not return after disabling delay.');
+    sameImages(before, '#score');
+  });
+  check('Clearing and reselecting a game rebuilds the correct header', () => {
+    const h = setup(); h.header(); const summary = h.state.sum;
+    h.state.sum = null; h.header();
+    assert(!images('#score').length && byId('score').textContent === 'Loading game…', 'Old logos remained while loading.');
+    h.state.sum = summary; h.header();
+    assert(images('#score').length === 2 && scores() === '3,17', 'The same teams did not render again.');
+    summary.header.competitions[0].competitors[0].team = { abbreviation: '<TEST>', logo: logos[1] }; h.header();
+    assert(byId('score').textContent.includes('<TEST>'), 'Team label was not safely updated.');
+    assert(images('#score')[0].getAttribute('src') === logos[1], 'Changed team logo did not update.');
+  });
+  check('Failed header logos stay hidden without being retried on every refresh', () => {
+    const h = setup(); h.header(); const before = images('#score');
+    before[0].dispatchEvent(new Event('error')); h.header();
+    assert(before[0].hidden, 'Failed logo was not hidden.');
+    sameImages(before, '#score');
+    h.picker();
+    assert(images('#games').every(img => img.getAttribute('src') !== logos[0]), 'Known broken logo was retried in the picker.');
+  });
+  check('Header logos load eagerly; offscreen picker logos remain lazy', () => {
+    const h = setup(); h.header(); h.picker();
+    assert(images('#score').every(img => img.loading === 'eager'), 'Header logos are still lazy-loaded.');
+    assert(images('#games').every(img => img.loading === 'lazy'), 'Picker loads all logos eagerly.');
+  });
+  check('100 picker refreshes retain buttons, logos and keyboard focus', () => {
+    const h = setup(); h.picker(); const before = images('#games');
+    const button = document.querySelector('button[data-g="test-a"]'); button.focus();
+    for (let i = 0; i < 100; i++) h.picker();
+    sameImages(before, '#games');
+    assert(document.activeElement === button, 'A refresh lost keyboard focus.');
+  });
+  check('Picker scores, game status and selection update in place', () => {
+    const h = setup(); h.picker(); const before = images('#games');
+    h.state.games[0].awayScore = 10; h.state.games[0].detail = '1:00 - 4th'; h.state.gameId = 'test-b'; h.picker();
+    assert(document.querySelector('button[data-g="test-a"] small').textContent.includes('Tulane 10'), 'Picker score stayed stale.');
+    assert(document.querySelector('button[data-g="test-a"] small').textContent.includes('1:00 - 4th'), 'Picker clock stayed stale.');
+    assert(document.querySelector('.gbtn.sel').dataset.g === 'test-b', 'Selected game stayed stale.');
+    sameImages(before, '#games');
+  });
+  check('Moving games between groups retains their existing buttons and logos', () => {
+    const h = setup(); h.picker();
+    const button = document.querySelector('button[data-g="test-a"]'), before = Array.from(button.querySelectorAll('img'));
+    h.state.games[0].state = 'post'; h.state.games[1].state = 'in'; h.state.games.push(game('test-c', 'pre')); h.picker();
+    assert(document.querySelector('button[data-g="test-a"]') === button, 'Moving a game replaced its button.');
+    assert(before.every((img, i) => img === button.querySelectorAll('img')[i]), 'Moving a game replaced its logos.');
+    assert(Array.from(document.querySelectorAll('.gbtn'), el => el.dataset.g).join(',') === 'test-b,test-c,test-a', 'Groups are out of order.');
+    h.state.games = h.state.games.filter(g => g.id !== 'test-b'); h.picker();
+    assert(!document.querySelector('button[data-g="test-b"]'), 'A removed game remained.');
+  });
+  check('Only the changed matchup gets new team labels and logo URLs', () => {
+    const h = setup(); h.picker(); const unchanged = images('button[data-g="test-b"]');
+    h.state.games[0].away = '<New team>'; h.state.games[0].awayLogo = logos[1]; h.picker();
+    const button = document.querySelector('button[data-g="test-a"]');
+    assert(button.textContent.includes('<New team>') && !button.querySelector('new'), 'Team name was not escaped.');
+    assert(button.querySelector('img').getAttribute('src') === logos[1], 'New logo did not appear.');
+    sameImages(unchanged, 'button[data-g="test-b"]');
+  });
+  check('Empty schedules and league changes clear old logos', () => {
+    const h = setup(); h.picker(); h.state.games = []; h.state.league = 'nfl'; h.picker();
+    assert(images('#games').length === 0 && document.querySelector('#games .empty'), 'Old games remained.');
+    assert(document.querySelector('.seg .on').dataset.lg === 'nfl', 'League did not update.');
+    h.state.games = [game('new-league-game', 'pre')]; h.picker();
+    assert(images('#games').length === 2 && !document.querySelector('#games .empty'), 'New schedule did not replace empty state.');
+  });
+  byId('result').textContent = passed + ' passed, ' + failed + ' failed';
+  document.body.dataset.status = failed ? 'fail' : 'pass';
+})().catch(error => {
+  document.getElementById('result').textContent = 'Could not run checks: ' + error.message;
+  document.body.dataset.status = 'fail';
+});
+</script>
+</html>
