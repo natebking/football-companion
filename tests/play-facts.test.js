@@ -22,6 +22,23 @@ test('ordinary run: gives the next down and explicit direction', () => {
   assert.equal(p.need, 10);
 });
 
+test('a defender named Kneeland cannot turn a run into taking a knee', () => {
+  const f = copy('normalRun');
+  f.play.text = f.play.text + ' Tackled by M.Kneeland.';
+  const result = describe(f.play, f.abbr);
+  assert.equal(result.outcome, 'run');
+  assert.equal(result.gained, 4);
+  const insights = require('../web/game-insights.js').summarize([f.play], { teamAbbreviations: f.abbr });
+  assert.equal(insights.teams[0].earlyDowns.runs, 1);
+});
+
+test('a fake kneel remains an actual run', () => {
+  const f = copy('normalRun');
+  f.play.text += ' Fake kneel by QB.';
+  assert.equal(describe(f.play, f.abbr).outcome, 'run');
+  assert.equal(describe(f.play, f.abbr).clockPlay, false);
+});
+
 test('pass details preserve named players, short depth, and direction', () => {
   const p = fixture('normalPass');
   assert.equal(p.summary, 'Pass complete for 12 yards.');

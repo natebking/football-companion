@@ -3,7 +3,7 @@
  * selections. An observation never establishes the next formation or call. */
 (function (root) {
   'use strict';
-  var VERSION = 'read-1';
+  var VERSION = 'read-2';
   function valid(s) {
     return s && Number.isInteger(s.down) && s.down >= 1 && s.down <= 4 &&
       Number.isInteger(s.distance) && s.distance >= 1 && Number.isInteger(s.yardsToGoal) &&
@@ -54,15 +54,20 @@
         key: 'fourth_down:' + variant, question: { kind: 'gokick', q: 'Will they keep the offense out or bring on the kicking team?' }
       }));
     } else if (late && scoreKnown && s.scoreDiff < 0) {
-      add(candidate('chasing_score', 89, 'They need points without using up this possession’s time.',
+      add(candidate('chasing_score', 96, 'They need points without using up this possession’s time.',
         'Down ' + Math.abs(s.scoreDiff) + ' with ' + Math.floor(s.clockSeconds / 60) + ':' + String(s.clockSeconds % 60).padStart(2, '0') +
         ' left. A short gain inbounds also uses clock unless it is stopped.',
         'After a catch, watch where the runner finishes relative to the sideline.', { lessonId: 'catch_and_run' }));
+    } else if (late && scoreKnown && s.scoreDiff > 0 && s.scoreDiff <= 16) {
+      add(candidate('protect_clock', 96, 'A first down would help them keep the ball and use the clock.',
+        'They lead by ' + s.scoreDiff + ' with ' + Math.floor(s.clockSeconds / 60) + ':' + String(s.clockSeconds % 60).padStart(2, '0') +
+        ' left. Another set of downs would make it harder for the opponent to get the ball back in time.',
+        'Watch whether the runner stays inbounds, and whether the defense uses a timeout.'));
     }
     if (d && d.verified && d.playCount >= 2 && d.penaltyYards >= 10 && d.penaltyYards > Math.max(0, d.playYards)) {
       add(candidate('penalty_progress', 86, 'Flags have moved this drive farther than the offense’s plays.',
         'Penalties: ' + d.penaltyYards + ' yards forward. Plays: ' + (d.playYards < 0 ? Math.abs(d.playYards) + ' yards lost' : d.playYards + ' yards gained') + '.',
-        '', { source: 'ESPN · released drive reports', playIds: d.playIds, key: 'penalty_progress:' + d.id + ':' + d.penaltyYards }));
+        '', { source: 'ESPN · released drive reports', playIds: d.playIds, key: 'penalty_progress:' + d.id }));
     }
     if (team) {
       var t = team.thirdDowns;
@@ -72,21 +77,21 @@
           receiver.targets + ' of ' + t.throws + ' reported third-down throws have targeted him.',
           'Find him before the snap and watch where his defender lines up.',
           { source: 'ESPN · named targets this game', playIds: t.playIds,
-            key: 'third_down_target:' + receiver.name + ':' + receiver.targets }));
+            key: 'third_down_target:' + off + ':' + receiver.name }));
       }
       if (t.attempts >= 4 && t.knownDistances === t.attempts && t.long >= 3 && t.long / t.attempts >= 0.6) {
         add(candidate('long_thirds', 75, 'Long third downs are making these possessions harder.',
           t.long + ' of ' + t.attempts + ' reported third-down plays needed at least seven yards.',
           s.down < 3 ? 'Watch how much the next play leaves them to gain.' : 'Watch where the catch happens relative to the first-down line.',
           { source: 'ESPN · third downs this game', playIds: t.playIds, lessonId: 'first_down_line',
-            key: 'long_thirds:' + off + ':' + t.attempts }));
+            key: 'long_thirds:' + off }));
       }
     }
     if (d && d.sacks >= 2) {
       add(candidate('drive_sacks', 82, 'Two or more sacks have interrupted this drive.',
         'They have allowed ' + d.sacks + ' sacks on this possession. Another loss would leave more ground to make up.',
         'On a pass, watch whether the quarterback can step forward or has to leave the pocket.',
-        { source: 'ESPN · released drive reports', playIds: d.playIds, lessonId: 'pocket_edges', key: 'drive_sacks:' + d.id + ':' + d.sacks }));
+        { source: 'ESPN · released drive reports', playIds: d.playIds, lessonId: 'pocket_edges', key: 'drive_sacks:' + d.id }));
     }
     if (goal && s.down < 4) {
       add(candidate('goal_to_go', 65, 'The defense has less depth to protect here.',
@@ -107,8 +112,8 @@
   }
   function select(s, evidence, recent) {
     var list = candidates(s, evidence), seen = (recent || []).slice(-6);
-    // Meaningful fourth-down decisions remain visible even if they recur.
-    return list.find(function (c) { return c.priority >= 100 || seen.indexOf(c.key) < 0; }) || null;
+    // Clock and fourth-down decisions keep their place while they still apply.
+    return list.find(function (c) { return c.priority >= 96 || seen.indexOf(c.key) < 0; }) || null;
   }
   var api = { version: VERSION, valid: valid, candidates: candidates, select: select };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

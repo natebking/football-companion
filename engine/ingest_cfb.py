@@ -134,8 +134,8 @@ NO_DOWN_TYPES = frozenset(
 # make a fumble return look like special teams.
 _PAT_PARENS = re.compile(r"\([^)]*\bkick\b[^)]*\)", re.I)
 _TEXT_PATTERNS = (
-    ("pass", re.compile(r"pass(?:es|ed)?\b|sack(?:ed)?\b|incomplete|intercept|scramble", re.I)),
-    ("rush", re.compile(r"\bruns?\b|\brush(?:ed|es)?\b|\bkneel|\bkeeper\b", re.I)),
+    ("pass", re.compile(r"pass(?:es|ed)?\b|sack(?:ed)?\b|incomplete|intercept", re.I)),
+    ("rush", re.compile(r"\bruns?\b|\brush(?:ed|es)?\b|\bkneel(?:s|ed|ing)?\b|\bkeeper\b|\bscrambl(?:e|es|ed|ing)\b", re.I)),
     ("special", re.compile(r"kickoff|\bpunt|field goal|\bkicks?\b|\bfg\b|extra point|onside", re.I)),
 )
 
@@ -153,6 +153,9 @@ def resolve_from_text(play_text: Optional[str]) -> Optional[str]:
 
 def classify(play_type: Optional[str], play_text: Optional[str]) -> Tuple[str, str]:
     """Return (category, how). Category is pass/rush/special/penalty/drop."""
+    play_text = re.split(r"\bOriginal Play:", play_text or "", maxsplit=1, flags=re.I)[0]
+    if re.search(r"\bno play\b|\bnullified\b", play_text or "", re.I):
+        return "penalty", "explicit-no-play"
     known = PLAY_TYPE_CLASS.get(play_type or "")
     if known in ("pass", "rush", "special", "penalty"):
         return known, "table"
@@ -272,6 +275,20 @@ def _clock_seconds(clock: Any) -> Optional[int]:
     return total if 0 <= total <= 900 else None
 
 
+def text_clock(play_text: Optional[str]) -> Optional[int]:
+    """Explicit snap clock at the start of a report; never a later clock mention.
+
+    The structured CFBD clock can describe the end of the play in 2025+.
+    Earlier reports often omit the leading clock, so absence stays unknown here.
+    """
+    match = re.match(r"^\s*\((\d{1,2}):(\d{2})\)", play_text if isinstance(play_text, str) else "")
+    if not match:
+        return None
+    minutes, seconds = map(int, match.groups())
+    total = minutes * 60 + seconds
+    return total if seconds < 60 and total <= 900 else None
+
+
 def build_rows(plays: List[Dict[str, Any]], season: int, week: int,
                stats: Dict[str, Any]) -> List[Dict[str, Any]]:
     """One dict per surviving play. Ordering keys and raw scores ride along."""
@@ -306,6 +323,7 @@ def build_rows(plays: List[Dict[str, Any]], season: int, week: int,
             if int(gained) != yards_gained:
                 stats["clamped_yards"] += 1
 
+        snap_clock = text_clock(play_text)
         rows.append({
             "league": "cfb",
             "season": season,
@@ -315,7 +333,7 @@ def build_rows(plays: List[Dict[str, Any]], season: int, week: int,
             "offense": play.get("offense"),
             "defense": play.get("defense"),
             "period": play.get("period"),
-            "clock_seconds": _clock_seconds(play.get("clock")),
+            "clock_seconds": snap_clock if snap_clock is not None else _clock_seconds(play.get("clock")),
             "down": down,
             "distance": distance,
             "yards_to_goal": _int_or_none(play.get("yardsToGoal"), 1, 99),

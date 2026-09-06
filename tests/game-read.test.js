@@ -64,6 +64,19 @@ test('long-third-down observation describes reported attempts, not guessed drive
   assert.equal(c.id, 'long_thirds'); assert.match(c.detail, /3 of 4 reported third-down plays/);
 });
 
+test('late-game clock decisions outrank old patterns and stay relevant on the next down', () => {
+  const e = observe([target(1), target(2), target(3), target(4)]);
+  for (const scoreDiff of [-14, -3, 3, 14]) {
+    const s = { ...sit, down: 2, clockSeconds: 100, scoreDiff };
+    const c = read.select(s, e);
+    assert.equal(c.id, scoreDiff > 0 ? 'protect_clock' : 'chasing_score');
+    assert.equal(read.select({ ...s, down: 3 }, e, [c.key]).id, c.id);
+    assert.doesNotMatch(c.detail, /kneel|no timeouts|will win/i);
+  }
+  assert.equal(read.select({ ...sit, down: 2, scoreDiff: null }, e).id, 'long_thirds');
+  assert.equal(read.select({ ...sit, down: 2, clockSeconds: null }, e).id, 'long_thirds');
+});
+
 test('penalty progress needs a verified current drive for the offense on screen', () => {
   const d = { id: 'drive', teamId: '68', complete: false, verified: true, playCount: 3,
     playYards: 11, penaltyYards: 20, sacks: 0, playIds: ['one', 'two'] };
@@ -95,6 +108,14 @@ test('ordinary repetition yields a quiet state; consequential fourth downs remai
   assert.equal(read.select(s, evidence, [first.key, 'q', 'q', 'q', 'q', 'q', 'q']).id, first.id);
   const fourth = read.select(sit);
   assert.equal(read.select(sit, evidence, [fourth.key]).id, fourth.id);
+});
+
+test('one more qualifying play does not reset a pattern cooldown', () => {
+  const s = { ...sit, down: 1, period: 1 };
+  const plays = [target(1), target(2), target(3), target(4)];
+  const c = read.select(s, observe(plays));
+  assert.equal(c.id, 'long_thirds');
+  assert.equal(read.select(s, observe([...plays, target(5)]), [c.key]), null);
 });
 
 test('switching modes at fourth down replaces the entire guidance, preserving explicit basics', () => {

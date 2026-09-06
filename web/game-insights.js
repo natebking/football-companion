@@ -17,7 +17,7 @@
     var noPlay = /\bno play\b|\bnullified\b/i.test(text);
     var penalty = /^A penalty affected/.test(f.voidReason || '');
     var sack = !penalty && !noPlay && /\bsacked\b/i.test(text);
-    var clockPlay = !penalty && /\bkneel|\bspike[ds]?\b/i.test(text);
+    var clockPlay = !penalty && f.clockPlay === true;
     var action = !marker && !noPlay && !penalty ?
       (sack ? 'sack' : f.outcome === 'run' || f.outcome === 'pass' ? f.outcome : '') : '';
     return { p: p, f: f, text: text, teamId: teamId(p), marker: marker, noPlay: noPlay,

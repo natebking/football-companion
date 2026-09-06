@@ -49,14 +49,32 @@ test('covered or background prompts are not counted as visible learning moments'
   const game = fixture(); game.shown[0].visibility = 'background';
   assert.equal(auditGame(game).summary.visibleGuidanceMoments, 0);
 });
-test('a disclosure re-render is not another prompt, and the last rating wins per shown ID', () => {
+test('a disclosure re-render is not another prompt, and the last rating wins for the moment', () => {
   const game = fixture();
   game.shown.push({ ...structuredClone(game.shown[0]), id: 'shown:2', shownAt: 1501 });
   game.observations = [{ kind: 'read_feedback', shownId: 'shown:1', rating: 'useful' },
-    { kind: 'read_feedback', shownId: 'shown:1', rating: 'obvious' }];
+    { kind: 'read_feedback', shownId: 'shown:2', rating: 'obvious' }];
   const report = auditGame(game);
   assert.equal(report.summary.visibleGuidanceMoments, 1);
   assert.deepEqual(report.summary.feedback, { useful: 0, obvious: 1, unsupported: 0 });
+});
+test('candidate cooldown uses its own selections, including saved background moments', () => {
+  const game = fixture();
+  delete game.shown[0].read;
+  game.shown[0].visibility = 'background';
+  game.shown.push({ ...structuredClone(game.shown[0]), id: 'shown:2', shownAt: 1501,
+    visibility: 'visible', basisPlayId: '4' });
+  const report = auditGame(game);
+  assert.equal(report.summary.replayedGuidanceMoments, 2);
+  assert.equal(report.summary.visibleGuidanceMoments, 1);
+  assert.equal(report.rows[0].recordedRead, null);
+  assert.equal(report.rows[0].proposedRead, 'third_down_distance', 'The third-down target candidate was already used in the background.');
+});
+test('repetition checks use the compact metadata saved by the real browser', () => {
+  const game = fixture();
+  delete game.shown[0].read.priority;
+  game.shown.push({ ...structuredClone(game.shown[0]), id: 'shown:2', shownAt: 1501, basisPlayId: '4' });
+  assert.equal(auditGame(game).summary.repeatedWithinSixMoments, 1);
 });
 test('invalid source relationships and duplicate records fail explicitly', () => {
   for (const mutate of [

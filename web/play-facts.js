@@ -131,7 +131,7 @@
     var raw = String(p.text || ''), primary = primaryText(raw);
     var scoring = String((p.scoringType || {}).name || '').toLowerCase().replace(/[^a-z]/g, '');
     var result = { summary: '', consequence: '', facts: [], players: '', kind: '', raw: raw,
-      outcome: 'other', voidReason: null, turnover: false, gained: null, need: null };
+      outcome: 'other', voidReason: null, turnover: false, clockPlay: false, gained: null, need: null };
     var y = number(p.statYardage) ? p.statYardage : null;
     var penaltyParts = primary.split(/\bPENALTY\b/i).slice(1);
     var acceptedPenalty = penaltyParts.some(function (part) { return !/\bdeclined\b/i.test(part); });
@@ -152,13 +152,15 @@
       result.voidReason = 'A penalty affected this play, so your pick does not count.';
       return result;
     }
-    if (/\bkneel|\bkneels\b/i.test(primary)) {
+    if (/\bkneel(?:s|ed|ing)?\b|\btakes? a knee\b/i.test(primary) && !/\bfake(?:s|d)? kneel\b/i.test(primary)) {
+      result.clockPlay = true;
       result.summary = 'Took a knee.';
       result.consequence = next ? 'Next: ' + next + '.' : '';
       result.voidReason = 'The offense took a knee. Your pick does not count.';
       return result;
     }
     if (/\bspike[ds]?\b/i.test(primary) || type.indexOf('spike') >= 0) {
+      result.clockPlay = true;
       result.summary = 'Spike to stop the clock.';
       result.consequence = next ? 'Next: ' + next + '.' : '';
       result.voidReason = 'The quarterback spiked the ball to stop the clock. Your pick does not count.';
@@ -300,7 +302,7 @@
       return { start: from, end: to, net: net, play: playGain, penalty: penaltyGain };
     }
     if (result.gained !== null && result.gained === net) return { start: from, end: to, net: net, play: net, penalty: 0 };
-    if (/\bsacked\b|\bkneel|\bspike[ds]?\b/i.test(text)) {
+    if (result.clockPlay || /\bsacked\b/i.test(text)) {
       var checked = playYardage(p, abbr, text);
       if (!checked.conflict && checked.value === net) return { start: from, end: to, net: net, play: net, penalty: 0 };
     }

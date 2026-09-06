@@ -2,12 +2,30 @@
   "schemaVersion": 1,
   "reviews": [
     {
+      "key": "cfb:401858437",
+      "league": "cfb",
+      "gameId": "401858437",
+      "label": "Washington State at Washington",
+      "status": "final",
+      "reviewedAt": "2026-09-06T23:52:42.579447+00:00",
+      "path": "cfb-401858437.json"
+    },
+    {
+      "key": "cfb:401856668",
+      "league": "cfb",
+      "gameId": "401856668",
+      "label": "Missouri State at Texas A&M",
+      "status": "final",
+      "reviewedAt": "2026-09-06T23:52:42.497056+00:00",
+      "path": "cfb-401856668.json"
+    },
+    {
       "key": "cfb:401858433",
       "league": "cfb",
       "gameId": "401858433",
       "label": "Boise State at Oregon",
       "status": "final",
-      "reviewedAt": "2026-09-06T02:11:19.607003+00:00",
+      "reviewedAt": "2026-09-06T23:52:42.413257+00:00",
       "path": "cfb-401858433.json"
     }
   ]

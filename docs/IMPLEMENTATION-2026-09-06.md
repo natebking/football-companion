@@ -2,6 +2,16 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Second checkpoint: clock priority and real-source evaluation**
+
+See [the complete results](CONTEXT-RESULTS-2026-09-06.md) and [the fixed evaluation protocol](CONTEXT-EVALUATION-PROTOCOL-2026-09-06.md). Read selector `read-2` keeps late-game score/clock ahead of routine patterns and applies pattern cooldowns across count changes. The live parser no longer confuses the surname Kneeland or a fake kneel with taking a knee. Finished Washington–Washington State and Texas A&M–Missouri State reviews were exported from final sources, and Oregon's review was regenerated with the checked parser.
+
+The journal audit now replays saved background selections and keeps independent proposed/recorded histories. It deduplicates disclosure renders and feedback by teaching moment. The real journals contain 29 distinct visible guidance moments; final comparison found four changed play-display records, each with changed source evidence. Only three source-aligned pre-arrival probabilities are linkable, so live forecasting performance remains unestablished.
+
+The separate NFL and CFB context evaluations are complete. Both show lower held-out historical error than the current estimator on matching inputs, and both pass the declared research gates. Calibration improves NFL but worsens college relative to its uncalibrated context model; do not silently choose a different college method from test results. Python/client parity passes across all unique held-out inputs. Research tables remain in ignored data, and live probability files are unchanged. New source checks corrected college snap clocks where explicit report times exist and corrected no-play/scramble classification. Older college clock semantics remain a limitation.
+
+At this checkpoint 186 JavaScript tests and 22 Python tests pass. A browser replay of saved Washington releases shows the clock/possession read at 1:48 up 14; desktop and mobile light/dark are free of horizontal overflow. Publishing details follow when verified. Remaining work is still the team/opponent comparison feature, wider verified play-caller coverage, expanded recognition examples, and prospective usefulness/forecast evaluation. The paid live-source question remains pending.
+
 **Implemented and checked in the first release candidate**
 
 - “Read the game” remains the default; “Beginner” is explicit and remembered. Switching modes replaces the whole main read, including at fourth down. The default no longer falls through to the old beginner card library.
@@ -23,7 +33,7 @@ The isolated Chrome session could not fetch ESPN’s schedule. Direct requests r
 
 The real browser also exposed two journals, downloaded through the app UI and copied to ignored `data/journals/`: `cfb:401856668` (TA&M–MOST, final, 524 source revisions) and `cfb:401858437` (WASH–WSU, still live at download, 187 revisions). The initial audit found 23 and 6 distinct visible guidance moments respectively. Most other WASH–WSU prompts were recorded as background/covered; do not treat them as read. These exports precede the new selector and have no usefulness ratings. Their old prompts cannot count as successful reproduction of the new selector. Final-review matching and comparison work remains.
 
-Two follow-ups identified in the live check: a late-game lead should outrank an all-game third-down pattern; and counterfactual audit selection needs its own cooldown history rather than the old selector's missing read keys. Neither finding justifies claiming a forecast improvement.
+Two follow-ups identified in that live check—late-game lead priority and independent counterfactual cooldown history—are implemented in the second checkpoint above. Neither change itself demonstrates a forecast improvement.
 
 **Additional source access**
 

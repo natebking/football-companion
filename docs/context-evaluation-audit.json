@@ -1,0 +1,1034 @@
+{
+  "schemaVersion": 1,
+  "protocol": "CONTEXT-EVALUATION-PROTOCOL-2026-09-06.md",
+  "results": [
+    {
+      "league": "nfl",
+      "status": "research_only",
+      "year": 2025,
+      "inputRows": 361470,
+      "eligibleRows": 276440,
+      "knownContextRows": 276440,
+      "excludedContext": 0,
+      "clockAudit": {
+        "eligibleWithExplicitSnapClock": 253613,
+        "eligibleClocksDiffer": 0,
+        "eligiblePhaseChanges": 0,
+        "fallback": "Structured source clock when the report has no explicit leading snap time; exact snap semantics are not independently verified."
+      },
+      "sourceLabelCorrections": 0,
+      "partitions": {
+        "before2024": {
+          "plays": 207036,
+          "games": 1657
+        },
+        "tuning2024Weeks1to9": {
+          "plays": 16824,
+          "games": 138
+        },
+        "calibration2024AfterWeek9": {
+          "plays": 18078,
+          "games": 147
+        },
+        "test2025": {
+          "plays": 34502,
+          "games": 285
+        }
+      },
+      "contextK": 10.0,
+      "identityK": 200.0,
+      "tuningCurves": {
+        "context": [
+          {
+            "k": 10.0,
+            "brier": 0.20304808515507727
+          },
+          {
+            "k": 30.0,
+            "brier": 0.2043693552782593
+          },
+          {
+            "k": 100.0,
+            "brier": 0.20744521487465972
+          },
+          {
+            "k": 300.0,
+            "brier": 0.21151312825217872
+          },
+          {
+            "k": 1000.0,
+            "brier": 0.21584840698392355
+          }
+        ],
+        "team": [
+          {
+            "k": 30.0,
+            "brier": 0.2027414863533081
+          },
+          {
+            "k": 60.0,
+            "brier": 0.2026398695325197
+          },
+          {
+            "k": 200.0,
+            "brier": 0.20253449987264607
+          },
+          {
+            "k": 600.0,
+            "brier": 0.2026003752669314
+          },
+          {
+            "k": 2000.0,
+            "brier": 0.20277622408700158
+          },
+          {
+            "k": null,
+            "brier": 0.20304808515507727
+          }
+        ]
+      },
+      "calibration": {
+        "slope": 1.0437998091104799,
+        "intercept": -0.024144978133867238
+      },
+      "scores": {
+        "production": {
+          "plays": 34502,
+          "games": 285,
+          "brier": 0.2188309710526926,
+          "accuracy": 0.6247753753405599,
+          "ece": 0.009147359573358022,
+          "calibration": [
+            {
+              "from": 0.1,
+              "n": 21,
+              "predicted": 0.18569999999999998,
+              "observed": 0.2857142857142857
+            },
+            {
+              "from": 0.2,
+              "n": 579,
+              "predicted": 0.26938583765112256,
+              "observed": 0.27461139896373055
+            },
+            {
+              "from": 0.3,
+              "n": 3028,
+              "predicted": 0.3577348414795245,
+              "observed": 0.3556803170409511
+            },
+            {
+              "from": 0.4,
+              "n": 10277,
+              "predicted": 0.4594906684830204,
+              "observed": 0.46239174856475623
+            },
+            {
+              "from": 0.5,
+              "n": 9005,
+              "predicted": 0.5388707606885064,
+              "observed": 0.5187118267629095
+            },
+            {
+              "from": 0.6,
+              "n": 3467,
+              "predicted": 0.6588348428035766,
+              "observed": 0.673781367176233
+            },
+            {
+              "from": 0.7,
+              "n": 3024,
+              "predicted": 0.7411543981481481,
+              "observed": 0.732473544973545
+            },
+            {
+              "from": 0.8,
+              "n": 4030,
+              "predicted": 0.8579434243176179,
+              "observed": 0.8580645161290322
+            },
+            {
+              "from": 0.9,
+              "n": 1071,
+              "predicted": 0.9144267973856209,
+              "observed": 0.9010270774976658
+            }
+          ]
+        },
+        "context_team": {
+          "plays": 34502,
+          "games": 285,
+          "brier": 0.20263808003964137,
+          "accuracy": 0.6723668193148223,
+          "ece": 0.012168346304397854,
+          "calibration": [
+            {
+              "from": 0.0,
+              "n": 92,
+              "predicted": 0.07853066203410294,
+              "observed": 0.043478260869565216
+            },
+            {
+              "from": 0.1,
+              "n": 492,
+              "predicted": 0.1592978160926777,
+              "observed": 0.1016260162601626
+            },
+            {
+              "from": 0.2,
+              "n": 1841,
+              "predicted": 0.25730153102543063,
+              "observed": 0.244975556762629
+            },
+            {
+              "from": 0.3,
+              "n": 3206,
+              "predicted": 0.35805082500329405,
+              "observed": 0.34903306300686215
+            },
+            {
+              "from": 0.4,
+              "n": 9436,
+              "predicted": 0.45422362576638353,
+              "observed": 0.43768545994065283
+            },
+            {
+              "from": 0.5,
+              "n": 5274,
+              "predicted": 0.5362601888695573,
+              "observed": 0.5174440652256352
+            },
+            {
+              "from": 0.6,
+              "n": 3677,
+              "predicted": 0.6568419526595529,
+              "observed": 0.6644003263530052
+            },
+            {
+              "from": 0.7,
+              "n": 3785,
+              "predicted": 0.7460813813520232,
+              "observed": 0.7521796565389696
+            },
+            {
+              "from": 0.8,
+              "n": 4502,
+              "predicted": 0.8563537282056674,
+              "observed": 0.8582852065748556
+            },
+            {
+              "from": 0.9,
+              "n": 2197,
+              "predicted": 0.9211515148339008,
+              "observed": 0.9112426035502958
+            }
+          ]
+        },
+        "calibrated": {
+          "plays": 34502,
+          "games": 285,
+          "brier": 0.2025319209074996,
+          "accuracy": 0.6719900295635035,
+          "ece": 0.008190966909177587,
+          "calibration": [
+            {
+              "from": 0.0,
+              "n": 127,
+              "predicted": 0.07643883627261872,
+              "observed": 0.03937007874015748
+            },
+            {
+              "from": 0.1,
+              "n": 577,
+              "predicted": 0.1599383247250846,
+              "observed": 0.11785095320623917
+            },
+            {
+              "from": 0.2,
+              "n": 1986,
+              "predicted": 0.25371932297633915,
+              "observed": 0.25478348439073517
+            },
+            {
+              "from": 0.3,
+              "n": 3684,
+              "predicted": 0.3603556595091246,
+              "observed": 0.36563517915309446
+            },
+            {
+              "from": 0.4,
+              "n": 9300,
+              "predicted": 0.4536913672455676,
+              "observed": 0.4449462365591398
+            },
+            {
+              "from": 0.5,
+              "n": 4697,
+              "predicted": 0.536781134184272,
+              "observed": 0.5194805194805194
+            },
+            {
+              "from": 0.6,
+              "n": 3517,
+              "predicted": 0.656680294732425,
+              "observed": 0.6610747796417401
+            },
+            {
+              "from": 0.7,
+              "n": 3699,
+              "predicted": 0.7455574915507671,
+              "observed": 0.7472289808056232
+            },
+            {
+              "from": 0.8,
+              "n": 4351,
+              "predicted": 0.8563538662525896,
+              "observed": 0.8517582165019536
+            },
+            {
+              "from": 0.9,
+              "n": 2564,
+              "predicted": 0.9234886126747185,
+              "observed": 0.9126365054602185
+            }
+          ]
+        }
+      },
+      "pairedComparison": {
+        "difference": -0.01629905014519299,
+        "interval95": [
+          -0.0177012874096772,
+          -0.014883646882025151
+        ],
+        "cluster": "game_id",
+        "clusters": 285,
+        "replicates": 2000,
+        "verdict": "better"
+      },
+      "subgroups": [
+        {
+          "phase": "fourth",
+          "scoreBand": "ahead_1to8",
+          "plays": 1111,
+          "baseline": 0.2104175692349235,
+          "candidate": 0.20675593052373062
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "ahead_9plus",
+          "plays": 1225,
+          "baseline": 0.23529856649795916,
+          "candidate": 0.19658438228474068
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "behind_1to8",
+          "plays": 1158,
+          "baseline": 0.20139542800518134,
+          "candidate": 0.20016534309704723
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "behind_9plus",
+          "plays": 1828,
+          "baseline": 0.21305993284463895,
+          "candidate": 0.18835672772062637
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "tied",
+          "plays": 322,
+          "baseline": 0.2089734963043478,
+          "candidate": 0.20629135368733456
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "ahead_1to8",
+          "plays": 562,
+          "baseline": 0.2130730718327402,
+          "candidate": 0.17937018326977325
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "ahead_9plus",
+          "plays": 399,
+          "baseline": 0.22879464997493737,
+          "candidate": 0.19234156746806033
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "behind_1to8",
+          "plays": 761,
+          "baseline": 0.20756679073587384,
+          "candidate": 0.1605727870623655
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "behind_9plus",
+          "plays": 569,
+          "baseline": 0.20772912506151142,
+          "candidate": 0.15164208121760986
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "tied",
+          "plays": 223,
+          "baseline": 0.20382780013452914,
+          "candidate": 0.16003487796159577
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "ahead_1to8",
+          "plays": 164,
+          "baseline": 0.32441450158536583,
+          "candidate": 0.1446529067205452
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "ahead_9plus",
+          "plays": 103,
+          "baseline": 0.3730388270873788,
+          "candidate": 0.15465348820545838
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "behind_1to8",
+          "plays": 735,
+          "baseline": 0.20371555725170068,
+          "candidate": 0.1290586859304913
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "behind_9plus",
+          "plays": 394,
+          "baseline": 0.2208326774111675,
+          "candidate": 0.17587782219156234
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "tied",
+          "plays": 136,
+          "baseline": 0.22079992933823528,
+          "candidate": 0.18234038710513836
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "ahead_1to8",
+          "plays": 407,
+          "baseline": 0.24312356299754298,
+          "candidate": 0.1734228617290408
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "ahead_9plus",
+          "plays": 431,
+          "baseline": 0.2803867844547564,
+          "candidate": 0.12824315204357067
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "behind_1to8",
+          "plays": 493,
+          "baseline": 0.1981636434888438,
+          "candidate": 0.17108599344224482
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "behind_9plus",
+          "plays": 775,
+          "baseline": 0.21098678123870968,
+          "candidate": 0.13773833524809623
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "tied",
+          "plays": 131,
+          "baseline": 0.21497587190839693,
+          "candidate": 0.2055764382681948
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "ahead_1to8",
+          "plays": 4660,
+          "baseline": 0.22031866733047212,
+          "candidate": 0.21727337207989522
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "ahead_9plus",
+          "plays": 2216,
+          "baseline": 0.2205594490207581,
+          "candidate": 0.2143005936187443
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "behind_1to8",
+          "plays": 6404,
+          "baseline": 0.218091814806371,
+          "candidate": 0.2161998293525992
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "behind_9plus",
+          "plays": 3492,
+          "baseline": 0.2151679233676976,
+          "candidate": 0.2137725063259558
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "tied",
+          "plays": 5574,
+          "baseline": 0.2195192527412989,
+          "candidate": 0.21745868992056636
+        },
+        {
+          "phase": "overtime",
+          "scoreBand": "behind_1to8",
+          "plays": 75,
+          "baseline": 0.23053840679999998,
+          "candidate": 0.22262566909258646
+        },
+        {
+          "phase": "overtime",
+          "scoreBand": "tied",
+          "plays": 154,
+          "baseline": 0.21779742318181822,
+          "candidate": 0.2160144012982095
+        }
+      ],
+      "researchGates": {
+        "positiveCalibrationSlope": true,
+        "pairedImprovement": true,
+        "calibrationECE": true,
+        "supportedCalibrationBins": true,
+        "contextRegressions": true
+      },
+      "allResearchGatesPass": true,
+      "clientParity": {
+        "uniqueInputs": 34478,
+        "maxAbsoluteError": 2.220446049250313e-16,
+        "passed": true
+      },
+      "liveReplacementApproved": false,
+      "inputSha256": "b569d25a6e0feb6fe9fea6c19b16d878685ba0f4da40b1e8fcaba333f57eb4a1"
+    },
+    {
+      "league": "cfb",
+      "status": "research_only",
+      "year": 2025,
+      "inputRows": 451287,
+      "eligibleRows": 360375,
+      "knownContextRows": 360260,
+      "excludedContext": 115,
+      "clockAudit": {
+        "eligibleWithExplicitSnapClock": 45491,
+        "eligibleClocksDiffer": 41580,
+        "eligiblePhaseChanges": 219,
+        "fallback": "Structured source clock when the report has no explicit leading snap time; exact snap semantics are not independently verified."
+      },
+      "sourceLabelCorrections": 242,
+      "partitions": {
+        "before2024": {
+          "plays": 118563,
+          "games": 910
+        },
+        "tuning2024Weeks1to9": {
+          "plays": 74553,
+          "games": 577
+        },
+        "calibration2024AfterWeek9": {
+          "plays": 44848,
+          "games": 341
+        },
+        "test2025": {
+          "plays": 122296,
+          "games": 933
+        }
+      },
+      "contextK": 10.0,
+      "identityK": 200.0,
+      "tuningCurves": {
+        "context": [
+          {
+            "k": 10.0,
+            "brier": 0.22001607670056011
+          },
+          {
+            "k": 30.0,
+            "brier": 0.2207350690601527
+          },
+          {
+            "k": 100.0,
+            "brier": 0.22260392984637853
+          },
+          {
+            "k": 300.0,
+            "brier": 0.22490263305504804
+          },
+          {
+            "k": 1000.0,
+            "brier": 0.22712075207231347
+          }
+        ],
+        "team": [
+          {
+            "k": 30.0,
+            "brier": 0.21919120032306177
+          },
+          {
+            "k": 60.0,
+            "brier": 0.2187537304847332
+          },
+          {
+            "k": 200.0,
+            "brier": 0.21858167932947392
+          },
+          {
+            "k": 600.0,
+            "brier": 0.21897346524285566
+          },
+          {
+            "k": 2000.0,
+            "brier": 0.21952887829630832
+          },
+          {
+            "k": null,
+            "brier": 0.22001607670056011
+          }
+        ]
+      },
+      "calibration": {
+        "slope": 1.1007096650744987,
+        "intercept": -0.04898832926882082
+      },
+      "scores": {
+        "production": {
+          "plays": 122296,
+          "games": 933,
+          "brier": 0.22738352837770656,
+          "accuracy": 0.6121786485248905,
+          "ece": 0.009181371426702466,
+          "calibration": [
+            {
+              "from": 0.1,
+              "n": 2064,
+              "predicted": 0.1628183139534884,
+              "observed": 0.15455426356589147
+            },
+            {
+              "from": 0.2,
+              "n": 8098,
+              "predicted": 0.2594405038281057,
+              "observed": 0.253272412941467
+            },
+            {
+              "from": 0.3,
+              "n": 21164,
+              "predicted": 0.35710412965412963,
+              "observed": 0.36647136647136647
+            },
+            {
+              "from": 0.4,
+              "n": 39688,
+              "predicted": 0.45262395182422893,
+              "observed": 0.45824934489014313
+            },
+            {
+              "from": 0.5,
+              "n": 26293,
+              "predicted": 0.5444944243715057,
+              "observed": 0.5291142129083787
+            },
+            {
+              "from": 0.6,
+              "n": 8837,
+              "predicted": 0.6431422088944213,
+              "observed": 0.6269095847006902
+            },
+            {
+              "from": 0.7,
+              "n": 9012,
+              "predicted": 0.7578996005326232,
+              "observed": 0.7610963160230804
+            },
+            {
+              "from": 0.8,
+              "n": 7140,
+              "predicted": 0.8281066666666667,
+              "observed": 0.8200280112044818
+            }
+          ]
+        },
+        "context_team": {
+          "plays": 122296,
+          "games": 933,
+          "brier": 0.21624471621133298,
+          "accuracy": 0.6466932687904756,
+          "ece": 0.005458097777452768,
+          "calibration": [
+            {
+              "from": 0.0,
+              "n": 866,
+              "predicted": 0.06667637859447553,
+              "observed": 0.06351039260969978
+            },
+            {
+              "from": 0.1,
+              "n": 4635,
+              "predicted": 0.15437062929800305,
+              "observed": 0.14110032362459546
+            },
+            {
+              "from": 0.2,
+              "n": 10344,
+              "predicted": 0.2529718784314158,
+              "observed": 0.24023588553750966
+            },
+            {
+              "from": 0.3,
+              "n": 18668,
+              "predicted": 0.3545706770850858,
+              "observed": 0.35065352474823225
+            },
+            {
+              "from": 0.4,
+              "n": 34426,
+              "predicted": 0.4499764276367266,
+              "observed": 0.44806251089292976
+            },
+            {
+              "from": 0.5,
+              "n": 21529,
+              "predicted": 0.5476648742095834,
+              "observed": 0.5440568535463793
+            },
+            {
+              "from": 0.6,
+              "n": 12125,
+              "predicted": 0.6441454376500984,
+              "observed": 0.6575670103092783
+            },
+            {
+              "from": 0.7,
+              "n": 10327,
+              "predicted": 0.7515503982095819,
+              "observed": 0.7548174687711824
+            },
+            {
+              "from": 0.8,
+              "n": 8881,
+              "predicted": 0.837235803858128,
+              "observed": 0.8327891003265399
+            },
+            {
+              "from": 0.9,
+              "n": 495,
+              "predicted": 0.9209192927011057,
+              "observed": 0.8828282828282829
+            }
+          ]
+        },
+        "calibrated": {
+          "plays": 122296,
+          "games": 933,
+          "brier": 0.21641271074484578,
+          "accuracy": 0.647208412376529,
+          "ece": 0.013104154466324857,
+          "calibration": [
+            {
+              "from": 0.0,
+              "n": 2041,
+              "predicted": 0.07304428063697187,
+              "observed": 0.08182263596276335
+            },
+            {
+              "from": 0.1,
+              "n": 5970,
+              "predicted": 0.16035590884306528,
+              "observed": 0.17370184254606366
+            },
+            {
+              "from": 0.2,
+              "n": 11626,
+              "predicted": 0.2529936034212789,
+              "observed": 0.2677619129537244
+            },
+            {
+              "from": 0.3,
+              "n": 20596,
+              "predicted": 0.3547240564299494,
+              "observed": 0.37793746358516217
+            },
+            {
+              "from": 0.4,
+              "n": 31377,
+              "predicted": 0.44599582168936414,
+              "observed": 0.4579150333046499
+            },
+            {
+              "from": 0.5,
+              "n": 19177,
+              "predicted": 0.5477854617480968,
+              "observed": 0.5525368931532565
+            },
+            {
+              "from": 0.6,
+              "n": 11120,
+              "predicted": 0.644374133565759,
+              "observed": 0.6554856115107913
+            },
+            {
+              "from": 0.7,
+              "n": 9515,
+              "predicted": 0.7516078002906469,
+              "observed": 0.7468208092485549
+            },
+            {
+              "from": 0.8,
+              "n": 10108,
+              "predicted": 0.8441093748520778,
+              "observed": 0.8252869014641868
+            },
+            {
+              "from": 0.9,
+              "n": 766,
+              "predicted": 0.9239182876830492,
+              "observed": 0.8838120104438643
+            }
+          ]
+        }
+      },
+      "pairedComparison": {
+        "difference": -0.010970817632860771,
+        "interval95": [
+          -0.011707570234541059,
+          -0.010184344130327398
+        ],
+        "cluster": "game_id",
+        "clusters": 933,
+        "replicates": 2000,
+        "verdict": "better"
+      },
+      "subgroups": [
+        {
+          "phase": "fourth",
+          "scoreBand": "ahead_1to8",
+          "plays": 2700,
+          "baseline": 0.21728833451111113,
+          "candidate": 0.20314496090442888
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "ahead_9plus",
+          "plays": 5646,
+          "baseline": 0.22182855442968474,
+          "candidate": 0.19755706720402183
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "behind_1to8",
+          "plays": 2821,
+          "baseline": 0.22393809163417228,
+          "candidate": 0.22477240585696093
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "behind_9plus",
+          "plays": 7159,
+          "baseline": 0.2296183865930996,
+          "candidate": 0.22150206483102483
+        },
+        {
+          "phase": "fourth",
+          "scoreBand": "tied",
+          "plays": 861,
+          "baseline": 0.21440123279907083,
+          "candidate": 0.21006719950155456
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "ahead_1to8",
+          "plays": 1546,
+          "baseline": 0.247147593072445,
+          "candidate": 0.22060837989291726
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "ahead_9plus",
+          "plays": 2054,
+          "baseline": 0.25172724397273616,
+          "candidate": 0.22178082709176614
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "behind_1to8",
+          "plays": 1836,
+          "baseline": 0.23806023699891068,
+          "candidate": 0.20625588929334113
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "behind_9plus",
+          "plays": 2470,
+          "baseline": 0.24838429888663968,
+          "candidate": 0.20934016525802185
+        },
+        {
+          "phase": "half_2min",
+          "scoreBand": "tied",
+          "plays": 680,
+          "baseline": 0.2491812010735294,
+          "candidate": 0.22823791487604092
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "ahead_1to8",
+          "plays": 505,
+          "baseline": 0.2609850173663366,
+          "candidate": 0.10459693974452607
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "ahead_9plus",
+          "plays": 991,
+          "baseline": 0.24949732286579215,
+          "candidate": 0.08978610787124587
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "behind_1to8",
+          "plays": 1528,
+          "baseline": 0.23648978733638742,
+          "candidate": 0.14963595942312743
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "behind_9plus",
+          "plays": 1977,
+          "baseline": 0.2468653014820435,
+          "candidate": 0.21203130581670235
+        },
+        {
+          "phase": "last_2min",
+          "scoreBand": "tied",
+          "plays": 433,
+          "baseline": 0.23622007891454966,
+          "candidate": 0.21914567312708483
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "ahead_1to8",
+          "plays": 829,
+          "baseline": 0.22015201726176115,
+          "candidate": 0.14811505091373237
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "ahead_9plus",
+          "plays": 1710,
+          "baseline": 0.23784339490643278,
+          "candidate": 0.13180480020322663
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "behind_1to8",
+          "plays": 904,
+          "baseline": 0.2146226784845133,
+          "candidate": 0.19262543515516095
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "behind_9plus",
+          "plays": 2217,
+          "baseline": 0.23722585330626975,
+          "candidate": 0.19977902843401985
+        },
+        {
+          "phase": "last_5min",
+          "scoreBand": "tied",
+          "plays": 221,
+          "baseline": 0.20480779651583708,
+          "candidate": 0.18901117111251475
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "ahead_1to8",
+          "plays": 14809,
+          "baseline": 0.22507437665001015,
+          "candidate": 0.22466425324479486
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "ahead_9plus",
+          "plays": 13335,
+          "baseline": 0.22618391576377953,
+          "candidate": 0.2252703321287346
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "behind_1to8",
+          "plays": 18494,
+          "baseline": 0.2219848510835947,
+          "candidate": 0.2206570098767747
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "behind_9plus",
+          "plays": 17057,
+          "baseline": 0.2264249282066014,
+          "candidate": 0.22690494090008004
+        },
+        {
+          "phase": "ordinary",
+          "scoreBand": "tied",
+          "plays": 19138,
+          "baseline": 0.22522646994670287,
+          "candidate": 0.22465398781809584
+        },
+        {
+          "phase": "overtime",
+          "scoreBand": "ahead_1to8",
+          "plays": 19,
+          "baseline": 0.25266024684210536,
+          "candidate": 0.2598616036774491
+        },
+        {
+          "phase": "overtime",
+          "scoreBand": "behind_1to8",
+          "plays": 154,
+          "baseline": 0.19914258279220778,
+          "candidate": 0.20869466680629659
+        },
+        {
+          "phase": "overtime",
+          "scoreBand": "behind_9plus",
+          "plays": 11,
+          "baseline": 0.20445486181818176,
+          "candidate": 0.2219323425275433
+        },
+        {
+          "phase": "overtime",
+          "scoreBand": "tied",
+          "plays": 191,
+          "baseline": 0.20711060172774873,
+          "candidate": 0.21798691312331633
+        }
+      ],
+      "researchGates": {
+        "positiveCalibrationSlope": true,
+        "pairedImprovement": true,
+        "calibrationECE": true,
+        "supportedCalibrationBins": true,
+        "contextRegressions": true
+      },
+      "allResearchGatesPass": true,
+      "clientParity": {
+        "uniqueInputs": 121684,
+        "maxAbsoluteError": 2.220446049250313e-16,
+        "passed": true
+      },
+      "liveReplacementApproved": false,
+      "inputSha256": "edf40a4b879ad7e525024da150b5c7e713e05222fea7aa959a26f5d9708377f8"
+    }
+  ]
+}
