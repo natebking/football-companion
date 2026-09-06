@@ -143,6 +143,14 @@
       </div>
       <button id="closeSheet" class="closex">Close</button>
     </div>
+    <div class="game-search">
+      <label for="gameSearch">Search teams</label>
+      <div class="game-search-field">
+        <input id="gameSearch" type="search" placeholder="Team name or abbreviation" autocomplete="off" autocapitalize="none" spellcheck="false" aria-controls="games" aria-describedby="gameSearchStatus">
+        <button id="clearGameSearch" type="button" aria-label="Clear team search" hidden>Clear</button>
+      </div>
+      <p id="gameSearchStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+    </div>
     <div id="games"><div class="empty">Loading games…</div></div>
     <div class="settings-section">
       <div class="grouphead">Appearance</div>

@@ -9,6 +9,7 @@
   #fixture { border-top: 1px solid #ccc; margin-top: 24px; padding-top: 16px; }
   .team-logo { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
   .gbtn { display: block; padding: 8px; margin: 6px 0; } small { display: block; }
+  [hidden] { display: none !important; }
 </style>
 <h1 id="result">Running browser checks...</h1>
 <p>Checks the production rendering functions in a real browser using synthetic scores and schedules. Serve the repository root and open <code>/tests/logo-rendering.html</code>. No dependencies required.</p>
@@ -28,10 +29,11 @@
   // Match the existing Node tests' source extraction, with a real DOM here so
   // node identity, focus, image error events and element ordering are exercised.
   const createRenderer = new Function('document', 'sh', 'st', '$', 'paintConnection',
-    between('function teamLogo(', 'function eventRow(') + '\n' +
+    between('function teamLogo(', '// A CFB game that starts') + '\n' +
     between('function renderHeader(', 'function paintConnection(') + '\n' +
     between('function renderPicker(', '// ---------------------------------------------------------------- loop') + '\n' +
-    'return { header: renderHeader, picker: renderPicker };');
+    between("$('gameSearch').addEventListener('input'", "$('games').addEventListener('click'") + '\n' +
+    'return { header: renderHeader, picker: renderPicker, eventRow };');
   const logos = ['https://a.espncdn.com/i/teamlogos/ncaa/500/2655.png',
     'https://a.espncdn.com/i/teamlogos/ncaa/500/150.png'];
   const byId = id => document.getElementById(id);
@@ -39,7 +41,9 @@
     char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   function setup() {
     byId('fixture').innerHTML = '<div id="score"></div><div id="hmeta"></div>' +
-      '<button id="pickBtn">Games</button><div class="seg"><button data-lg="cfb">College</button><button data-lg="nfl">NFL</button></div><div id="games"></div>';
+      '<button id="pickBtn">Games</button><div class="seg"><button data-lg="cfb">College</button><button data-lg="nfl">NFL</button></div>' +
+      '<label for="gameSearch">Search teams</label><input id="gameSearch" type="search" aria-controls="games">' +
+      '<button id="clearGameSearch" type="button" hidden>Clear</button><p id="gameSearchStatus" role="status"></p><div id="games"></div>';
     const state = {
       gameId: 'test-a', gameLabel: '', delay: 0, league: 'cfb', shownPlay: null,
       sum: { header: { competitions: [{ competitors: [
@@ -52,7 +56,7 @@
     return { state, ...render };
   }
   function game(id, state) {
-    return { id, state, name: 'Test matchup', away: 'Tulane', home: 'Duke',
+    return { id, state, name: 'Test matchup', away: 'Tulane', home: 'Duke', searchText: 'tulane tuln green wave duke blue devils',
       awayLogo: logos[0], homeLogo: logos[1], awayScore: 3, homeScore: 17, detail: 'Test clock' };
   }
   const images = selector => Array.from(document.querySelectorAll(selector + ' .team-logo'));
@@ -117,12 +121,52 @@
     assert(images('#score').every(img => img.loading === 'eager'), 'Header logos are still lazy-loaded.');
     assert(images('#games').every(img => img.loading === 'lazy'), 'Picker loads all logos eagerly.');
   });
-  check('100 picker refreshes retain buttons, logos and keyboard focus', () => {
+  check('Search, 100 score refreshes and clearing retain buttons, logos and keyboard focus', () => {
     const h = setup(); h.picker(); const before = images('#games');
-    const button = document.querySelector('button[data-g="test-a"]'); button.focus();
+    const buttons = Array.from(document.querySelectorAll('button[data-g]'));
+    const button = buttons[0]; button.focus();
     for (let i = 0; i < 100; i++) h.picker();
     sameImages(before, '#games');
     assert(document.activeElement === button, 'A refresh lost keyboard focus.');
+    const search = byId('gameSearch'); search.focus();
+    search.value = 'No matching team'; search.dispatchEvent(new Event('input'));
+    assert(buttons.every(el => el.hidden && el.isConnected), 'Filtered buttons were not hidden in place.');
+    assert(Array.from(document.querySelectorAll('#games .grouphead')).every(el => el.hidden), 'Empty group headings remained visible.');
+    assert(document.querySelector('#games .empty'), 'An unmatched search has no empty state.');
+    h.state.games[0].awayScore = 24;
+    for (let i = 0; i < 100; i++) h.picker();
+    assert(search.value === 'No matching team' && document.activeElement === search, 'A score refresh reset search or its focus.');
+    assert(button.querySelector('small').textContent.includes('Tulane 24'), 'A filtered row missed its score update.');
+    byId('clearGameSearch').click();
+    assert(search.value === '' && document.activeElement === search, 'Clearing did not restore the focused search field.');
+    assert(buttons.every(el => !el.hidden && el === document.querySelector('button[data-g="' + el.dataset.g + '"]')), 'Clearing replaced game buttons.');
+    assert(!document.querySelector('#games .empty'), 'Clearing left an unmatched-search message.');
+    sameImages(before, '#games');
+  });
+  check('Search uses source team names, abbreviations and either opponent as typing narrows results', () => {
+    const h = setup();
+    h.state.games[1] = h.eventRow({
+      id: 'test-b', name: 'Louisiana State Tigers at Clemson Tigers', shortName: 'LSU @ CLEM',
+      status: { type: { state: 'pre', detail: 'Saturday' } },
+      competitions: [{ competitors: [
+        { homeAway: 'away', team: { displayName: 'LSU Tigers', shortDisplayName: 'LSU', abbreviation: 'LSU', location: 'Louisiana State', name: 'Tigers', logo: logos[0] } },
+        { homeAway: 'home', team: { displayName: 'Clemson Tigers', shortDisplayName: 'Clemson', abbreviation: 'CLEM', location: 'Clemson', name: 'Tigers', logo: logos[1] } }
+      ] }]
+    });
+    h.picker();
+    const search = byId('gameSearch'); search.focus();
+    const visibleIds = () => Array.from(document.querySelectorAll('button[data-g]:not([hidden])'), el => el.dataset.g).join(',');
+    search.value = 'ls'; search.dispatchEvent(new Event('input'));
+    assert(visibleIds() === 'test-a,test-b', 'Partial search missed LSU or the matching letters in Blue Devils.');
+    for (const query of ['LsU', '  louisiana   state ', 'clem', 'tigers clemson']) {
+      search.value = query; search.dispatchEvent(new Event('input'));
+      assert(visibleIds() === 'test-b', 'Team search did not narrow correctly for: ' + query);
+      assert(h.state.gameId === 'test-a', 'Searching changed the selected game.');
+    }
+    search.value = 'duke'; search.dispatchEvent(new Event('input'));
+    assert(visibleIds() === 'test-a', 'Searching the other opponent did not find its game.');
+    search.value = ''; search.dispatchEvent(new Event('input'));
+    assert(visibleIds() === 'test-a,test-b', 'Native search clearing did not restore all games.');
   });
   check('Picker scores, game status and selection update in place', () => {
     const h = setup(); h.picker(); const before = images('#games');

@@ -166,6 +166,13 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 .seg button.on, .theme-options button[aria-pressed="true"] { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px #0000000d; }
 .closex { margin-left: auto; min-height: 44px; padding: 8px 10px; background: transparent; border: 0; font-size: .875rem; color: var(--dim); }
 .grouphead { color: var(--faint); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; padding: 22px 0 10px; }
+.game-search label { display: block; margin-bottom: 7px; font-size: .875rem; font-weight: 600; }
+.game-search-field { display: flex; gap: 8px; }
+.game-search input { flex: 1; min-width: 0; width: 100%; min-height: 46px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; font-size: 1rem; }
+.game-search input::placeholder { color: var(--dim); opacity: 1; }
+.game-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.game-search button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: .875rem; }
+#gameSearchStatus { min-height: 1.4em; margin: 6px 0 0; color: var(--dim); font-size: .75rem; }
 .gbtn { display: block; position: relative; width: 100%; padding: 14px 38px 14px 15px; text-align: left; border: 1px solid var(--line); border-radius: 11px; margin-bottom: 8px; background: var(--card); }
 .gbtn b { display: block; font-size: 1rem; font-weight: 600; }
 .game-teams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }

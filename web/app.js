@@ -960,6 +960,9 @@ document.addEventListener('error', function (event) {
     img.hidden = true;
   }
 }, true);
+function normalizeTeamSearch(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
 function eventRow(e) {
   var c = (e.competitions && e.competitions[0]) || {};
   var cs = c.competitors || [];
@@ -970,6 +973,10 @@ function eventRow(e) {
   var t = (e.status && e.status.type) || {};
   return {
     id: String(e.id), name: e.shortName || e.name || '?',
+    searchText: normalizeTeamSearch([e.name, e.shortName].concat(cs.map(function (competitor) {
+      var team = competitor.team || {};
+      return [team.displayName, team.shortDisplayName, team.abbreviation, team.location, team.name, team.nickname].join(' ');
+    })).join(' ')),
     state: t.state || '?', detail: t.detail || t.shortDetail || '',
     away: a && a.team ? (a.team.shortDisplayName || a.team.abbreviation || '') : '',
     home: h && h.team ? (h.team.shortDisplayName || h.team.abbreviation || '') : '',
@@ -1564,6 +1571,10 @@ function renderPicker() {
     segs[i].className = segs[i].dataset.lg === sh.league() ? 'on' : '';
     segs[i].setAttribute('aria-pressed', String(segs[i].dataset.lg === sh.league()));
   }
+  var query = normalizeTeamSearch($('gameSearch').value);
+  var terms = query ? query.split(' ') : [];
+  $('clearGameSearch').hidden = !$('gameSearch').value;
+  var matchCount = 0;
   var groups = [
     ['Live now', st.games.filter(function (g) { return g.state === 'in'; })],
     ['Coming up', st.games.filter(function (g) { return g.state === 'pre'; })],
@@ -1583,6 +1594,7 @@ function renderPicker() {
       heading.className = 'grouphead';
       heading.textContent = groups[gi][0];
     }
+    var groupMatches = 0;
     children.push(heading);
     for (var j = 0; j < rows.length; j++) {
       var g = rows[j];
@@ -1602,15 +1614,21 @@ function renderPicker() {
         button.dataset.teams = teamsKey;
       }
       button.className = 'gbtn' + (g.id === st.gameId ? ' sel' : '');
+      button.hidden = !terms.every(function (term) { return g.searchText.indexOf(term) >= 0; });
+      if (!button.hidden) groupMatches += 1;
       var detail = button.querySelector('small');
       if (detail.textContent !== sub) detail.textContent = sub;
       children.push(button);
     }
+    heading.hidden = !groupMatches;
+    matchCount += groupMatches;
   }
-  if (!children.length) {
+  if (!matchCount) {
     var empty = el.querySelector('.empty') || document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'No games on the schedule today.';
+    empty.textContent = query && st.games.length
+      ? 'No teams match “' + $('gameSearch').value.trim() + '”. Try another name or abbreviation.'
+      : 'No games on the schedule today.';
     children.push(empty);
   }
   // Leave unchanged rows attached; move a row only if the schedule reordered it.
@@ -1618,6 +1636,8 @@ function renderPicker() {
     if (el.children[ci] !== children[ci]) el.insertBefore(children[ci], el.children[ci] || null);
   }
   while (el.children.length > children.length) el.lastElementChild.remove();
+  var status = query ? matchCount + (matchCount === 1 ? ' game' : ' games') + ' found in ' + (sh.league() === 'cfb' ? 'College' : 'NFL') : '';
+  if ($('gameSearchStatus').textContent !== status) $('gameSearchStatus').textContent = status;
 }
 
 // ---------------------------------------------------------------- loop
@@ -1716,6 +1736,7 @@ function selectGame(id) {
 $('pickBtn').addEventListener('click', function () {
   st.sheet = true;
   $('sheet').className = 'sheet on';
+  $('sheet').querySelector('.sheetInner').scrollTop = 0;
   renderPicker();
   sh.bus.emit('sheet');
   pollScoreboard(true);
@@ -1723,6 +1744,12 @@ $('pickBtn').addEventListener('click', function () {
 function closeSheet() { st.sheet = false; $('sheet').className = 'sheet'; }
 $('closeSheet').addEventListener('click', closeSheet);
 $('sheet').addEventListener('click', function (ev) { if (ev.target === $('sheet')) closeSheet(); });
+$('gameSearch').addEventListener('input', renderPicker);
+$('clearGameSearch').addEventListener('click', function () {
+  $('gameSearch').value = '';
+  renderPicker();
+  $('gameSearch').focus();
+});
 $('games').addEventListener('click', function (ev) {
   var b = ev.target.closest('button[data-g]');
   if (!b) return;

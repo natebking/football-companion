@@ -39,7 +39,11 @@
         active = sheet;
         document.body.style.overflow = 'hidden';
         requestAnimationFrame(function () {
-          if (active === sheet) sheet.querySelector('.closex').focus();
+          if (active === sheet) {
+            var firstControl = sheet.id === 'sheet' && window.matchMedia('(pointer: fine)').matches
+              ? document.getElementById('gameSearch') : sheet.querySelector('.closex');
+            firstControl.focus();
+          }
         });
       } else if (!open && active === sheet) {
         active = null;
