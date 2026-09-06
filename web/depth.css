@@ -31,9 +31,9 @@
 .play-understand summary::after { content: '+'; margin-left: 8px; }
 .play-understand[open] summary::after { content: '−'; }
 .play-understand > p { font-size: .875rem; margin-top: 8px; line-height: 1.6; }
-.example-entry { margin-top: 25px; border: 1px solid var(--line); border-radius: 14px; padding: 20px; background: var(--accent-bg); }
-.example-entry h2 { font: 700 1.5rem/1.2 var(--heading); margin: 8px 0; }
-.example-entry p { color: var(--dim); font-size: .875rem; }
+.learning-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.learning-footer .depth-link { min-height: 44px; }
+.learning-footer p { color: var(--dim); font-size: .8125rem; }
 .learning-panel { max-width: 700px; }
 .depth-context { padding: 10px 12px; background: var(--surface); border-radius: 8px; color: var(--dim); margin-bottom: 14px; font-size: .8125rem; }
 .learning-intro { color: var(--dim); text-wrap: pretty; margin: 5px 0 20px; font-size: 1rem; line-height: 1.65; }
