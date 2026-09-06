@@ -19,7 +19,11 @@ The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-
 
 Chrome via agent-browser replayed the published Oregon–Boise review up to the fourth-down decision at 1:37. It used source-derived reports with their drive IDs and mocked transport, not a real live viewing session. The default showed the possession/clock tradeoff; Beginner showed its distinct teaching. Feedback saved and the CLI audit reproduced the recorded advanced read with no missing support. Desktop and 390×844 light/dark checks showed no horizontal overflow or JavaScript errors. The Games score-hiding behavior was verified with a 30-second delay.
 
-The initial unmocked local browser could not fetch ESPN’s schedule from this environment. That limitation is separate from the replay verification. Do not describe the replay as verified stadium-to-TV timing or measured live prediction performance.
+The isolated Chrome session could not fetch ESPN’s schedule. Direct requests returned HTTP 200 with CORS enabled. The user's existing Codex in-app browser did receive live reports. After preserving its journals and reloading, it displayed the new default read for WASH–WSU: “8 of 12 reported third-down plays needed at least seven yards,” alongside the current situation and five-play feed. This verifies the deployed path in that browser, not stadium-to-TV latency or prediction accuracy.
+
+The real browser also exposed two journals, downloaded through the app UI and copied to ignored `data/journals/`: `cfb:401856668` (TA&M–MOST, final, 524 source revisions) and `cfb:401858437` (WASH–WSU, still live at download, 187 revisions). The initial audit found 23 and 6 distinct visible guidance moments respectively. Most other WASH–WSU prompts were recorded as background/covered; do not treat them as read. These exports precede the new selector and have no usefulness ratings. Their old prompts cannot count as successful reproduction of the new selector. Final-review matching and comparison work remains.
+
+Two follow-ups identified in the live check: a late-game lead should outrank an all-game third-down pattern; and counterfactual audit selection needs its own cooldown history rather than the old selector's missing read keys. Neither finding justifies claiming a forecast improvement.
 
 **Additional source access**
 
@@ -33,7 +37,18 @@ At 2026-09-06T23:32:43Z, a single CFBD `/live/plays` access probe using the exis
 4. Expand the verified historical charting/practice bank and test recognition on a different play. The existing six examples remain; this release does not yet add examples or establish learning gains.
 5. Run the new audit across real exported live-viewer journals, review the actual feedback and compare candidate changes on untouched later games. The local QA journal is not a substitute for those observations.
 6. If authorized and accessible, run a bounded CFBD live trial measuring useful fields, missingness, revisions and latency. Add a protected server adapter/shared game cache only if the trial establishes a useful replacement or supplement. Evaluate richer licensed NFL access separately; no assumed college/NFL feature parity.
-7. Finish deployment verification and record the production build below. Continue auditing the full original plan before declaring the goal complete.
+7. Continue auditing the full original plan before declaring the goal complete. The first production deployment is verified below.
+
+**Production deployment**
+
+- Application commit: `3b6596e`, pushed to `origin/main`.
+- Production: https://fluentin.football/ — READY.
+- Production deployment: `dpl_5EbEP1uiiVjTWa1ZRZUeXXy1EeML` (`https://football-companion-p7mvd3f3t-nates-projects-925609f4.vercel.app`).
+- Preview: `dpl_2KfSC9TCJ1cAad4beEDNRHxziY98`.
+- Tested local, preview and production `build-info.json` IDs all match: `01410c22287174fe03f6d03e9e855030a5c1438d72a514b41b57a0cba8b322e7`.
+- Browser verified `read-1`, default `game`, a distinct Beginner choice, questions disabled by default and no horizontal overflow. The user's existing tab was refreshed and the new live read appeared.
+- Static deployment; no application server functions or function logs to scan. No continuous monitoring was created.
+- `vercel curl` in CLI 54.14.5 forwards `--scope` to curl and rejects it. Use the linked project without that flag for authenticated preview reads. `vercel promote` created a separate production deployment; its content was independently checked against the local build.
 
 Run a downloaded journal audit with:
 
