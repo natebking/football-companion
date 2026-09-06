@@ -30,29 +30,33 @@ test('lesson selection does not read play outcomes, raw text, model rates, or a 
   assert.equal(learning.choose({ ...situation, clockSeconds: null }), expected);
 });
 
-test('red-zone lessons stay near the end zone, and all eight lessons can be selected', () => {
-  const selected = new Set();
-  for (let ytg = 1; ytg <= 99; ytg++) {
-    for (let down = 1; down <= 3; down++) {
-      for (let distance = 1; distance <= Math.min(ytg, 15); distance++) {
-        const lesson = learning.choose({ ...situation, down, distance, yardsToGoal: ytg });
-        selected.add(lesson.id);
-        if (lesson.id === 'red_zone') assert.ok(ytg <= 20);
-        if (ytg <= 10) assert.equal(lesson.id, 'red_zone');
-        if (distance === ytg) assert.notEqual(lesson.id, 'first_down_line', 'There is no first-down marker in goal-to-go.');
+test('both levels respect field position and every lesson is reachable', () => {
+  for (const level of ['game', 'basics']) {
+    const selected = new Set();
+    for (let ytg = 1; ytg <= 99; ytg++) {
+      for (let down = 1; down <= 3; down++) {
+        for (let distance = 1; distance <= Math.min(ytg, 15); distance++) {
+          const lesson = learning.choose({ ...situation, down, distance, yardsToGoal: ytg }, { level });
+          selected.add(lesson.id);
+          assert.equal(lesson.level, level);
+          if (lesson.id === 'red_zone') assert.ok(ytg <= 20);
+          if (ytg <= 10) assert.equal(lesson.id, 'red_zone');
+          if (distance === ytg) assert.notEqual(lesson.id, 'first_down_line', 'There is no first-down marker in goal-to-go.');
+        }
       }
     }
+    assert.deepEqual([...selected].sort(), learning.all({ level }).map(lesson => lesson.id).sort());
+    assert.equal(selected.size, level === 'game' ? 11 : 8);
   }
-  assert.equal(selected.size, 8);
 });
 
 test('every observation can be skipped and no response grades knowledge', () => {
-  for (const lesson of learning.all()) {
+  for (const lesson of [...learning.all(), ...learning.all({ level: 'basics' })]) {
     assert.ok(lesson.choices.some(choice => choice.id === 'unsure'), lesson.id);
     assert.ok(lesson.concepts.every(id => concepts[id]), lesson.id);
     assert.equal(new Set(lesson.choices.map(choice => choice.id)).size, lesson.choices.length);
     for (const choice of lesson.choices) {
-      const response = learning.observationResponse(lesson.id, choice.id);
+      const response = learning.observationResponse(lesson.id, choice.id, { level: lesson.level });
       assert.equal(typeof response, 'string');
       assert.doesNotMatch(response, /\b(?:correct|incorrect|mastered|mastery|score|graded|you learned|you know)\b/i);
     }
@@ -62,7 +66,7 @@ test('every observation can be skipped and no response grades knowledge', () => 
 });
 
 test('every shorter hint keeps an observation prompt and is shorter than its full version', () => {
-  for (const lesson of learning.all()) {
+  for (const lesson of [...learning.all(), ...learning.all({ level: 'basics' })]) {
     assert.equal(typeof lesson.shortWatch, 'string', lesson.id);
     assert.ok(lesson.shortWatch.split(/\s+/).length < lesson.watch.split(/\s+/).length, lesson.id);
     assert.doesNotMatch(lesson.shortWatch, /\b(?:will|always|correct|mastered|score)\b|\d+%/i, lesson.id);
@@ -91,14 +95,14 @@ test('the app selects the preferred lesson wording without replacing its topic',
 });
 
 test('instructional diagrams are accessible examples with no live data or executable markup', () => {
-  for (const lesson of learning.all()) {
-    const svg = learning.renderDiagram(lesson.id);
+  for (const lesson of [...learning.all(), ...learning.all({ level: 'basics' })]) {
+    const svg = learning.renderDiagram(lesson.id, { level: lesson.level });
     assert.match(svg, /role="img" aria-label="Illustration/);
     assert.match(svg, /EXAMPLE ONLY/);
     assert.match(svg, /Selected players shown/);
     assert.match(svg, /viewBox="0 0 480 300"/);
     assert.doesNotMatch(svg, /<script|onload=|<foreignObject|href=|\sid=/i);
-    assert.equal(svg, learning.renderDiagram(lesson.id));
+    assert.equal(svg, learning.renderDiagram(lesson.id, { level: lesson.level }));
   }
   assert.equal(learning.renderDiagram('"><script>alert(1)</script>'), '');
   assert.equal(learning.get('__proto__'), null);
@@ -144,4 +148,108 @@ test('a verified catch position is acknowledged without pretending to know the r
   assert.doesNotMatch(related.reason, /does not locate the catch/);
   const noDepth = learning.relatedToReport({ ...report, depthText: '', airYards: null });
   assert.match(noDepth.reason, /does not locate the catch/);
+});
+
+
+test('Read the game is the default, while basics keeps a simpler explanation of the same topic', () => {
+  assert.equal(learning.choose(situation).level, 'game');
+  assert.equal(learning.choose(situation, { level: 'invalid' }).level, 'game');
+  const tactical = learning.get('handoff_fake');
+  const basic = learning.get('handoff_fake', { level: 'basics' });
+  assert.match(tactical.question, /defender/);
+  assert.match(basic.question, /exchange/);
+  assert.notEqual(tactical.explanation, basic.explanation);
+  assert.notEqual(learning.renderDiagram('handoff_fake'), learning.renderDiagram('handoff_fake', { level: 'basics' }));
+  assert.equal(learning.observationResponse('handoff_fake', 'forward', { level: 'basics' }), null);
+  assert.equal(learning.observationResponse('handoff_fake', 'handoff'), null);
+  assert.ok(learning.observationResponse('handoff_fake', 'handoff', { level: 'basics' }));
+  assert.equal(learning.get('defender_conflict', { level: 'basics' }), null);
+  assert.equal(learning.relatedToReport({ summary: 'Sack.' }, { level: 'basics' }).lesson, learning.get('pocket_edges', { level: 'basics' }));
+});
+
+test('the deeper reads keep their limits explicit instead of diagnosing a live play', () => {
+  assert.match(learning.observationResponse('motion', 'followed'), /alone does not prove man coverage/);
+  assert.match(learning.observationResponse('pocket_edges', 'free'), /without deciding who missed an assignment/);
+  assert.match(learning.get('defender_conflict').followUp, /not the quarterback’s known read/);
+  assert.match(learning.get('catch_and_run').followUp, /total yards alone cannot locate the catch/);
+  assert.match(learning.get('recurring_look').watch, /If you see that look again/);
+  assert.match(learning.observationResponse('recurring_look', 'same'), /not enough to know/);
+  for (const lesson of learning.all()) assert.ok(lesson.followUp, lesson.id);
+});
+
+// Minimal dialog surfaces exercise the real DOM module and event boundary.
+// These are synthetic clicks, not evidence that a viewer saw a live play.
+function depthHarness() {
+  const nodes = new Map(), events = [], listeners = new Map();
+  const node = id => {
+    if (!nodes.has(id)) {
+      const classes = new Set();
+      nodes.set(id, {
+        id, dataset: {}, innerHTML: '', textContent: '', hidden: false, inert: false,
+        addEventListener() {}, focus() {},
+        classList: { add: cls => classes.add(cls), remove: cls => classes.delete(cls), contains: cls => classes.has(cls) },
+        querySelector: () => ({ scrollTop: 0 }), querySelectorAll: () => []
+      });
+    }
+    return nodes.get(id);
+  };
+  const document = { getElementById: node, querySelectorAll: () => [], addEventListener: (name, fn) => listeners.set(name, fn) };
+  const root = { document, FootballLearning: learning, FootballGlossary: { annotate: String, close() {} },
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
+    dispatchEvent: event => events.push(event) };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../web/depth-ui.js'), 'utf8'), { window: root });
+  function click(selector, dataset) {
+    const target = { dataset, setAttribute() {}, closest: value => value === selector ? target : null };
+    listeners.get('click')({ target });
+  }
+  return { depth: root.FootballDepth, node, events, click };
+}
+
+test('the open lesson uses its level for answers and preserves frozen journal context through a level change', () => {
+  const { depth, node, events, click } = depthHarness();
+  const options = { origin: 'reported-play', journalKey: 'synthetic-game-a', playId: 'synthetic-play-12' };
+  depth.showLesson('handoff_fake', 'A synthetic reported play.', options);
+  options.journalKey = 'synthetic-game-b'; options.playId = 'synthetic-play-99';
+  assert.match(node('learningContent').innerHTML, /Read the game/);
+  click('[data-observation]', { observation: 'forward' });
+  assert.equal(events[0].type, 'football-observation');
+  assert.equal(events[0].detail.level, 'game');
+  assert.equal(events[0].detail.journalKey, 'synthetic-game-a');
+  assert.equal(events[0].detail.playId, 'synthetic-play-12');
+  assert.equal(events[0].detail.isLiveContext, true);
+  assert.equal(events[0].detail.response, learning.observationResponse('handoff_fake', 'forward'));
+  depth.setTeachingLevel('basics');
+  assert.match(node('learningContent').innerHTML, /Start with basics/);
+  click('[data-observation]', { observation: 'forward' });
+  assert.equal(events.length, 1, 'An answer from the other level is not accepted.');
+  click('[data-observation]', { observation: 'handoff' });
+  assert.equal(events[1].detail.level, 'basics');
+  assert.equal(events[1].detail.journalKey, 'synthetic-game-a');
+  assert.equal(events[1].detail.context, 'A synthetic reported play.');
+  assert.equal(events[1].detail.response, learning.observationResponse('handoff_fake', 'handoff', { level: 'basics' }));
+});
+
+test('reference and library answers are not relabeled as current-game observations', () => {
+  const { depth, events, click } = depthHarness();
+  depth.showLesson('motion');
+  click('[data-observation]', { observation: 'unsure' });
+  assert.equal(events[0].detail.origin, 'reference');
+  assert.equal(events[0].detail.isLiveContext, false);
+  assert.equal(events[0].detail.journalKey, null);
+  const dataset = { lesson: 'motion', lessonOrigin: 'library', lessonExample: 'synthetic-past-play' };
+  click('[data-lesson]', dataset);
+  dataset.lessonOrigin = 'live';
+  click('[data-observation]', { observation: 'followed' });
+  assert.equal(events[1].detail.origin, 'library');
+  assert.equal(events[1].detail.exampleId, 'synthetic-past-play');
+  assert.equal(events[1].detail.isLiveContext, false);
+  assert.equal(events[1].detail.journalKey, null);
+});
+
+test('switching a tactical-only topic to basics opens a related basic lesson without writing an observation', () => {
+  const { depth, node, events } = depthHarness();
+  depth.showLesson('catch_and_run');
+  depth.setTeachingLevel('basics');
+  assert.equal(node('learningTitle').textContent, learning.get('first_down_line', { level: 'basics' }).title);
+  assert.equal(events.length, 0);
 });

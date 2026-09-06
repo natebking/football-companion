@@ -684,7 +684,7 @@ test('queue catch-up ending in a touchdown clears the card without showing inter
 test('an intermediate queue transition closes an old pick before a later play repeats its situation', () => {
   // Synthetic catch-up: halftime occurred, then a later possession returned to
   // the same down, distance and field position as an unresolved pick.
-  const h = liveQueue(), handlers = {}, records = [], exposures = [];
+  const h = liveQueue(), handlers = {}, records = [], exposures = [], journalLinks = [];
   const oldKey = '1|10|84|194', finalKey = '2|6|80|194';
   const card = { id: 'synthetic-final-card', concepts: ['box'], prime: {
     situation: 'Second and 6.', tendency: '', watch: 'Watch the box.'
@@ -694,12 +694,14 @@ test('an intermediate queue transition closes an old pick before a later play re
     st: {
       pending: { sitKey: oldKey, game: 'A', league: 'cfb', cardId: 'synthetic-old-card',
         kind: 'passrun', answer: 'run', latency: 1500, down: 1, distance: 10, ytg: 84 },
-      sit: { sitKey: oldKey }, sitKey: oldKey, res: null, ask: null, sinceAsk: 99, skippedGrade: false
+      journalIds: ['shown:old'], sit: { sitKey: oldKey }, sitKey: oldKey, res: null, ask: null, sinceAsk: 99, skippedGrade: false
     },
     sh: {
       bus: { on: (name, handler) => { (handlers[name] || (handlers[name] = [])).push(handler); } },
       logAsk: record => records.push(record), diag: () => {}, invalidateCalls: () => {}, league: () => 'cfb',
       shortHints: () => false,
+      teachingLevel: () => 'game',
+      journalObservation: row => journalLinks.push(row),
       bumpExposure: concepts => exposures.push(concepts)
     },
     resolveTeam: () => null, lookupTendency: () => null, printedRate: () => null,
@@ -712,6 +714,8 @@ test('an intermediate queue transition closes an old pick before a later play re
   prime.sh.sameSnap = prime.sameSnap;
   const eventsStart = source.indexOf('// ---------------------------------------------------------------- events');
   vm.runInContext(grading + '\n' + source.slice(eventsStart, source.indexOf('// ---------------------------------------------------------------- render', eventsStart)), prime);
+  const journalEventStart = source.indexOf("sh.bus.on('result'", source.indexOf('function captureGuidance('));
+  vm.runInContext(source.slice(journalEventStart, source.indexOf('function renderAsk(', journalEventStart)), prime);
   const captureLiveEvent = h.context.sh.bus.emit;
   h.context.sh.bus.emit = (name, value) => {
     captureLiveEvent(name, value);
@@ -731,6 +735,7 @@ test('an intermediate queue transition closes an old pick before a later play re
     } }
   ];
   h.tick(110000);
+  assert.equal(journalLinks.length, 0, 'The old prompt must not link across a transition.');
   assert.equal(records.length, 1);
   assert.equal(records[0].correct, null);
   assert.equal(records[0].voided, true);
@@ -745,4 +750,25 @@ test('an intermediate queue transition closes an old pick before a later play re
   assert.equal(h.events.filter(event => event.name === 'snap').length, 1);
   assert.equal(h.events.filter(event => event.name === 'nosnap').length, 0);
   assert.equal(h.events.filter(event => event.name === 'result').length, 1);
+});
+
+// Preserve the number the reader saw, not an unrounded internal estimate.
+test('journal guidance stores displayed probability and exact wording separately from the model', () => {
+  const saved = [];
+  const text = { pDD: '1st & 10', pSpot: 'at ORE25', pSit: '', pTen: 'They run here 58% of the time.', pWatch: 'Watch the space.' };
+  const c = vm.createContext({
+    st: { sit: { down: 1 }, sitKey: 'one', card: { id: 'card', prints_number: true },
+      ten: { pass_rate: 0.41777, league_pass_rate: 0.46 }, lesson: { id: 'space' },
+      tendLine: text.pTen, attributed: true, journalSignature: '', journalIds: [] },
+    document: { visibilityState: 'visible', querySelector: () => null },
+    $: id => ({ textContent: text[id] }),
+    sh: { teachingLevel: () => 'game', journalShown: entry => { saved.push(entry); return { ok: true, id: 'shown:1' }; } }
+  });
+  const begin = source.indexOf('function captureGuidance(');
+  vm.runInContext(source.slice(begin, source.indexOf("window.addEventListener('football-view-visible'", begin)), c);
+  c.captureGuidance(); c.captureGuidance();
+  assert.equal(saved.length, 1); assert.ok(Math.abs(saved[0].probabilityShown - 0.42) < 1e-10);
+  assert.equal(saved[0].modelProbability, 0.41777); assert.equal(saved[0].lines.tendency, text.pTen);
+  c.st.card.prints_number = false; c.st.journalSignature = ''; c.captureGuidance();
+  assert.equal(saved[1].probabilityShown, null);
 });

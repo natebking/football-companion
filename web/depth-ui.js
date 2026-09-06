@@ -7,6 +7,7 @@
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   }); }
   var examples = null, selectedLesson = null, selectedExample = null;
+  var teachingLevel = 'game', lessonContext = null;
   function rich(text) { return root.FootballGlossary.annotate(text); }
   function resetView() {
     $('learningSheet').querySelector('.sheetInner').scrollTop = 0;
@@ -24,15 +25,25 @@
   $('closeLearning').addEventListener('click', close);
   $('learningSheet').addEventListener('click', function (event) { if (event.target === $('learningSheet')) close(); });
 
-  function showLesson(id, context) {
-    var lesson = root.FootballLearning.get(id);
+  function showLesson(id, context, options) {
+    options = options || {};
+    var lesson = root.FootballLearning.get(id, { level: teachingLevel });
     if (!lesson) return;
     selectedLesson = lesson; selectedExample = null;
+    // Capture the opener's identity. Later game/feed changes must not relabel an
+    // observation of the example or play the user actually opened.
+    lessonContext = {
+      context: context || '', origin: options.origin || 'reference',
+      exampleId: options.exampleId || null, journalKey: options.journalKey || null,
+      playId: options.playId || null
+    };
     $('learningTitle').textContent = lesson.title;
     $('learningContent').innerHTML = (context ? '<p class="depth-context">' + esc(context) + '</p>' : '') +
+      '<p class="learning-level">' + (lesson.level === 'basics' ? 'Start with basics' : 'Read the game') + '</p>' +
       '<p class="learning-intro">' + rich(lesson.explanation) + '</p>' +
-      root.FootballLearning.renderDiagram(id) +
+      root.FootballLearning.renderDiagram(id, { level: lesson.level }) +
       '<p class="learning-caption">' + esc(lesson.diagramCaption) + '</p>' +
+      (lesson.followUp ? '<p class="learning-next"><b>Watch next</b>' + rich(lesson.followUp) + '</p>' : '') +
       '<section class="learning-observe" aria-labelledby="observeTitle"><span class="eyebrow">Your observation</span>' +
       '<h2 id="observeTitle">' + esc(lesson.question) + '</h2><p class="depth-caption">Your observation, not checked against the feed. Choose “Couldn’t tell” if the camera missed it.</p>' +
       '<div class="learning-choices">' + lesson.choices.map(function (choice) {
@@ -64,7 +75,7 @@
   }
   function topicLesson(topic) {
     var lessons = { screen: 'screen_blockers', 'play-action': 'handoff_fake', 'down-and-distance': 'first_down_line' };
-    return lessons[topic] ? root.FootballLearning.get(lessons[topic]) : null;
+    return lessons[topic] ? root.FootballLearning.get(lessons[topic], { level: teachingLevel }) : null;
   }
   function showExample(id) {
     var example = examples && examples.examples.find(function (entry) { return entry.id === id; });
@@ -76,8 +87,8 @@
       '<p class="example-label">Past game · ' + esc(example.season) + ' · ' + esc(example.offense) + ' vs ' + esc(example.defense) + '</p>' +
       '<h2 class="example-summary">' + esc(example.summary) + '</h2><p class="learning-intro">' + rich(example.explanation) + '</p>' +
       yardageGraphic(example.facts) +
-      (topic ? root.FootballLearning.renderDiagram(topic.id) + '<p class="learning-caption">' + esc(topic.diagramCaption) + '</p>' +
-        '<button type="button" class="depth-link" data-lesson="' + esc(topic.id) + '">Learn what to watch <span aria-hidden="true">↗</span></button>' : '') +
+      (topic ? root.FootballLearning.renderDiagram(topic.id, { level: teachingLevel }) + '<p class="learning-caption">' + esc(topic.diagramCaption) + '</p>' +
+        '<button type="button" class="depth-link" data-lesson="' + esc(topic.id) + '" data-lesson-origin="library" data-lesson-example="' + esc(example.id) + '">Learn what to watch <span aria-hidden="true">↗</span></button>' : '') +
       '<details class="example-sources"><summary>Source and play details</summary><p>' + sourceLinks(example.sources) + '</p>' +
       '<p class="depth-caption">Game ' + esc(example.gameId) + ' · Play ' + esc(example.playId) + '</p></details>';
     resetView();
@@ -134,19 +145,46 @@
   }
   doc.addEventListener('click', function (event) {
     var lessonButton = event.target.closest('[data-lesson]');
-    if (lessonButton) { showLesson(lessonButton.dataset.lesson, lessonButton.dataset.lessonContext); return; }
+    if (lessonButton) {
+      showLesson(lessonButton.dataset.lesson, lessonButton.dataset.lessonContext, {
+        origin: lessonButton.dataset.lessonOrigin, exampleId: lessonButton.dataset.lessonExample,
+        journalKey: lessonButton.dataset.lessonJournalKey, playId: lessonButton.dataset.lessonPlay
+      });
+      return;
+    }
     var exampleButton = event.target.closest('[data-example]');
     if (exampleButton) { showExample(exampleButton.dataset.example); return; }
     if (event.target.closest('[data-example-library]')) { showLibrary(); return; }
     var choice = event.target.closest('[data-observation]');
     if (choice && selectedLesson) {
-      var response = root.FootballLearning.observationResponse(selectedLesson.id, choice.dataset.observation);
+      var response = root.FootballLearning.observationResponse(selectedLesson.id, choice.dataset.observation, { level: selectedLesson.level });
       if (!response) return;
       $('learningContent').querySelectorAll('[data-observation]').forEach(function (button) { button.setAttribute('aria-pressed', String(button === choice)); });
       $('observationResponse').innerHTML = rich(response);
       $('observationResponse').hidden = false;
+      root.dispatchEvent(new root.CustomEvent('football-observation', { detail: {
+        lessonId: selectedLesson.id, choiceId: choice.dataset.observation,
+        response: response, level: selectedLesson.level,
+        origin: lessonContext.origin, context: lessonContext.context,
+        exampleId: lessonContext.exampleId, journalKey: lessonContext.journalKey,
+        playId: lessonContext.playId,
+        isLiveContext: lessonContext.origin === 'live' || lessonContext.origin === 'reported-play'
+      } }));
     }
   });
+  function setTeachingLevel(level) {
+    teachingLevel = level === 'basics' ? 'basics' : 'game';
+    if (!$('learningSheet').classList.contains('on')) return;
+    if (selectedLesson) {
+      var id = selectedLesson.id;
+      if (teachingLevel === 'basics') {
+        var basicTopic = { defender_conflict: 'route_break', catch_and_run: 'first_down_line', recurring_look: 'motion' };
+        id = basicTopic[id] || id;
+      }
+      showLesson(id, lessonContext.context, lessonContext);
+    } else if (selectedExample) showExample(selectedExample.id);
+  }
   $('exploreExamples').addEventListener('click', showLibrary);
-  root.FootballDepth = { showLesson: showLesson, showLibrary: showLibrary, renderInsights: renderInsights };
+  root.FootballDepth = { showLesson: showLesson, showLibrary: showLibrary,
+    setTeachingLevel: setTeachingLevel, renderInsights: renderInsights };
 })(window);

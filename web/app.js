@@ -40,7 +40,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-stable-logos';
+var VERSION = '2026-09-05-game-journal';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -60,7 +60,7 @@ var NFL_ALIAS = { LAR: 'LA', WSH: 'WAS', JAC: 'JAX' };
 
 var LS = {
   league: 'fc_league', game: 'fc_game_',
-  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag', shortHints: 'fc_short_hints'
+  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag', shortHints: 'fc_short_hints', teachingLevel: 'fc_teaching_level'
 };
 var DIAG_MAX = 500;
 
@@ -95,12 +95,52 @@ var bus = makeBus();
 // ---------------------------------------------------------------- settings
 var league = lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
 var shortHints = lsGet(LS.shortHints) === '1';
+var teachingLevel = lsGet(LS.teachingLevel) === 'basics' ? 'basics' : 'game';
 var delaySec = (function () {
   var n = parseInt(lsGet(LS.delay), 10);
   return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : 0;
 })();
 var TEND = null;    // tendency table for the current league
 var CARDS = null;   // cards.json
+var artifacts = { version: VERSION, build: null };
+// Read access stays with the review panel. PRIME receives only a write function.
+var journalStorage;
+try { journalStorage = window.localStorage; } catch (e) { journalStorage = {
+  getItem: function () { return null; }, setItem: function () { throw new Error('Browser storage unavailable'); }, removeItem: function () {}
+}; }
+var journal = window.FootballJournal.create({ storage: journalStorage });
+var journalContext = { key: null, basisPlayId: null, basisRevision: null };
+function journalResult(result) {
+  if (result && !result.ok) $('journalStatus').textContent = 'Journal paused. Open it to check storage.';
+  return result;
+}
+function journalGame(meta) {
+  var result = journalResult(journal.beginGame(meta));
+  journalContext.key = meta.league + ':' + meta.gameId;
+  return result;
+}
+function journalSources(entries) {
+  if (!journalContext.key || !entries.length) return;
+  return journalResult(journal.recordSources(journalContext.key, entries));
+}
+function journalShown(entry) {
+  if (!journalContext.key) return null;
+  return journalResult(journal.recordShown(journalContext.key, Object.assign({
+    shownAt: Date.now(), basisPlayId: journalContext.basisPlayId, basisRevision: journalContext.basisRevision,
+    delaySeconds: delaySec, artifacts: { version: VERSION, buildId: artifacts.build && artifacts.build.id,
+      table: TEND && { generated: TEND.generated, seasons: TEND.seasons } },
+    visibility: document.visibilityState !== 'visible' ? 'background' : document.querySelector('.sheet.on') ? 'covered' : 'visible'
+  }, entry)));
+}
+function journalObservation(entry, key) {
+  key = key || journalContext.key;
+  if (key) return journalResult(journal.recordObservation(key, entry));
+}
+window.FootballReview.init({ journal: journal, current: function () { return Object.assign({}, journalContext); } });
+window.addEventListener('football-observation', function (event) {
+  var entry = event.detail;
+  if (entry && entry.isLiveContext && entry.journalKey) journalObservation(Object.assign({ kind: 'learning' }, entry), entry.journalKey);
+});
 
 function delayMs() { return delaySec * 1000; }
 function seasonsLabel() {
@@ -233,6 +273,12 @@ var shell = {
   tend: function () { return TEND; },
   cards: function () { return CARDS; },
   shortHints: function () { return shortHints; },
+  teachingLevel: function () { return teachingLevel; },
+  journalReset: function () { journalContext = { key: null, basisPlayId: null, basisRevision: null }; },
+  journalGame: journalGame, journalSources: journalSources, journalShown: journalShown,
+  journalObservation: journalObservation,
+  journalBasis: function (id, revision) { journalContext.basisPlayId = id; journalContext.basisRevision = revision; },
+  journalKey: function () { return journalContext.key; },
   bumpExposure: bumpExposure, logAsk: logAsk, invalidateCalls: invalidateCalls,
   calls: function () { return askLog; },
   diag: diag, VERSION: VERSION,
@@ -259,7 +305,7 @@ var st = {
   gap: 7,
   quiet: 'Pick a game to start.',
   hold: '',
-  sig: '', asig: ''
+  sig: '', asig: '', journalIds: [], journalSignature: ''
 };
 
 // ---------------------------------------------------------------- tendency
@@ -393,6 +439,12 @@ sh.bus.on('hints', function () {
   render();
 });
 
+sh.bus.on('teaching', function () {
+  if (!st.sit) return;
+  st.lesson = window.FootballLearning.choose(st.sit, { level: sh.teachingLevel() });
+  st.watchLine = st.lesson ? (sh.shortHints() ? st.lesson.shortWatch : st.lesson.watch) : st.watchLine;
+  render();
+});
 // ---------------------------------------------------------------- the ask
 // Every ask is gradeable from the play feed alone. A question the feed cannot
 // settle is a question this app has no business asking.
@@ -486,6 +538,7 @@ sh.bus.on('hold', function (n) {
   if (s !== st.hold) { st.hold = s; $('pHold').textContent = s; }
 });
 sh.bus.on('transition', function () {
+  st.journalIds = []; st.journalSignature = '';
   // A catch-up still closes the old pick at its original boundary, even when
   // the intermediate card itself is never displayed.
   if (closePending('The feed moved on before this pick could be graded.')) st.skippedGrade = true;
@@ -493,6 +546,7 @@ sh.bus.on('transition', function () {
 // The drive ended: touchdown, made kick, end of period. There is no legal next
 // snap, so the card comes down rather than describing a down already played.
 sh.bus.on('nosnap', function (msg) {
+  st.journalIds = []; st.journalSignature = '';
   closePending('The feed moved on before this pick could be graded.');
   st.skippedGrade = false;
   st.quiet = msg || '';
@@ -502,6 +556,7 @@ sh.bus.on('nosnap', function (msg) {
   render();
 });
 sh.bus.on('clear', function () {
+  st.journalIds = []; st.journalSignature = '';
   window.FootballGlossary.close();
   closePending('The game changed before this pick could be graded.');
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
@@ -594,7 +649,8 @@ sh.bus.on('snap', function (sit) {
 
   st.ten = ten;
   st.card = card;
-  st.lesson = window.FootballLearning.choose(sit);
+  st.lesson = window.FootballLearning.choose(sit, { level: sh.teachingLevel() });
+  st.journalIds = []; st.journalSignature = '';
   st.rate = rate;
   st.ask = null;
   sh.diag('card', {
@@ -732,7 +788,11 @@ function render() {
   $('pTen').innerHTML = window.FootballGlossary.annotate(st.tendLine);
   $('pWatch').innerHTML = window.FootballGlossary.annotate(st.watchLine);
   $('exploreRead').hidden = !st.lesson;
-  if (st.lesson) $('exploreRead').dataset.lesson = st.lesson.id;
+  if (st.lesson) {
+    $('exploreRead').dataset.lesson = st.lesson.id;
+    $('exploreRead').dataset.lessonOrigin = 'live';
+    $('exploreRead').dataset.lessonJournalKey = sh.journalKey ? sh.journalKey() : '';
+  }
   $('prime').className = st.attributed ? '' : 'low';
 
   // The source chip is attribution too. It carries the team name on exactly
@@ -751,9 +811,35 @@ function render() {
     chips.push('<button class="chip" data-term="' + esc(cs[i]) + '" aria-haspopup="dialog" aria-controls="termPopover">' + esc(cs[i].replace(/_/g, ' ')) + '</button>');
   }
   $('pFoot').innerHTML = chips.join('');
-
-
+  captureGuidance();
 }
+function captureGuidance() {
+  if (!st.sit || !st.card || !sh.journalShown) return;
+  var lines = { situation: $('pDD').textContent, spot: $('pSpot').textContent,
+    context: $('pSit').textContent, tendency: $('pTen').textContent, watch: $('pWatch').textContent };
+  var visible = document.visibilityState === 'visible' && !document.querySelector('.sheet.on');
+  var signature = JSON.stringify([st.sitKey, lines, visible]);
+  if (signature === st.journalSignature) return;
+  st.journalSignature = signature;
+  var printed = st.card.prints_number !== false && st.tendLine.match(/(\d+)%/);
+  var shown = printed ? Number(printed[1]) / 100 : null;
+  if (shown !== null && /\brun\b/i.test(st.tendLine)) shown = 1 - shown;
+  var result = sh.journalShown({ kind: 'guidance', lines: lines, situation: st.sit,
+    cardId: st.card.id, lessonId: st.lesson && st.lesson.id, teachingLevel: sh.teachingLevel(),
+    probabilityShown: shown, modelProbability: st.ten && st.ten.pass_rate,
+    baselineProbability: st.ten && st.ten.league_pass_rate, attributed: st.attributed });
+  if (result && result.ok && result.id) st.journalIds.push(result.id);
+}
+window.addEventListener('football-view-visible', captureGuidance);
+sh.bus.on('result', function (r) {
+  // Link only a newly released play whose exact pre-snap situation matches.
+  // Corrections, clock matches and approximate spots cannot earn a prediction score.
+  if (!sh.journalObservation || r.revised || !st.sit || r.sitKey !== st.sitKey) return;
+  st.journalIds.forEach(function (id) {
+    sh.journalObservation({ kind: 'resolution', shownId: id, playId: r.playId, voided: !!r.voidReason });
+  });
+  st.journalIds = [];
+});
 function renderAsk() {
   var sig = askSig();
   if (sig === st.asig) return;
@@ -995,7 +1081,7 @@ function feedRow(p, abbr, facts) {
     plain: facts.summary, kind: facts.kind, raw: facts.raw,
     players: facts.players, facts: facts.facts, consequence: facts.consequence,
     meaning: facts.meaning || '', depthText: facts.depthText || '', depthSource: facts.depthSource,
-    related: window.FootballLearning.relatedToReport(facts),
+    related: window.FootballLearning.relatedToReport(facts, { level: sh.teachingLevel ? sh.teachingLevel() : 'game' }),
     reportFirst: /[Ss]ee the play report/.test(facts.consequence),
     awayScore: typeof p.awayScore === 'number' ? p.awayScore : null,
     homeScore: typeof p.homeScore === 'number' ? p.homeScore : null,
@@ -1097,7 +1183,7 @@ function playSitKey(p, abbr) {
 function due(item) { return item.at === 0 ? 0 : item.at + sh.delayMs(); }
 function pump(trigger) {
   var now = Date.now(), moved = false, nextSnap = null;
-  var released = [], maxOverdue = 0;
+  var released = [], maxOverdue = 0, journalReleases = [];
   while (st.queue.length && due(st.queue[0]) <= now) {
     var it = st.queue.shift();
     moved = true;
@@ -1109,7 +1195,10 @@ function pump(trigger) {
       var index = st.rows.findIndex(function (row) { return row.id === it.row.id; });
       var prior = index >= 0 ? st.rows[index] : null;
       if (index >= 0) st.rows[index] = it.row; else st.rows.push(it.row);
-      if (it.source) st.released[it.row.id] = it.source;
+      if (it.source) {
+        st.released[it.row.id] = it.source;
+        journalReleases.push({ report: it.source, observedAt: it.at, releasedAt: now, source: 'espn' });
+      }
       st.rows.sort(function (a, b) { return (st.order[b.id] ?? -1) - (st.order[a.id] ?? -1); });
       if (st.rows.length > sh.FEED_MAX) st.rows.length = sh.FEED_MAX;
       st.shownPlay = st.rows[0] || null;
@@ -1136,7 +1225,9 @@ function pump(trigger) {
   // Catch-up can release several situations in one turn. Only the final one
   // was actually available to read; intermediate hints must not log learning
   // exposures or open predictions about plays whose results are already here.
+  if (sh.journalSources && journalReleases.length) sh.journalSources(journalReleases);
   if (nextSnap) {
+    if (sh.journalBasis) sh.journalBasis(nextSnap.basis, nextSnap.version);
     sh.diag(nextSnap.kind, nextSnap.kind === 'snap' ?
       { sit: nextSnap.sit.sitKey, basis: nextSnap.basis, version: nextSnap.version } : nextSnap.msg);
     sh.bus.emit(nextSnap.kind, nextSnap.kind === 'snap' ? nextSnap.sit : nextSnap.msg);
@@ -1166,6 +1257,12 @@ function applySummary(sum) {
   st.gameState = (status && status.type && status.type.state) || '';
   st.statusName = (status && status.type && status.type.name) || '';
   var plays = collectPlays(sum), abbr = teamAbbrs(sum);
+  if (sh.journalGame) sh.journalGame({ league: sh.league(), gameId: st.gameId,
+    label: (sum.header && (sum.header.shortName || sum.header.name)) || Object.values(abbr).join(' vs '),
+    teams: ((comp && comp.competitors) || []).map(function (c) { return { id: String(c.id),
+      abbreviation: c.team && c.team.abbreviation, name: c.team && c.team.displayName, homeAway: c.homeAway }; }),
+    status: st.gameState === 'post' ? 'final' : st.gameState === 'in' ? 'live' : 'scheduled' });
+  var journalArrivals = [];
   var health = window.FootballFeed.inspectClocks(plays, status || {});
   var first = !st.primed, now = Date.now(), last = plays.length - 1;
   var responseGap = st.lastOk ? now - st.lastOk : null;
@@ -1189,6 +1286,7 @@ function applySummary(sum) {
     var p = plays[i], id = String(p.id), previous = st.seen[id];
     var fingerprint = playFingerprint(p);
     if (previous && previous.fingerprint === fingerprint) continue;
+    journalArrivals.push({ report: p, observedAt: now, source: 'espn' });
     var backlog = first && i < last;
     var backfill = !first && !previous && i < newestKnown;
     var facts = window.FootballPlay.describe(p, abbr);
@@ -1220,6 +1318,7 @@ function applySummary(sum) {
       sitKey: playSitKey(p, abbr), gained: facts.gained, need: facts.need
     });
   }
+  if (sh.journalSources && journalArrivals.length) sh.journalSources(journalArrivals);
   if (added || revised) st.lastChange = now;
   var sit = preSnap(sum, plays, health);
   var basisIndex = last;
@@ -1353,13 +1452,29 @@ function renderFeed() {
       ((r.meaning || r.depthText || r.related) ? '<details class="play-understand" data-understand="' + sh.esc(r.id) + '"' + (understood[r.id] ? ' open' : '') + '><summary>Understand this play</summary>' +
         (r.depthText ? '<p>' + sh.esc(r.depthText) + '</p><span class="depth-caption">' + (r.depthSource === 'reported spots' ? 'Calculated from the positions in the play report.' : 'Distances supplied by the play report.') + '</span>' : '') +
         (r.meaning ? '<p>' + window.FootballGlossary.annotate(r.meaning) + '</p>' : '') +
-        (r.related ? '<button type="button" class="depth-link" data-lesson="' + sh.esc(r.related.lesson.id) + '" data-lesson-context="' + sh.esc(r.related.reason) + '" aria-haspopup="dialog" aria-controls="learningSheet">' + sh.esc(r.related.lesson.title) + ' <span aria-hidden="true">↗</span></button>' : '') + '</details>' : '') +
+        (r.related ? '<button type="button" class="depth-link" data-lesson="' + sh.esc(r.related.lesson.id) + '" data-lesson-origin="reported-play" data-lesson-play="' + sh.esc(r.id) + '" data-lesson-journal-key="' + sh.esc(sh.journalKey ? sh.journalKey() : '') + '" data-lesson-context="' + sh.esc(r.related.reason) + '" aria-haspopup="dialog" aria-controls="learningSheet">' + sh.esc(r.related.lesson.title) + ' <span aria-hidden="true">↗</span></button>' : '') + '</details>' : '') +
       (r.raw ? '<details class="play-details" data-play="' + sh.esc(r.id) + '"' +
         (detailsOpen ? ' open' : '') + '><summary>ESPN play report</summary><p class="pl3">' +
         sh.esc(r.raw) + '</p></details>' : '') +
       '</div>';
   }
   el.innerHTML = h;
+  if (sh.journalShown) {
+    st.journalFeed = st.journalFeed || {};
+    st.rows.forEach(function (r) {
+      if (st.journalFeed[r.id] === r.version || !st.released[r.id]) return;
+      st.journalFeed[r.id] = r.version;
+      sh.journalShown({ kind: 'play', playId: r.id, report: st.released[r.id],
+        facts: window.FootballPlay.describe(st.released[r.id], teamAbbrs(st.sum)),
+        lines: { summary: r.plain, consequence: r.consequence, players: r.players,
+          situation: r.dd, offense: r.off,
+          clock: st.health && st.health.unreliableIds.indexOf(r.id) >= 0 ? (r.period ? 'Q' + r.period : '') : r.when,
+          facts: r.facts.map(function (f) { return f === 'Shotgun' ? 'Quarterback starts back from center' : f === 'No huddle' ? 'Offense lines up without a huddle' : f; }),
+          meaning: understood[r.id] ? r.meaning : null, depth: understood[r.id] ? r.depthText : null,
+          report: (expanded[r.id] === undefined ? r.reportFirst : expanded[r.id]) ? r.raw : null },
+        historicalOnArrival: r.observedAt === null, timingIssue: r.timingIssue });
+    });
+  }
 }
 function renderInsights() {
   var plays = Object.keys(st.released).map(function (id) { return st.released[id]; }).sort(function (a, b) {
@@ -1561,11 +1676,12 @@ function pollScoreboard(force) {
   });
 }
 function resetGame() {
+  if (sh.journalReset) sh.journalReset();
   gameGeneration += 1;
   clearTimeout(pollTimer);
   if (pollRequest) pollRequest.controller.abort();
   pollRequest = null;
-  st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = []; st.released = {};
+  st.journalFeed = {}; st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = []; st.released = {};
   window.FootballDepth.renderInsights({ drive: null, teams: [] });
   st.health = null; st.lastQueuedHealth = ''; st.lastChange = 0;
   st.syncCandidate = null; st.syncSample = null; st.timingBreak = null;
@@ -1660,6 +1776,14 @@ sh.bus.on('boot', function () {
 })(shell);
 
 // ================================================================= shell wiring
+$('teachingLevel').value = teachingLevel;
+window.FootballDepth.setTeachingLevel(teachingLevel);
+$('teachingLevel').addEventListener('change', function () {
+  teachingLevel = this.value === 'basics' ? 'basics' : 'game';
+  lsSet(LS.teachingLevel, teachingLevel);
+  window.FootballDepth.setTeachingLevel(teachingLevel);
+  bus.emit('teaching');
+});
 $('shortHints').checked = shortHints;
 $('shortHints').addEventListener('change', function () {
   shortHints = this.checked;
@@ -1757,7 +1881,8 @@ paintDelay();
 
 Promise.all([
   jget('cards.json').then(function (c) { CARDS = c; window.FootballGlossary.configure(c.concepts); }),
-  loadTables()
+  loadTables(),
+  jget('build-info.json').then(function (info) { artifacts.build = info; }).catch(function () {})
 ]).then(function () {
   bus.emit('tables');
   bus.emit('boot');

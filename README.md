@@ -8,9 +8,17 @@ The app puts a concrete watching suggestion first, with the next down, field pos
 
 Open **Understand this play** for the meaning of a gain and, when verified, the yards through the air versus after the catch. The drive story separates progress on plays from penalties. **So far in this game** shows observed player involvement and direction with coverage counts. These views use the full released history, even though the visible feed keeps only the latest 25 rows.
 
+**Read the game** is the default teaching level: 11 lessons on defensive reactions, space, leverage, protection, and where yards come from. **Start with basics** keeps the original eight introductory lessons available in Games. Both levels use plain language and definitions on tap.
+
 **See the idea** opens an illustrative diagram and an optional observation question. Answers are self-reported, never checked against the feed or treated as mastery. **Explore plays** offers six real examples from nflverse, FTN Data, and CollegeFootballData, with source and license links.
 
 Choose a game, measure or set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
+
+**Game journal** saves source revisions, released play explanations, exact watching prompts and optional observations in this browser. Journals survive reloads and can be downloaded or removed. Storage is bounded and reports failures; it never silently removes old games. The old Vercel address and the new domain have separate browser storage.
+
+Open **post-game review** only when finished watching. Any saved game can request ESPN's final report; published college reviews also join available CFBD passing and rushing detail by exact game/play/offense IDs. The first enriched review is Boise State at Oregon. Reviews highlight different lessons, compare recorded explanations with later facts, and retain unmatched/missing data. Added detail is separated from corrections. Historical sessions from before journaling cannot be reconstructed.
+
+The completed [coaching/history pilot](docs/COACHING-PILOT-2026-09-05.md) tested eight NFL seasons and verified actual play-calling roles. Score/time context helped offline; extra years alone did not, and one caller's career transfer remains inconclusive. Production probabilities are unchanged.
 
 ## Data and limits
 
@@ -23,7 +31,8 @@ Both shipped tendency tables now cover 2023–2025. The NFL refresh adds 104,878
 The live app is in `web/`. The root `index.html` is the frozen broadcast-timing instrument, published at `/stopwatch`.
 
 ```sh
-python3 -m http.server 8765 --bind 127.0.0.1 --directory web
+node scripts/build-web.mjs
+python3 -m http.server 8765 --bind 127.0.0.1 --directory .vercel-build
 node --test tests/*.test.js
 .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
 ```
@@ -41,3 +50,15 @@ vercel deploy --prod --yes --scope nates-projects-925609f4
 ```
 
 Vercel project: `football-companion`. Git pushes alone do not deploy this project.
+
+## Publish an enriched college review
+
+```sh
+.venv/bin/python engine/export_game_review.py --game 401858433 --team Oregon --year 2026 --refresh
+# Or find a team's finished game today:
+.venv/bin/python engine/export_game_review.py --recent --team Oregon --refresh
+```
+
+This uses the existing private CFBD key, caches raw source versions under ignored `data/`, and writes public facts to `web/reviews/`. Publish those files with the app. Other games can still be reviewed against ESPN directly; richer CFBD fields arrive only after the export is refreshed. This task does not add a paid feed or background collection service.
+
+Builds produce a SHA-256 manifest for the deployed assets. Each journal entry records its build fingerprint and historical-table period, enabling later analysis of the version actually shown. See [journal implementation and verification](docs/JOURNAL-2026-09-05.md).

@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="learning.css">
 <link rel="stylesheet" href="depth.css">
+<link rel="stylesheet" href="review.css">
 </head>
 <body>
 
@@ -52,6 +53,10 @@
 <div id="err" role="status"></div>
 
 <main class="workspace">
+  <div class="journal-toolbar">
+    <button id="openJournal" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="reviewSheet">Game journal <span aria-hidden="true">↗</span></button>
+    <span id="journalStatus" role="status">Saved in this browser</span>
+  </div>
   <div class="read-column">
     <section id="prime" aria-label="Before the snap" tabindex="-1">
       <div class="card-heading"><span class="eyebrow">Before the snap</span><span class="card-symbol" aria-hidden="true">↗</span></div>
@@ -124,6 +129,8 @@
     <p class="note">Use <b>See the idea</b> for a diagram and a question about what you noticed. Those answers are your observations, not a graded quiz. Diagrams explain the concept; they do not reconstruct the players’ actual paths.</p>
     <p class="note"><b>Explore plays</b> uses named examples from past games, including NFL charting from FTN Data via nflverse. Historical examples are separate from the live game. Passing detail is shown only when its numbers agree with the play report.</p>
     <p class="note">If the app gets ahead of your TV, use <b>TV delay</b> to hold cards, plays, and scores by 0–90 seconds. Adjust it as you watch. Your occasional picks are practice: a correct prediction does not measure your understanding of a football concept.</p>
+    <p class="note"><b>Game journal</b> keeps the guidance you saw and the reports that arrived, including later corrections. Open a finished game for a review. Your journal stays in this browser on this website; use Download to keep a copy. It does not follow you between the old Vercel address and fluentin.football.</p>
+    <p class="note">Teaching starts with reading the game: defensive reactions, space, and the decisions a play creates. Choose <b>Start with basics</b> in Games if you want more explanation of the rules and positions.</p>
   </div>
 </div>
 
@@ -146,6 +153,7 @@
       </div>
     </div>
     <div class="grouphead">Hints</div>
+    <label class="teaching-option" for="teachingLevel"><b>Teaching level</b><select id="teachingLevel"><option value="game">Read the game</option><option value="basics">Start with basics</option></select><small>Keep the language clear. Choose how much football to assume.</small></label>
     <label class="hint-option"><span><b>Shorter hints</b><small>Leave out definitions. You can still tap a term to look it up.</small></span><input type="checkbox" id="shortHints"></label>
     <div class="grouphead">Your calls</div>
     <p class="note" id="callSummary">No graded picks yet.</p>
@@ -204,12 +212,21 @@
   </div>
 </div>
 
+<div id="reviewSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="reviewTitle" inert>
+  <div class="sheetInner review-panel">
+    <div class="sheetTop"><span class="ttl" id="reviewTitle">Game journal</span><button id="closeReview" class="closex" type="button">Close</button></div>
+    <div id="reviewContent"></div>
+  </div>
+</div>
+
 <script src="play-facts.js"></script>
 <script src="feed-health.js"></script>
 <script src="game-insights.js"></script>
 <script src="learning.js"></script>
 <script src="glossary.js"></script>
 <script src="depth-ui.js"></script>
+<script src="journal.js"></script>
+<script src="review-ui.js"></script>
 <script src="app.js"></script>
 <script src="ui.js"></script>
 </body>

@@ -67,3 +67,7 @@ connector's authorization.
 As checked on 2026-09-05, the Vercel project has no Git integration (`link: null`).
 A GitHub push, including the weekly tendency refresh, does not by itself deploy
 the site. Deploy explicitly after validating changes.
+
+## Journal build fingerprints
+
+The static build now runs `node scripts/build-web.mjs`. It copies `web/`, preserves `/stopwatch`, and generates `build-info.json` containing SHA-256 hashes and a content-derived build ID. No credentials or raw private data enter the output. Serve `.vercel-build` locally to test the same artifacts as production.

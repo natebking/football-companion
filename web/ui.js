@@ -46,9 +46,12 @@
         document.body.style.overflow = '';
         if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
         restoreFocus = null;
+        window.dispatchEvent(new CustomEvent('football-view-visible'));
       }
     }).observe(sheet, { attributes: true, attributeFilter: ['class'] });
   });
+
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') window.dispatchEvent(new CustomEvent('football-view-visible')); });
 
   document.addEventListener('keydown', function (event) {
     var definition = document.querySelector('#termPopover:popover-open');
@@ -74,7 +77,7 @@
       return;
     }
     if (event.key !== 'Tab') return;
-    var controls = Array.from(active.querySelectorAll('button, input, a[href], summary, [tabindex="0"]'))
+    var controls = Array.from(active.querySelectorAll('button, input, select, a[href], summary, [tabindex="0"]'))
       .filter(function (element) { return !element.disabled && element.getClientRects().length; });
     var first = controls[0], last = controls[controls.length - 1];
     if (event.shiftKey && (document.activeElement === first || !active.contains(document.activeElement))) {

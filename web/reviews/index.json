@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "reviews": [
+    {
+      "key": "cfb:401858433",
+      "league": "cfb",
+      "gameId": "401858433",
+      "label": "Boise State at Oregon",
+      "status": "final",
+      "reviewedAt": "2026-09-06T02:11:19.607003+00:00",
+      "path": "cfb-401858433.json"
+    }
+  ]
+}

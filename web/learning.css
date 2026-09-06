@@ -16,12 +16,17 @@
 .learning-defender-path { stroke: var(--learning-defense); }
 .learning-pass { stroke: #b5d9ef; stroke-dasharray: 5 6; }
 .learning-arrowhead.learning-pass { stroke-dasharray: none; }
+.learning-alternative { stroke: #b5d9ef; stroke-dasharray: 6 6; }
+.learning-arrowhead.learning-alternative { stroke-dasharray: none; }
 .learning-guide { fill: none; stroke: var(--field-ink); stroke-width: 1; stroke-opacity: .6; }
 .learning-highlight { fill: none; stroke: var(--learning-route); stroke-width: 2; stroke-dasharray: 3 4; }
 .learning-zone { fill: var(--learning-route); fill-opacity: .09; stroke: var(--learning-route); stroke-opacity: .35; stroke-dasharray: 4 5; }
 .learning-endzone { fill: var(--field-ink); fill-opacity: .1; }
 .learning-boundary { stroke: var(--field-ink); stroke-width: 3; }
 .learning-marker { stroke: var(--learning-defense); stroke-width: 2; stroke-dasharray: 8 6; }
+.learning-level { color: var(--dim); font-size: .75rem; margin: 0 0 .5rem; }
+.learning-next { padding: .85rem 1rem; border-left: 3px solid var(--accent); background: var(--surface); line-height: 1.6; }
+.learning-next b { display: block; margin-bottom: .25rem; font-size: .8rem; }
 @media (forced-colors: active) {
   .learning-diagram { forced-color-adjust: none; }
 }

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-09-05",
+  "scope": "A reported-primary-play-caller pilot, not a league-wide staff database or a per-snap audit of who spoke into the headset.",
+  "sources": {
+    "no_2018": {"title": "Sean Payton NFC Championship media availability", "published": "2019-01-18", "url": "https://www.neworleanssaints.com/news/quotes-from-saints-coach-sean-payton-s-nfc-championship-media-availability-x1213", "supports": "Payton describes calling plays from field level during the 2018 postseason, with Carmichael and other assistants contributing."},
+    "no_2019": {"title": "Sean Payton postgame quotes, Cardinals 2019 Week 8", "published": "2019-10-27", "url": "https://www.neworleanssaints.com/news/transcript-new-orleans-saints-head-coach-sean-payton-postgame-quotes-saints-card", "supports": "Payton discusses his play-calling decisions with Brees back in the lineup."},
+    "no_2020": {"title": "Saints season-opening victory over Tampa Bay", "published": "2020-09-13", "url": "https://www.neworleanssaints.com/news/timely-contributions-by-each-unit-fuel-new-orleans-saints-victory-over-tampa-bay", "supports": "Team report explicitly attributes offensive play-calling to Payton."},
+    "no_2021": {"title": "Sean Payton conference call, October 21", "published": "2021-10-21", "url": "https://www.neworleanssaints.com/news/saints-transcripts-sean-payton-conference-call-thursday-october-21-quotes", "supports": "Payton answers questions about his responsibilities as play caller and Winston's effect on play calls."},
+    "no_exception": {"title": "Dennis Allen media availability, December 17", "published": "2021-12-17", "url": "https://www.neworleanssaints.com/news/saints-transcripts-dennis-allen-media-availability-friday-december-17", "supports": "Allen announces Carmichael will call offense against Tampa Bay while Payton is absent with COVID-19."},
+    "no_departure": {"title": "Sean Payton to step away", "published": "2022-01-25", "url": "https://www.neworleanssaints.com/news/sean-payton-new-orleans-saints-head-coach-step-away-nfl-retirement-012522", "supports": "Payton leaves New Orleans after 2021; original hire January 18, 2006."},
+    "den_hire": {"title": "Sean Payton official biography", "published": null, "url": "https://www.denverbroncos.com/team/coaches-roster/sean-payton", "supports": "Denver appointed Payton February 3, 2023; he coached Denver in 2023–25 after New Orleans."},
+    "den_staff": {"title": "Broncos announce coaching hires", "published": "2023-02-25", "url": "https://www.denverbroncos.com/news/broncos-announce-series-of-coaching-hires", "supports": "Joe Lombardi's offensive coordinator title is separate from Payton's head coach role."},
+    "den_caller_change": {"title": "Payton announces Davis Webb will call plays", "published": "2026-02-24", "url": "https://www.denverbroncos.com/news/i-wouldn-t-do-it-if-i-didn-t-think-it-was-going-to-help-our-team-win-hc-sean-payton-announces-oc-davis-webb-to-call-plays-for-broncos-offense", "supports": "Payton transfers play-calling responsibility to Webb for 2026 while remaining head coach."},
+    "den_confirmation": {"title": "Davis Webb entering his first season as Broncos offensive coordinator", "published": "2026-06-11", "url": "https://www.denverbroncos.com/news/davis-webb-blessed-and-thankful-to-have-hc-sean-payton-as-resource-entering-first-season-as-broncos-oc", "supports": "Webb is a first-time regular-season caller in 2026 after three seasons learning from Payton; 2025 preseason play-calling is distinguished."}
+  },
+  "assignments": [
+    {"team": "NO", "seasons": [2018, 2019, 2020, 2021], "headCoach": "Sean Payton", "offensiveCoordinator": "Pete Carmichael", "playCaller": "Sean Payton", "callerId": "sean_payton", "tenureId": "sean_payton_NO", "headCoachAppointed": "2006-01-18", "roleEnded": "2022-01-25", "datePrecision": "season-level caller assignment with game exception below", "sourceIds": ["no_2018", "no_2019", "no_2020", "no_2021", "no_departure"]},
+    {"team": "DEN", "seasons": [2023, 2024, 2025], "headCoach": "Sean Payton", "offensiveCoordinator": "Joe Lombardi", "playCaller": "Sean Payton", "callerId": "sean_payton", "tenureId": "sean_payton_DEN", "headCoachAppointed": "2023-02-03", "callerChangeAnnounced": "2026-02-24", "datePrecision": "regular season and postseason only; caller handoff effective for 2026", "sourceIds": ["den_hire", "den_staff", "den_caller_change", "den_confirmation"]},
+    {"team": "DEN", "seasons": [2026], "headCoach": "Sean Payton", "offensiveCoordinator": "Davis Webb", "playCaller": "Davis Webb", "callerId": "davis_webb", "tenureId": "davis_webb_DEN", "callerChangeAnnounced": "2026-02-24", "datePrecision": "regular season starts in 2026; announcement date is not a game date", "sourceIds": ["den_caller_change", "den_confirmation"], "includedInExperiment": false}
+  ],
+  "exceptions": [
+    {"gameId": "2021_15_NO_TB", "team": "NO", "headCoach": "Dennis Allen (acting)", "playCaller": "Pete Carmichael", "gameDate": "2021-12-19", "sourceIds": ["no_exception"], "excludeFromCallerTraining": true, "reason": "Verified temporary replacement; retained in league/team training but excluded from Payton's history."}
+  ],
+  "limitations": [
+    "Only one transferring play caller is covered. Unmapped teams and seasons remain unknown; they are never assigned the head coach by default.",
+    "Official reports establish the primary role, not a snap-by-snap audit. Shared decisions and unreported temporary delegation may remain.",
+    "Published retrospective role confirmation does not reveal play outcomes to the model; nevertheless this is reconstructed historical metadata, not a database archived before each kickoff.",
+    "The 2026 caller change is source-backed context and a boundary test only. No 2026 outcomes enter training or evaluation."
+  ]
+}

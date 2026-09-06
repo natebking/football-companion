@@ -1,0 +1,39 @@
+.journal-toolbar { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: -12px; }
+#journalStatus { font-size: .75rem; color: var(--dim); text-align: right; max-width: 65%; }
+.teaching-option { display: grid; gap: 8px; margin-bottom: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.teaching-option select { width: 100%; min-height: 44px; padding: 8px; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.teaching-option small { color: var(--dim); font-size: .75rem; }
+select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+#reviewSheet .review-panel { max-width: 760px; }
+.review-lead { font-size: 1.65rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.2; margin: 22px 0 12px; }
+.review-game-list { display: grid; gap: 12px; margin: 26px 0; }
+.review-game { position: relative; display: grid; gap: 9px; width: 100%; text-align: left; padding: 20px 46px 20px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.review-game b { font-size: 1.2rem; }
+.review-game > span:not(.eyebrow):not(.review-arrow) { color: var(--dim); font-size: .875rem; }
+.review-arrow { position: absolute; right: 18px; top: 42%; color: var(--accent); }
+.review-game:hover { border-color: var(--accent); }
+.review-empty, .review-warning { padding: 18px; margin: 18px 0; border-radius: 10px; background: var(--surface); }
+.review-warning { color: var(--warn); background: var(--warn-bg); }
+.review-invitation { padding: 24px; margin: 20px 0; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 12px; background: var(--card); }
+.review-invitation h2 { margin: 8px 0 12px; font-size: 1.5rem; letter-spacing: -.035em; }
+.review-invitation > p { color: var(--dim); font-size: .9375rem; margin: 12px 0; }
+.review-invitation .review-spoiler { font-size: .8125rem; color: var(--warn); }
+.review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 28px; }
+.review-section-title { font-size: 1.125rem; margin: 24px 0 12px; }
+.journal-prompt { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.journal-prompt > p { margin-top: 8px; }
+.review-final { color: var(--dim); padding: 20px 0 10px; font-size: 1.125rem; }
+.review-final b { color: var(--text); }
+.review-moment { padding: 24px 0; border-bottom: 1px solid var(--line); }
+.review-moment h2 { font-size: 1.375rem; margin: 10px 0 16px; letter-spacing: -.035em; }
+.review-moment > p { margin: 14px 0; }
+.review-yards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; border-radius: 10px; background: var(--surface); font-size: .8125rem; color: var(--dim); }
+.review-yards b { display: block; font: 700 2.5rem/1 var(--heading); color: var(--accent); margin-bottom: 8px; }
+.review-audit { margin-top: 28px; padding: 22px; background: var(--surface); border-radius: 12px; }
+.review-audit h2 { margin-bottom: 12px; font-size: 1.2rem; }
+.review-audit > p { font-size: .9375rem; }
+.review-change { padding: 12px 0; font-size: .875rem; }
+.review-source-list { margin-top: 24px; color: var(--dim); }
+.review-source-list a { color: var(--accent); }
+#reviewContent { overflow-wrap: anywhere; }
+@media (max-width: 759px) { .journal-toolbar { margin-bottom: 0; } .review-invitation, .review-audit { padding: 18px; } }
