@@ -114,6 +114,8 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 .feedhead h1 { font: 700 1.625rem/1.2 var(--heading); text-transform: uppercase; letter-spacing: .01em; }
 .feedhead > span { font-size: .75rem; color: var(--faint); }
 #feed { padding-left: 17px; border-left: 1px solid var(--line); margin: 20px 0 0 4px; }
+.feed-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.feed-controls span { color: var(--dim); font-size: .75rem; }
 .play { position: relative; padding: 0 0 21px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
 .play::before { content: ""; position: absolute; left: -22px; top: 8px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--bg); background: var(--line); }
 .play:first-child::before { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }

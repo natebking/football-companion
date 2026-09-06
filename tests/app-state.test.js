@@ -44,7 +44,9 @@ test('repeated wake-up polls share one active request and one next timer', async
 
 test('a late response cannot overwrite a newly selected game, even if abort is ignored', async () => {
   const h = polling();
+  h.context.st.feedExpanded = true;
   h.context.pollGame(); h.context.selectGame('B');
+  assert.equal(h.context.st.feedExpanded, false, 'A newly selected game starts with the short feed.');
   assert.equal(h.requests.length, 2);
   assert.equal(h.requests[0].signal.aborted, true);
   assert.equal(h.requests[1].url, 'cfb/B');
@@ -125,11 +127,13 @@ test('brief hints are an explicit preference, independent of prediction history'
 
 test('switching leagues clears the old game before its new table or schedule arrives', async () => {
   const h = polling();
+  h.context.st.feedExpanded = true;
   h.context.st.queue = [{ kind: 'play', row: 'CFB play' }];
   h.context.st.released = { 'old-cfb': { id: 'old-cfb' } };
   h.context.pollGame();
   h.setLeague('nfl'); h.context.clearLeague();
   assert.equal(h.context.st.gameId, null);
+  assert.equal(h.context.st.feedExpanded, false);
   assert.equal(h.context.st.queue.length, 0);
   assert.equal(Object.keys(h.context.st.released).length, 0);
   assert.equal(h.insights.at(-1).drive, null);
@@ -771,4 +775,64 @@ test('journal guidance stores displayed probability and exact wording separately
   assert.equal(saved[0].modelProbability, 0.41777); assert.equal(saved[0].lines.tendency, text.pTen);
   c.st.card.prints_number = false; c.st.journalSignature = ''; c.captureGuidance();
   assert.equal(saved[1].probabilityShown, null);
+});
+
+function feedView(count = 8) {
+  const saved = [], elements = {};
+  const row = number => ({ id: String(number), version: 'v1', off: 'ORE', dd: '1st & 10',
+    when: 'Q1 10:00', kind: 'run', plain: 'Run for 4 yards.', facts: [], observedAt: 1 });
+  const rows = Array.from({ length: count }, (_, i) => row(count - i));
+  const context = vm.createContext({
+    FEED_PREVIEW: 5,
+    st: { rows, released: Object.fromEntries(rows.map(r => [r.id, { id: r.id }])),
+      sum: null, health: null, feedExpanded: false },
+    sh: { esc: value => String(value ?? ''), journalShown: entry => saved.push(entry) },
+    window: { FootballGlossary: { annotate: value => value }, FootballPlay: { describe: report => report } },
+    teamAbbrs: () => ({}),
+    $: id => elements[id] || (elements[id] = {
+      innerHTML: '', hidden: false, textContent: '', attributes: {},
+      querySelectorAll: () => [], setAttribute(name, value) { this.attributes[name] = value; }
+    })
+  });
+  const begin = source.indexOf('function renderFeed(');
+  vm.runInContext(source.slice(begin, source.indexOf('function renderInsights(', begin)), context);
+  return { context, elements, saved, row };
+}
+
+test('collapsed older reports enter the viewing journal only when the feed is expanded', () => {
+  const h = feedView();
+  h.context.renderFeed();
+  assert.deepEqual(h.saved.map(entry => entry.playId), ['8', '7', '6', '5', '4']);
+  assert.equal(h.context.st.rows.length, 8, 'Collapsing does not discard available reports.');
+  assert.equal(Object.keys(h.context.st.released).length, 8, 'Analysis retains every released report.');
+  // A correction can arrive while its older report is hidden. The journal
+  // should capture the version actually revealed, not either hidden version.
+  h.context.st.rows[7].version = 'v2';
+  h.context.st.rows[7].plain = 'Run for 5 yards.';
+  h.context.st.released['1'] = { id: '1', corrected: true };
+  h.context.renderFeed();
+  assert.equal(h.saved.length, 5);
+  h.context.st.feedExpanded = true;
+  h.context.renderFeed();
+  assert.deepEqual(h.saved.map(entry => entry.playId), ['8', '7', '6', '5', '4', '3', '2', '1']);
+  assert.equal(h.saved.at(-1).lines.summary, 'Run for 5 yards.');
+  assert.equal(h.saved.at(-1).report.corrected, true);
+  h.context.st.feedExpanded = false;
+  h.context.renderFeed();
+  h.context.st.feedExpanded = true;
+  h.context.renderFeed();
+  assert.equal(h.saved.length, 8, 'Toggling does not duplicate unchanged viewing records.');
+});
+
+test('an expanded feed stays expanded as newly released plays are rendered', () => {
+  const h = feedView();
+  h.context.st.feedExpanded = true;
+  h.context.renderFeed();
+  h.context.st.rows.unshift(h.row(9));
+  h.context.st.released['9'] = { id: '9' };
+  h.context.renderFeed();
+  assert.equal(h.context.st.feedExpanded, true);
+  assert.equal(h.elements.feedToggle.attributes['aria-expanded'], 'true');
+  assert.equal(h.saved.length, 9);
+  assert.equal(h.saved.at(-1).playId, '9');
 });

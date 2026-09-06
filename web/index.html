@@ -107,7 +107,10 @@
     </details>
     <div class="feedhead"><h1 id="feedTitle">Recent plays</h1><span>Latest first</span></div>
     <div id="feed"><div class="empty">Waiting for the first play.</div></div>
-
+    <div id="feedControls" class="feed-controls" hidden>
+      <button id="feedToggle" class="ghost" type="button" aria-expanded="false" aria-controls="feed">Show more plays</button>
+      <span id="feedCount"></span>
+    </div>
   </section>
   <footer class="learning-footer">
     <button id="exploreExamples" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="learningSheet">Explore past plays <span aria-hidden="true">↗</span></button>

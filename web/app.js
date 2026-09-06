@@ -919,10 +919,11 @@ sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedg
 // Everything ESPN. Allowed to know what happened.
 (function initLive(sh) {
 
+var FEED_PREVIEW = 5;
 var st = {
   gameId: null, games: [], gameLabel: '', gameState: '',
   sum: null,                 // latest raw summary, this scope only
-  seen: {}, order: {}, queue: [], rows: [], released: {}, shownPlay: null,
+  seen: {}, order: {}, queue: [], rows: [], released: {}, shownPlay: null, feedExpanded: false,
   health: null, lastQueuedHealth: '', lastChange: 0, syncCandidate: null, syncSample: null, timingBreak: null,
   lastQueuedSit: '', lastQueuedBasis: '', primed: false, lastOk: 0, sheet: false
 };
@@ -1430,6 +1431,13 @@ function paintConnection() {
 }
 function renderFeed() {
   var el = $('feed');
+  var visibleRows = st.feedExpanded ? st.rows : st.rows.slice(0, FEED_PREVIEW);
+  var more = st.rows.length > FEED_PREVIEW;
+  var remaining = st.rows.length - visibleRows.length;
+  $('feedControls').hidden = !more;
+  $('feedToggle').setAttribute('aria-expanded', String(st.feedExpanded));
+  $('feedToggle').textContent = st.feedExpanded ? 'Show fewer plays' : 'Show ' + remaining + ' more ' + (remaining === 1 ? 'play' : 'plays');
+  $('feedCount').textContent = 'Showing ' + visibleRows.length + ' of ' + st.rows.length + ' recent plays';
   if (!st.rows.length) {
     el.innerHTML = '<div class="empty">Waiting for the first play.</div>';
     return;
@@ -1447,7 +1455,7 @@ function renderFeed() {
         fact === 'No huddle' ? 'Offense lines up without a huddle' : fact;
       return '<span class="play-fact">' + sh.esc(label) + '</span>';
     }).join('');
-    h += '<div class="play">' +
+    h += '<div class="play"' + (i >= visibleRows.length ? ' hidden' : '') + '>' +
       '<div class="pl1">' + (r.off ? '<b>' + sh.esc(r.off) + '</b>' : '') +
       '<span>' + sh.esc(r.dd) + '</span>' +
       '<span class="t num">' + sh.esc(st.health && st.health.unreliableIds.indexOf(r.id) >= 0 ? (r.period ? 'Q' + r.period : '') : r.when) + '</span></div>' +
@@ -1468,7 +1476,7 @@ function renderFeed() {
   el.innerHTML = h;
   if (sh.journalShown) {
     st.journalFeed = st.journalFeed || {};
-    st.rows.forEach(function (r) {
+    visibleRows.forEach(function (r) {
       if (st.journalFeed[r.id] === r.version || !st.released[r.id]) return;
       st.journalFeed[r.id] = r.version;
       sh.journalShown({ kind: 'play', playId: r.id, report: st.released[r.id],
@@ -1701,7 +1709,7 @@ function resetGame() {
   clearTimeout(pollTimer);
   if (pollRequest) pollRequest.controller.abort();
   pollRequest = null;
-  st.journalFeed = {}; st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = []; st.released = {};
+  st.journalFeed = {}; st.sum = null; st.seen = {}; st.order = {}; st.queue = []; st.rows = []; st.released = {}; st.feedExpanded = false;
   window.FootballDepth.renderInsights({ drive: null, teams: [] });
   st.health = null; st.lastQueuedHealth = ''; st.lastChange = 0;
   st.syncCandidate = null; st.syncSample = null; st.timingBreak = null;
@@ -1733,6 +1741,14 @@ function selectGame(id) {
 }
 
 // ---------------------------------------------------------------- wiring
+$('feedToggle').addEventListener('click', function () {
+  st.feedExpanded = !st.feedExpanded;
+  renderFeed();
+  if (!st.feedExpanded) {
+    this.scrollIntoView({ block: 'nearest' });
+    this.focus({ preventScroll: true });
+  }
+});
 $('pickBtn').addEventListener('click', function () {
   st.sheet = true;
   $('sheet').className = 'sheet on';
