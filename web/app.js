@@ -14,7 +14,7 @@
  *
  *   PRIME   The card. Situation, tendency, watch instruction, the ask. It is a
  *           sibling scope of LIVE, so no ESPN variable is in its lexical scope
- *           at all. It receives exactly two records:
+ *           at all. It receives approved records:
  *             bus 'snap'    a frozen pre-snap whitelist, built in LIVE by
  *                           copying a fixed list of keys. No play text, yards
  *                           gained, scoring flag or turnover flag exists on it.
@@ -23,6 +23,9 @@
  *                           a call he already committed to. It arrives after
  *                           the reveal, never before it. Optional reported
  *                           players, formations and direction stay in LIVE.
+ *             bus 'evidence' a whitelist of aggregates from ALREADY released
+ *                           reports. Named counts and drive totals can select
+ *                           a read; no raw source object crosses this boundary.
  *
  * DELAY QUEUE, in LIVE. Nothing reaches the screen, card or feed or score,
  * before observed_at + the user's broadcast delay. The delay is a setting,
@@ -40,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-05-game-journal';
+var VERSION = '2026-09-06-evidence-reads';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -60,7 +63,7 @@ var NFL_ALIAS = { LAR: 'LA', WSH: 'WAS', JAC: 'JAX' };
 
 var LS = {
   league: 'fc_league', game: 'fc_game_',
-  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag', shortHints: 'fc_short_hints', teachingLevel: 'fc_teaching_level'
+  ledger: 'fc_ledger', asks: 'fc_asks', delay: 'fc_delay', diag: 'fc_diag', shortHints: 'fc_short_hints', teachingLevel: 'fc_teaching_level', questions: 'fc_questions'
 };
 var DIAG_MAX = 500;
 
@@ -96,6 +99,7 @@ var bus = makeBus();
 var league = lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
 var shortHints = lsGet(LS.shortHints) === '1';
 var teachingLevel = lsGet(LS.teachingLevel) === 'basics' ? 'basics' : 'game';
+var predictionQuestions = lsGet(LS.questions) === '1';
 var delaySec = (function () {
   var n = parseInt(lsGet(LS.delay), 10);
   return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : 0;
@@ -274,6 +278,7 @@ var shell = {
   cards: function () { return CARDS; },
   shortHints: function () { return shortHints; },
   teachingLevel: function () { return teachingLevel; },
+  predictionQuestions: function () { return predictionQuestions; },
   journalReset: function () { journalContext = { key: null, basisPlayId: null, basisRevision: null }; },
   journalGame: journalGame, journalSources: journalSources, journalShown: journalShown,
   journalObservation: journalObservation,
@@ -294,6 +299,7 @@ var shell = {
 (function initPrime(sh) {
 
 var st = {
+  evidence: null, read: null, readHistory: [],
   sit: null, sitKey: '', card: null, ten: null, lesson: null,
   sitLine: '', tendLine: '', watchLine: '', attributed: false, rate: null,
   ask: null,          // {id, kind, q, opts, priority}
@@ -301,7 +307,7 @@ var st = {
   pending: null,      // {sitKey, cardId, askId, kind, concepts, answer, latency}
   res: null,          // resolution strip
   skippedGrade: false,
-  sinceAsk: 99,       // start high so the mechanic shows itself on the first card
+  sinceAsk: 0,
   gap: 7,
   quiet: 'Pick a game to start.',
   hold: '',
@@ -396,8 +402,8 @@ function cardApplies(c, sit, rate) {
   if (typeof a.max_clock_seconds === 'number') {
     if (sit.clockSeconds === null || sit.clockSeconds > a.max_clock_seconds) return false;
   }
-  if (typeof a.min_score_diff === 'number' && sit.scoreDiff < a.min_score_diff) return false;
-  if (typeof a.max_score_diff === 'number' && sit.scoreDiff > a.max_score_diff) return false;
+  if (typeof a.min_score_diff === 'number' && (!Number.isFinite(sit.scoreDiff) || sit.scoreDiff < a.min_score_diff)) return false;
+  if (typeof a.max_score_diff === 'number' && (!Number.isFinite(sit.scoreDiff) || sit.scoreDiff > a.max_score_diff)) return false;
   // Rate gates read the number the card will actually print, which after
   // shrinkage is the shrunk team rate only when the cell may be attributed.
   if (typeof a.min_pass_rate === 'number') {
@@ -434,6 +440,7 @@ function useShortWatch(card) {
 }
 sh.bus.on('hints', function () {
   if (!st.card || !st.sit) return;
+  if (sh.teachingLevel() === 'game') { refreshRead(false); render(); return; }
   st.watchLine = st.lesson ? (sh.shortHints() ? st.lesson.shortWatch : st.lesson.watch) :
     fill(useShortWatch(st.card) ? st.card.prime.watch_short : st.card.prime.watch, st.sit, st.rate);
   render();
@@ -441,14 +448,59 @@ sh.bus.on('hints', function () {
 
 sh.bus.on('teaching', function () {
   if (!st.sit) return;
-  st.lesson = window.FootballLearning.choose(st.sit, { level: sh.teachingLevel() });
-  st.watchLine = st.lesson ? (sh.shortHints() ? st.lesson.shortWatch : st.lesson.watch) : st.watchLine;
+  closePending('The teaching mode changed before this pick was resolved.');
+  st.res = null;
+  setGuidance(false);
   render();
 });
+sh.bus.on('evidence', function (value) { st.evidence = value; });
+sh.bus.on('evidenceChanged', function () {
+  if (st.sit && sh.teachingLevel() === 'game') { refreshRead(false); render(); }
+});
+
+function refreshRead(remember) {
+  var history = st.readHistory.slice();
+  // Re-rendering a preference or a correction may retain a still-valid read.
+  if (!remember && st.read) history = history.filter(function (key) { return key !== st.read.key; });
+  st.read = window.FootballRead.select(st.sit, st.evidence, history);
+  st.lesson = st.read && st.read.lessonId ? window.FootballLearning.get(st.read.lessonId, { level: 'game' }) : null;
+  st.card = { id: st.read ? st.read.id : 'quiet_read', prints_number: !!st.tendLine, concepts: st.lesson ? st.lesson.concepts : [] };
+  st.watchLine = st.read ? st.read.headline : '';
+  if (remember) {
+    st.readHistory.push(st.read ? st.read.key : 'quiet');
+    st.readHistory = st.readHistory.slice(-6);
+  }
+}
+function setGuidance(remember) {
+  var sit = st.sit, ten = st.ten, rate = st.rate;
+  if (sh.teachingLevel() === 'game') {
+    st.attributed = !!(ten && ten.can_attribute);
+    var late = sit.period === 4 && Number.isFinite(sit.clockSeconds) && sit.clockSeconds <= 300;
+    // Situation-only history cannot explain urgent clock decisions or kick/go.
+    st.tendLine = sit.down < 4 && !late && rate !== null ?
+      (st.attributed ? 'This offense' : 'Offenses') + ' passed on ' + pct(rate) + '% of comparable historical downs.' : '';
+    st.sitLine = st.tendLine ? 'Matched by down, distance and field position. Score and clock are not included in this estimate.' : '';
+    refreshRead(remember);
+  } else {
+    st.read = null;
+    st.card = pickCard(sit, rate);
+    st.lesson = null;
+    if (!st.card) { st.watchLine = ''; st.tendLine = ''; st.sitLine = ''; return; }
+    st.attributed = !!(ten && ten.can_attribute && st.card.prints_number !== false);
+    var pr = st.card.prime;
+    st.sitLine = fill(pr.situation, sit, rate);
+    st.tendLine = fill(st.attributed ? pr.tendency : (pr.tendency_low || pr.tendency), sit, rate);
+    st.watchLine = fill(useShortWatch(st.card) ? (pr.watch_short || pr.watch) : pr.watch, sit, rate);
+  }
+}
 // ---------------------------------------------------------------- the ask
 // Every ask is gradeable from the play feed alone. A question the feed cannot
 // settle is a question this app has no business asking.
 var ASK_KINDS = {
+  conversion: {
+    q: 'Will this play gain enough for a first down?',
+    opts: [{ v: 'past', label: 'First down' }, { v: 'short', label: 'Short' }]
+  },
   passrun: {
     q: 'Call it now: throw or run?',
     opts: [{ v: 'pass', label: 'Throw' }, { v: 'run', label: 'Run' }]
@@ -484,7 +536,8 @@ function drawGap() { return 6 + Math.floor(Math.random() * 3); }   // 6, 7 or 8
 // Ration: sharp cards get first call on the budget, flat ones wait longer, and
 // nothing waits more than gap + 4. Long-run rate lands near one in six to eight.
 function askEligible(a) {
-  if (!a) return false;
+  if (!a || !sh.predictionQuestions()) return false;
+  if (a.kind === 'passrun' && (st.rate === null || Math.abs(st.rate - 0.5) < 0.08)) return false;
   var g = st.gap;
   var need = a.priority >= 75 ? g - 2 : a.priority >= 50 ? g : g + 2;
   if (need > g + 4) need = g + 4;
@@ -497,10 +550,10 @@ function grade(kind, answer, r) {
   if (r.voidReason) return { voided: r.voidReason };
   var K = r.kind;
   if (K === 'other') return { voided: 'This play could not be graded. Your pick does not count.' };
-  if (kind === 'sticks') {
+  if (kind === 'sticks' || kind === 'conversion') {
     if (r.turnover) return { voided: 'Possession changed on this play. Your yardage pick does not count.' };
     if (K === 'kick') return { voided: 'They kicked. This question only counts on a pass.' };
-    if (K === 'run') return { voided: 'They ran. This question only counts on a pass.' };
+    if (K === 'run' && kind === 'sticks') return { voided: 'They ran. This question only counts on a pass.' };
     if (typeof r.gained !== 'number' || typeof r.need !== 'number') {
       return { voided: 'The feed is missing the yardage. Your pick does not count.' };
     }
@@ -551,11 +604,12 @@ sh.bus.on('nosnap', function (msg) {
   st.skippedGrade = false;
   st.quiet = msg || '';
   st.sit = null; st.sitKey = ''; st.card = null; st.ten = null;
-  st.lesson = null;
+  st.lesson = null; st.read = null;
   st.ask = null;
   render();
 });
 sh.bus.on('clear', function () {
+  st.read = null; st.readHistory = []; st.evidence = null;
   st.journalIds = []; st.journalSignature = '';
   window.FootballGlossary.close();
   closePending('The game changed before this pick could be graded.');
@@ -563,7 +617,7 @@ sh.bus.on('clear', function () {
   st.lesson = null;
   st.ask = null; st.pending = null; st.res = null;
   st.skippedGrade = false;
-  st.sinceAsk = 99; st.sig = ''; st.asig = '';
+  st.sinceAsk = 0; st.sig = ''; st.asig = '';
   render();
 });
 
@@ -649,10 +703,11 @@ sh.bus.on('snap', function (sit) {
 
   st.ten = ten;
   st.card = card;
-  st.lesson = window.FootballLearning.choose(sit, { level: sh.teachingLevel() });
   st.journalIds = []; st.journalSignature = '';
   st.rate = rate;
   st.ask = null;
+  setGuidance(true);
+  card = st.card;
   sh.diag('card', {
     sit: sit.sitKey, team: teamKey, bucket: ten ? ten.bucket : null,
     rung: ten ? ten.rung : null, attr: !!(ten && ten.can_attribute),
@@ -660,21 +715,9 @@ sh.bus.on('snap', function (sit) {
   });
 
   if (card) {
-    // Copy register and variant are frozen here, once, for this snap. Nothing
-    // may rewrite the sentence he is halfway through reading.
-    // A card that prints no team number (prints_number false) states a
-    // league-wide fact, so it may not name the team however attributable the
-    // pass-rate cell happens to be. Measured: 65 of 1,034 real snaps drew the
-    // chip beside a sentence no team number produced.
-    st.attributed = !!(ten && ten.can_attribute && card.prints_number !== false);
-    var pr = card.prime;
-    var tendTpl = st.attributed ? pr.tendency : (pr.tendency_low || pr.tendency);
-    var watchTpl = useShortWatch(card) ? (pr.watch_short || pr.watch) : pr.watch;
-    st.sitLine = fill(pr.situation, sit, rate);
-    st.tendLine = fill(tendTpl, sit, rate);
-    st.watchLine = st.lesson ? (sh.shortHints() ? st.lesson.shortWatch : st.lesson.watch) : fill(watchTpl, sit, rate);
-
-    var a = askFor(card);
+    var question = st.read && st.read.question;
+    var a = sh.teachingLevel() === 'game' ? (question ? { id: st.read.id + ':' + question.kind,
+      kind: question.kind, q: question.q, opts: ASK_KINDS[question.kind].opts, priority: 80 } : null) : askFor(card);
     if (a && askEligible(a)) {
       st.ask = a;
       st.askAt = Date.now();
@@ -702,6 +745,8 @@ function flash() {
   setTimeout(function () { p.classList.remove('fresh'); }, 60);
 }
 function quietPrime(msg) {
+  $('readFeedback').hidden = true;
+  $('readDetail').textContent = ''; $('readWatch').textContent = ''; $('readSource').textContent = '';
   $('prime').className = '';
   $('pQuiet').hidden = false;
   $('pQuiet').textContent = msg;
@@ -740,7 +785,7 @@ function renderField(sit) {
 function cardSig() {
   return [
     st.sitKey, st.card ? st.card.id : '', st.attributed ? 1 : 0, st.rate,
-    st.sitLine, st.tendLine, st.watchLine, st.quiet, ''
+    st.sitLine, st.tendLine, st.watchLine, st.quiet, JSON.stringify(st.read)
   ].join('|');
 }
 function askSig() {
@@ -770,6 +815,21 @@ function render() {
   $('pHold').textContent = st.hold;
 
   renderField(sit);
+  $('readLabel').textContent = sh.teachingLevel() === 'game' ? 'Read the game' : 'Where to look';
+  $('readDetail').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.detail : '');
+  $('readWatch').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.watch : '');
+  $('readSource').textContent = st.read ? st.read.source : '';
+  $('readFeedback').hidden = !st.read;
+  var feedbackKey = st.sitKey + ':' + (st.read ? st.read.key : '');
+  if ($('readFeedback').dataset.key !== feedbackKey) {
+    $('readFeedback').dataset.key = feedbackKey;
+    $('readFeedback').open = false;
+    $('readFeedbackStatus').textContent = '';
+  }
+  if (sh.teachingLevel() === 'game' && !st.read) {
+    $('pQuiet').hidden = false;
+    $('pQuiet').textContent = 'Waiting for a new pattern or decision.';
+  }
 
   if (!st.card) {
     $('exploreRead').hidden = true;
@@ -816,21 +876,36 @@ function render() {
 function captureGuidance() {
   if (!st.sit || !st.card || !sh.journalShown) return;
   var lines = { situation: $('pDD').textContent, spot: $('pSpot').textContent,
-    context: $('pSit').textContent, tendency: $('pTen').textContent, watch: $('pWatch').textContent };
+    context: $('pSit').textContent, tendency: $('pTen').textContent, watch: $('pWatch').textContent,
+    detail: $('readDetail').textContent, observation: $('readWatch').textContent };
   var visible = document.visibilityState === 'visible' && !document.querySelector('.sheet.on');
   var signature = JSON.stringify([st.sitKey, lines, visible]);
   if (signature === st.journalSignature) return;
   st.journalSignature = signature;
   var printed = st.card.prints_number !== false && st.tendLine.match(/(\d+)%/);
-  var shown = printed ? Number(printed[1]) / 100 : null;
+  var historyVisible = document.querySelector('.tendency-block').open;
+  var shown = printed && historyVisible ? Number(printed[1]) / 100 : null;
   if (shown !== null && /\brun\b/i.test(st.tendLine)) shown = 1 - shown;
   var result = sh.journalShown({ kind: 'guidance', lines: lines, situation: st.sit,
     cardId: st.card.id, lessonId: st.lesson && st.lesson.id, teachingLevel: sh.teachingLevel(),
+    historicalVisible: historyVisible,
+    read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source, playIds: st.read.playIds },
     probabilityShown: shown, modelProbability: st.ten && st.ten.pass_rate,
     baselineProbability: st.ten && st.ten.league_pass_rate, attributed: st.attributed });
   if (result && result.ok && result.id) st.journalIds.push(result.id);
 }
 window.addEventListener('football-view-visible', captureGuidance);
+document.querySelector('.tendency-block').addEventListener('toggle', function () { st.journalSignature = ''; captureGuidance(); });
+$('readFeedback').addEventListener('click', function (event) {
+  var button = event.target.closest('[data-read-rating]');
+  if (!button || !st.read || !sh.journalObservation) return;
+  captureGuidance();
+  var shownId = st.journalIds[st.journalIds.length - 1];
+  if (!shownId) { $('readFeedbackStatus').textContent = 'This card could not be saved. Check the journal.'; return; }
+  var result = sh.journalObservation({ kind: 'read_feedback', shownId: shownId,
+    readId: st.read.id, readVersion: st.read.version, rating: button.dataset.readRating });
+  $('readFeedbackStatus').textContent = result && result.ok ? 'Saved with this card in your journal.' : 'Feedback could not be saved. Check the journal.';
+});
 sh.bus.on('result', function (r) {
   // Link only a newly released play whose exact pre-snap situation matches.
   // Corrections, clock matches and approximate spots cannot earn a prediction score.
@@ -1157,7 +1232,8 @@ function preSnap(sum, plays, health) {
   var fx = fixSituation(end, off.team.abbreviation, def.team.abbreviation, newPoss, true);
   if (!(fx.yardsToGoal >= 1 && fx.yardsToGoal <= 99)) return null;
 
-  var os = Number(off.score || 0), ds = Number(def.score || 0);
+  var os = off.score != null && String(off.score).trim() !== '' && Number.isFinite(Number(off.score)) ? Number(off.score) : null;
+  var ds = def.score != null && String(def.score).trim() !== '' && Number.isFinite(Number(def.score)) ? Number(def.score) : null;
   return Object.freeze({
     down: fx.down,
     distance: fx.distance,
@@ -1166,7 +1242,7 @@ function preSnap(sum, plays, health) {
     clockSeconds: clock,
     offenseScore: os,
     defenseScore: ds,
-    scoreDiff: os - ds,
+    scoreDiff: os !== null && ds !== null ? os - ds : null,
     offenseTeam: trimTeam(off.team),
     defenseTeam: trimTeam(def.team),
     spotText: end.possessionText || '',
@@ -1233,6 +1309,7 @@ function pump(trigger) {
   // Catch-up can release several situations in one turn. Only the final one
   // was actually available to read; intermediate hints must not log learning
   // exposures or open predictions about plays whose results are already here.
+  if (moved) renderInsights();
   if (sh.journalSources && journalReleases.length) sh.journalSources(journalReleases);
   if (nextSnap) {
     if (sh.journalBasis) sh.journalBasis(nextSnap.basis, nextSnap.version);
@@ -1247,7 +1324,10 @@ function pump(trigger) {
   if (released.length > 1 && maxOverdue > sh.STALE_MS && trigger !== 'delay_change') {
     st.timingBreak = { at: now, reason: 'queue_catchup' };
   }
-  if (moved) { renderFeed(); renderInsights(); renderHeader(); refreshSyncCandidate(); }
+  if (moved) {
+    if (!nextSnap) sh.bus.emit('evidenceChanged');
+    renderFeed(); renderHeader(); refreshSyncCandidate();
+  }
   var head = st.queue.length ? Math.ceil((due(st.queue[0]) - now) / 1000) : 0;
   sh.bus.emit('hold', head > 0 ? head : 0);
 }
@@ -1308,23 +1388,27 @@ function applySummary(sum) {
     row.gradeKey = JSON.stringify([facts.outcome, facts.gained, facts.need, facts.turnover, facts.voidReason, playSitKey(p, abbr)]);
     // Superseded queued reports must not flash or settle a pick while the
     // corrected version is waiting for the same broadcast delay.
+    var queuedPlay = st.queue.find(function (item) { return item.kind === 'play' && item.row.id === id; });
     st.queue = st.queue.filter(function (item) {
-      var remove = (item.kind === 'play' && item.row.id === id) ||
-        ((item.kind === 'snap' || item.kind === 'nosnap') && item.basis === id);
+      var remove = (item.kind === 'snap' || item.kind === 'nosnap') && item.basis === id;
       if (remove && item.kind !== 'play' && item.basis === st.lastQueuedBasis) st.lastQueuedSit = null;
       return !remove;
     });
     st.seen[id] = { fingerprint: fingerprint, version: row.version, observedAt: row.observedAt,
       released: !!(previous && previous.released), releasedGradeKey: previous && previous.releasedGradeKey };
     if (previous) revised++; else added++;
-    st.queue.push({
+    var queuedRevision = {
       kind: 'play', at: now, source: p,
       silent: backlog || backfill,
       wasReleased: !!(previous && previous.released), priorGradeKey: previous && previous.releasedGradeKey,
       marker: isMarker(p), row: row,
       cls: facts.outcome, turnover: facts.turnover, voidReason: facts.voidReason,
       sitKey: playSitKey(p, abbr), gained: facts.gained, need: facts.need
-    });
+    };
+    // Keep a corrected report in its original queue position. It still waits
+    // for the revision's full TV delay; newer plays cannot jump ahead of it.
+    if (queuedPlay) Object.assign(queuedPlay, queuedRevision);
+    else st.queue.push(queuedRevision);
   }
   if (sh.journalSources && journalArrivals.length) sh.journalSources(journalArrivals);
   if (added || revised) st.lastChange = now;
@@ -1495,7 +1579,9 @@ function renderInsights() {
   var plays = Object.keys(st.released).map(function (id) { return st.released[id]; }).sort(function (a, b) {
     return (st.order[String(a.id)] ?? -1) - (st.order[String(b.id)] ?? -1);
   });
-  window.FootballDepth.renderInsights(window.FootballInsights.summarize(plays, { teamAbbreviations: teamAbbrs(st.sum) }));
+  var summary = window.FootballInsights.summarize(plays, { teamAbbreviations: teamAbbrs(st.sum) });
+  sh.bus.emit('evidence', window.FootballInsights.forRead(summary, st.gameId));
+  window.FootballDepth.renderInsights(summary);
 }
 function ageText(at) {
   if (!at) return 'not yet';
@@ -1606,7 +1692,7 @@ function renderPicker() {
     children.push(heading);
     for (var j = 0; j < rows.length; j++) {
       var g = rows[j];
-      var sub = g.state === 'pre' ? g.detail
+      var sub = sh.delayMs() > 0 && g.state !== 'pre' ? 'Scores hidden while TV delay is on' : g.state === 'pre' ? g.detail
         : g.away + ' ' + g.awayScore + '  ·  ' + g.home + ' ' + g.homeScore + '  ·  ' + g.detail;
       var button = buttons.get(g.id);
       if (!button) {
@@ -1788,7 +1874,7 @@ sh.bus.on('leagueChanged', function () {
     if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
   });
 });
-sh.bus.on('delay', function () { pump('delay_change'); renderHeader(); });
+sh.bus.on('delay', function () { pump('delay_change'); renderHeader(); renderPicker(); });
 
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'visible') pollGame();
@@ -1819,6 +1905,12 @@ sh.bus.on('boot', function () {
 })(shell);
 
 // ================================================================= shell wiring
+$('predictionQuestions').checked = predictionQuestions;
+$('predictionQuestions').addEventListener('change', function () {
+  predictionQuestions = this.checked;
+  lsSet(LS.questions, predictionQuestions ? '1' : '0');
+  bus.emit('teaching');
+});
 $('teachingLevel').value = teachingLevel;
 window.FootballDepth.setTeachingLevel(teachingLevel);
 $('teachingLevel').addEventListener('change', function () {

@@ -2,6 +2,14 @@
 
 Interfaces every module codes against. Written before implementation so parallel work composes. If an implementation needs to deviate, it says so in its output rather than silently diverging.
 
+## Evidence reads — September 6, 2026
+
+The default main card is now selected by `FootballRead` from the pre-snap whitelist and `FootballInsights.forRead` aggregates of already released plays. This explicitly extends PRIME's input with safe named counts, supporting play IDs and verified drive totals; raw reports still never cross into PRIME. LIVE emits the evidence before the final next-snap event in a queue pump. Corrections recompute the evidence and cannot let newer queued plays jump ahead.
+
+Beginner is an explicit preference and uses the original authored cards; the default does not use that fallback. Prediction questions are opt-in and tied to the main read. A quiet card is valid when there is no supported new observation. Existing historical probability tables are unchanged, displayed in a disclosure with their limitations, and suppressed for fourth-down and urgent late-game decisions.
+
+Journals store read versions, support IDs, exact displayed wording and voluntary usefulness feedback. The offline journal audit reconstructs the evidence using only source revisions released before each visible prompt. Final review data is a correction reference, never a predictor input. These checks establish reproducibility and data support, not learning or forecasting accuracy.
+
 ## Current evidence and learning views — September 5, 2026
 
 The NFL export now covers 2023–2025. Its 2025 holdout Brier is **0.21896** versus **0.21901** for the situation-only baseline. The paired difference interval **[−0.00085, +0.00083]** includes zero. There is no demonstrated NFL team-specific forecasting edge in this newer test. The historical measurements below explain the original estimator decisions; they are not current performance claims. See [the refresh audit](DATA-REFRESH-2026-09-05.md) for complete results.

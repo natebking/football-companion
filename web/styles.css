@@ -89,6 +89,15 @@ html[data-read-fits="true"] .read-column { position: sticky; }
 .watch-label { display: flex; align-items: center; gap: 7px; color: var(--dim); margin-bottom: 8px; font-size: .6875rem; }
 .watch-label svg { width: 17px; height: 17px; }
 #pWatch { font-size: 1.5625rem; font-weight: 600; line-height: 1.32; letter-spacing: -.035em; text-wrap: pretty; }
+.read-detail { margin-top: 12px; font-size: 1.0625rem; line-height: 1.55; color: var(--text); }
+.read-observe { margin-top: 14px; padding-left: 13px; border-left: 3px solid var(--accent); font-size: 1rem; line-height: 1.5; color: var(--muted); }
+.read-source { display: block; margin-top: 12px; color: var(--muted); font-size: .75rem; }
+.read-detail:empty, .read-observe:empty, .read-source:empty { display: none; }
+.tendency-block summary { cursor: pointer; padding: 8px 0; }
+.read-feedback { margin-top: 16px; color: var(--muted); font-size: .8125rem; }
+.read-feedback summary { cursor: pointer; }
+.read-feedback > div { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }
+.read-feedback button { padding: 8px 10px; font-size: .8125rem; }
 .pFoot { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; align-items: center; }
 .pFoot:empty { display: none; }
 .chip { display: inline-flex; align-items: center; min-height: 32px; font-size: .75rem; font-weight: 400; border-radius: 6px; padding: 4px 8px; background: var(--surface); color: var(--dim); border: 1px solid transparent; font-variant-numeric: tabular-nums; }

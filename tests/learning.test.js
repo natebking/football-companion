@@ -77,23 +77,6 @@ test('every shorter hint keeps an observation prompt and is shorter than its ful
   assert.match(learning.get('first_down_line').shortWatch, /^On a catch/);
 });
 
-test('the app selects the preferred lesson wording without replacing its topic', () => {
-  const source = fs.readFileSync(require.resolve('../web/app.js'), 'utf8');
-  const assignments = source.match(/st\.watchLine = st\.lesson \?[\s\S]*?;/g);
-  assert.ok(assignments.length >= 2, 'Both a new snap and changing the preference retain the lesson.');
-  let short = false;
-  const context = vm.createContext({ st: { lesson: learning.get('motion') }, sh: { shortHints: () => short } });
-  for (const assignment of assignments) {
-    short = false;
-    vm.runInContext(assignment, context);
-    assert.equal(context.st.watchLine, learning.get('motion').watch);
-    short = true;
-    vm.runInContext(assignment, context);
-    assert.equal(context.st.watchLine, learning.get('motion').shortWatch);
-    assert.equal(context.st.lesson.id, 'motion');
-  }
-});
-
 test('instructional diagrams are accessible examples with no live data or executable markup', () => {
   for (const lesson of [...learning.all(), ...learning.all({ level: 'basics' })]) {
     const svg = learning.renderDiagram(lesson.id, { level: lesson.level });

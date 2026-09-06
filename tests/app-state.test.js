@@ -164,7 +164,7 @@ function liveQueue(delay = 10000) {
     window: {
       FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js'),
       FootballLearning: require('../web/learning.js'),
-      FootballInsights: { summarize: (plays, options) => {
+      FootballInsights: { forRead: require('../web/game-insights.js').forRead, summarize: (plays, options) => {
         insightInputs.push(structuredClone(Array.from(plays)));
         return require('../web/game-insights.js').summarize(plays, options);
       } },
@@ -704,7 +704,7 @@ test('an intermediate queue transition closes an old pick before a later play re
       bus: { on: (name, handler) => { (handlers[name] || (handlers[name] = [])).push(handler); } },
       logAsk: record => records.push(record), diag: () => {}, invalidateCalls: () => {}, league: () => 'cfb',
       shortHints: () => false,
-      teachingLevel: () => 'game',
+      teachingLevel: () => 'basics',
       journalObservation: row => journalLinks.push(row),
       bumpExposure: concepts => exposures.push(concepts)
     },
@@ -713,6 +713,7 @@ test('an intermediate queue transition closes an old pick before a later play re
     askFor: () => ({ id: 'synthetic-final-ask', kind: 'passrun' }), askEligible: () => true, drawGap: () => 7,
     render: () => {}, renderLedger: () => {}, flash: () => {}, $: () => ({ textContent: '' })
   });
+  prime.setGuidance = () => { prime.st.lesson = null; prime.st.watchLine = card.prime.watch; };
   const sameSnapStart = source.indexOf('function sameSnap(');
   vm.runInContext(source.slice(sameSnapStart, source.indexOf('var shell =', sameSnapStart)), prime);
   prime.sh.sameSnap = prime.sameSnap;
@@ -749,8 +750,8 @@ test('an intermediate queue transition closes an old pick before a later play re
   assert.equal(prime.st.pending.sitKey, finalKey);
   assert.equal(prime.st.pending.answer, null);
   assert.equal(exposures.length, 1);
-  assert.equal(prime.st.watchLine, prime.st.lesson.watch);
-  assert.deepEqual(exposures[0], prime.st.lesson.concepts);
+  assert.equal(prime.st.watchLine, card.prime.watch);
+  assert.deepEqual(exposures[0], card.concepts);
   assert.equal(h.events.filter(event => event.name === 'snap').length, 1);
   assert.equal(h.events.filter(event => event.name === 'nosnap').length, 0);
   assert.equal(h.events.filter(event => event.name === 'result').length, 1);
@@ -764,7 +765,7 @@ test('journal guidance stores displayed probability and exact wording separately
     st: { sit: { down: 1 }, sitKey: 'one', card: { id: 'card', prints_number: true },
       ten: { pass_rate: 0.41777, league_pass_rate: 0.46 }, lesson: { id: 'space' },
       tendLine: text.pTen, attributed: true, journalSignature: '', journalIds: [] },
-    document: { visibilityState: 'visible', querySelector: () => null },
+    document: { visibilityState: 'visible', querySelector: selector => selector === '.tendency-block' ? { open: true } : null },
     $: id => ({ textContent: text[id] }),
     sh: { teachingLevel: () => 'game', journalShown: entry => { saved.push(entry); return { ok: true, id: 'shown:1' }; } }
   });
@@ -775,6 +776,26 @@ test('journal guidance stores displayed probability and exact wording separately
   assert.equal(saved[0].modelProbability, 0.41777); assert.equal(saved[0].lines.tendency, text.pTen);
   c.st.card.prints_number = false; c.st.journalSignature = ''; c.captureGuidance();
   assert.equal(saved[1].probabilityShown, null);
+  c.st.card.prints_number = true; c.st.journalSignature = '';
+  c.document.querySelector = selector => selector === '.tendency-block' ? { open: false } : null;
+  c.captureGuidance();
+  assert.equal(saved[2].probabilityShown, null, 'A collapsed historical estimate was not displayed to the viewer.');
+});
+
+test('a queued correction retains order and holds newer plays until its full delay', () => {
+  const h = liveQueue();
+  const a = structuredClone(require('./fixtures/play-facts.json').normalRun.play);
+  const b = structuredClone(a); b.id = 'later';
+  h.context.applySummary(summaryOf([a]));
+  h.setNow(101000); h.context.applySummary(summaryOf([a, b]));
+  const corrected = structuredClone(a); corrected.text += ' Corrected report.';
+  h.setNow(102000); h.context.applySummary(summaryOf([corrected, b]));
+  h.tick(111000);
+  assert.equal(Object.keys(h.context.st.released).length, 0, 'B cannot jump ahead of corrected A.');
+  h.tick(112000);
+  assert.deepEqual(h.diagnostics.filter(r => r.name === 'release').map(r => r.value.id), [String(a.id), 'later']);
+  const names = h.events.map(e => e.name);
+  assert.ok(names.lastIndexOf('evidence') < names.lastIndexOf('snap'), 'Read evidence is ready before selecting the next card.');
 });
 
 function feedView(count = 8) {

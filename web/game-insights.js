@@ -32,6 +32,8 @@
       earlyDowns: { runs: 0, passes: 0, sacks: 0, total: 0 },
       directions: { run: directionCounts(), pass: directionCounts() },
       receivers: [], runners: [],
+      thirdDowns: { attempts: 0, knownDistances: 0, long: 0, conversions: 0, throws: 0, namedTargets: 0, receivers: [], playIds: [] },
+      playIds: [],
       coverage: { reports: 0, observedPlays: 0, excludedReports: 0, namedTargets: 0, passes: 0,
         namedCarries: 0, runs: 0, verifiedYardage: 0, text: '' } };
   }
@@ -46,6 +48,25 @@
     c.reports++;
     if (!action || r.clockPlay) { c.excludedReports++; return; }
     c.observedPlays++;
+    team.playIds.push(String(r.p.id));
+    if ((r.p.start || {}).down === 3) {
+      var third = team.thirdDowns;
+      third.attempts++;
+      third.playIds.push(String(r.p.id));
+      var distance = (r.p.start || {}).distance;
+      if (Number.isInteger(distance) && distance > 0) {
+        third.knownDistances++;
+        if (distance >= 7) third.long++;
+      }
+      if (!f.turnover && Number.isFinite(f.gained) && Number.isFinite(f.need) && f.gained >= f.need) third.conversions++;
+      if (action === 'pass') {
+        third.throws++;
+        if (f.people.receiver) {
+          third.namedTargets++;
+          named(third.receivers, f.people.receiver, true).targets++;
+        }
+      }
+    }
     if (f.gained !== null || r.sack && f.movement) c.verifiedYardage++;
     if ((r.p.start || {}).down === 1 || (r.p.start || {}).down === 2) {
       team.earlyDowns[action === 'run' ? 'runs' : action === 'pass' ? 'passes' : 'sacks']++;
@@ -121,6 +142,7 @@
     var result = { id: id, teamId: first.teamId, team: abbr[first.teamId] || 'Team ' + first.teamId,
       label: 'Latest drive', summary: '', complete: false, verified: true, playCount: 0,
       netYards: null, playYards: null, penaltyYards: null, progress: [],
+      sacks: 0, playIds: [],
       coverage: { reports: 0, verifiedMovements: 0, unverifiedReports: 0 } };
     var previous = null, playTotal = 0, penaltyTotal = 0, end = '', started = false;
     members.forEach(function (r) {
@@ -134,6 +156,8 @@
       }
       if (/^\s*PENALTY\b/i.test(r.text) && /\bdeclined\b/i.test(r.text) && !r.penalty && !r.noPlay) return;
       result.coverage.reports++;
+      result.playIds.push(String(r.p.id));
+      if (r.action === 'sack') result.sacks++;
       if (!started) {
         started = true;
         if ((r.p.start || {}).down !== 1) result.verified = false;
@@ -187,7 +211,26 @@
     return { drive: latestDrive(rows, abbr), teams: Array.from(teams.values()).filter(function (team) { return team.coverage.observedPlays > 0; }).map(finishTeam), coverage: coverage };
   }
 
-  var api = { summarize: summarize };
+  // Explicit whitelist for the main read. Only aggregates of released reports
+  // cross into PRIME; no raw play text or live source object is included.
+  function forRead(summary, gameId) {
+    var d = summary.drive;
+    return {
+      gameId: String(gameId || ''),
+      drive: d ? { id: d.id, teamId: d.teamId, complete: d.complete, verified: d.verified,
+        playCount: d.playCount, playYards: d.playYards, penaltyYards: d.penaltyYards,
+        sacks: d.sacks, playIds: d.playIds.slice() } : null,
+      teams: summary.teams.map(function (t) { return { teamId: t.teamId, team: t.team,
+        earlyDowns: Object.assign({}, t.earlyDowns), playIds: t.playIds.slice(),
+        thirdDowns: { attempts: t.thirdDowns.attempts, knownDistances: t.thirdDowns.knownDistances, long: t.thirdDowns.long,
+          conversions: t.thirdDowns.conversions, throws: t.thirdDowns.throws,
+          namedTargets: t.thirdDowns.namedTargets, playIds: t.thirdDowns.playIds.slice(),
+          receivers: t.thirdDowns.receivers.map(function (r) { return { name: r.name, targets: r.targets }; }) }
+      }; })
+    };
+  }
+
+  var api = { summarize: summarize, forRead: forRead };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.FootballInsights = api;
 })(typeof window !== 'undefined' ? window : null);
