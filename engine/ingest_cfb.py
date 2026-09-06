@@ -7,7 +7,7 @@ Network policy
 --------------
 One GET per (year, week, seasonType). Every response is cached to
 ``data/raw/cfb/{year}_w{week}.json`` and a file that exists is never refetched,
-because the free CFBD tier allows 5000 calls per month. Requests are throttled
+to avoid repeating requests against the account's monthly allowance. Requests are throttled
 to two per second and retried with exponential backoff on 429 and 5xx.
 
 Usage

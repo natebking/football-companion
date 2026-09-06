@@ -10,7 +10,16 @@ The journal audit now replays saved background selections and keeps independent 
 
 The separate NFL and CFB context evaluations are complete. Both show lower held-out historical error than the current estimator on matching inputs, and both pass the declared research gates. Calibration improves NFL but worsens college relative to its uncalibrated context model; do not silently choose a different college method from test results. Python/client parity passes across all unique held-out inputs. Research tables remain in ignored data, and live probability files are unchanged. New source checks corrected college snap clocks where explicit report times exist and corrected no-play/scramble classification. Older college clock semantics remain a limitation.
 
-At this checkpoint 186 JavaScript tests and 22 Python tests pass. A browser replay of saved Washington releases shows the clock/possession read at 1:48 up 14; desktop and mobile light/dark are free of horizontal overflow. Publishing details follow when verified. Remaining work is still the team/opponent comparison feature, wider verified play-caller coverage, expanded recognition examples, and prospective usefulness/forecast evaluation. The paid live-source question remains pending.
+At this checkpoint 186 JavaScript tests and 22 Python tests pass. A browser replay of saved Washington releases shows the clock/possession read at 1:48 up 14; desktop and mobile light/dark are free of horizontal overflow. Remaining work is still the team/opponent comparison feature, wider verified play-caller coverage, expanded recognition examples, and prospective usefulness/forecast evaluation. The paid live-source question remains pending.
+
+Second release production verification:
+
+- Application commit `669cd66`, pushed to `origin/main`.
+- Preview `dpl_J4CriaoP5hdKkCcjWjidfswWUxZ2`; production `dpl_6L4EHcixoFu4vVD8vB1tmsTiUjmZ`, READY.
+- Production URL `https://football-companion-ejpo61cu5-nates-projects-925609f4.vercel.app`, aliased to `https://fluentin.football/` and the old rose URL.
+- Local, preview and production build ID `c2f10048ef79bd075a14aeeb92e858d7858419f2a83d783e97435615a0a9cfce` matches. The actual public read-selector, play-parser and both new review responses also match their local SHA-256 hashes.
+- Temporary replay files were removed by the final clean build. The local server and isolated verification browser were closed. Cleanup produced local replay-file 404s after testing; those were not production requests.
+- No live probability change or paid source was deployed. The broader goal remains active.
 
 **Implemented and checked in the first release candidate**
 
