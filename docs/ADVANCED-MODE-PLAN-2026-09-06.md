@@ -2,6 +2,8 @@
 
 September 6, 2026. Planning document; no application changes or deployment in this pass. Based on the repository at `161d364`, its completed research and current provider documentation.
 
+> **Latest product feedback:** useful live analysis is still too occasional, waiting states are too prominent, and post-play explanations do not close the loop with the preceding cue. The [next-pass assessment](LIVE-ANALYSIS-NEXT-PASS-2026-09-06.md) prioritizes a bounded broadcast/feed comparison, retaining relevant reads, and visible linked post-play explanations. It is a plan, not a shipped change.
+
 **Product decision:** “Read the game” is the default. It assumes someone understands the rules and wants help noticing decisions, patterns and consequences. “Beginner” is an explicit alternative for learning the rules and basic terminology. Both use natural English and offer clickable definitions. Opening a definition never changes someone’s mode.
 
 The product should earn attention by answering: **What matters here? What has this team actually been doing? What should I watch next?** Its success is not how many statistics or football terms it displays.
