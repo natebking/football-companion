@@ -2,6 +2,16 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Sixth checkpoint: frozen forecast replay**
+
+The [forecast replay workflow](FORECAST-REPLAY-PROTOCOL-2026-09-06.md) now compares a frozen candidate and the shipped historical baseline on the exact pre-snap context saved in a journal. Separate 2026 NFL and college candidates train only through 2025, retaining the previously selected shrinkage and calibration. The freeze records model, baseline, training-source and code hashes. It does not update the live probability files.
+
+The two existing college exports contain 43 guidance records. Twenty-one support a visible, pre-arrival, explicitly linked counterfactual; only three visibly displayed a percentage. All are development examples, with no prospective observations. Nineteen have a later reported clock, score or period difference, which is retained separately and never used to repair the original input. Ordinary clock movement can cause these differences; the count is not a count of bugs. Exact source/play/offense joins, outcome-family exclusions and unknown inputs are preserved. [Results and limitations](FORECAST-REPLAY-RESULTS-2026-09-06.md) include all three displayed cases, with no small-sample accuracy claim.
+
+Validation: 217 JavaScript and 36 Python tests pass. The candidate's Python and browser calculations agree within 2.23×10⁻¹⁶ across 633,205 distinct training contexts in the two leagues. Tests cover outcome leakage, source arrival/release timing, conflicting links, latest-input selection, missing context, hidden probabilities and baseline parity. These establish calculation and replay correctness, not improved live predictions. There is no browser change or deployment at this checkpoint.
+
+Later sessions can use the existing freeze without fitting again. The declared minimum for an aggregate prospective readout is 2,000 eligible plays across 20 games per league. NFL additionally needs an exact-game final-label join; no NFL live journal is in this evaluation. Genuine viewer feedback and practice results are still needed to assess usefulness and learning separately.
+
 **Fifth checkpoint: historical practice**
 
 Explore past plays now has twelve verified source plays and six paired questions. Each question follows a worked example with a play from a different game. Added contrasts include a screen with no gain, a catch behind the line that FTN did not chart as a screen, a large completion short of the marker, play action without an established defensive reaction, and sacks with four versus five rushers. The library withholds target titles and summaries until after the answer. Practice stays near the footer and never interrupts live watching.
@@ -86,11 +96,11 @@ At 2026-09-06T23:32:43Z, a single CFBD `/live/plays` access probe using the exis
 
 **Outstanding work under the same goal**
 
-1. The separate NFL/college fit, calibration review, source-alignment audit and client parity are complete. The candidate remains research-only pending a prospective live-data gate; the old live model remains the comparison.
+1. The separate NFL/college fit, calibration review, source-alignment audit, client parity and frozen forecast replay are complete. The candidate remains research-only pending a prospective live-data gate; the old live model remains the comparison. Current exports provide zero prospective observations.
 2. The first descriptive team/opponent comparison is implemented and verified in the third checkpoint. Extend current-game comparisons only where the same outcome definitions and adequate samples support them; do not imply causal effects or opponent-adjusted weakness.
 3. The expanded three-caller NFL study is complete and remains inconclusive for forecasting benefit. Dated descriptive coaching context and college-specific transfer research are possible follow-ups; do not imply that the current catalog covers every team or today’s staff.
 4. The expanded twelve-play bank and six different-game practice pairs are implemented in the fifth checkpoint. Collect voluntary practice exports to evaluate whether the explanations help; successful QA answers do not establish learning gains.
-5. Run the new audit across real exported live-viewer journals, review the actual feedback and compare candidate changes on untouched later games. The local QA journal is not a substitute for those observations.
+5. Both explanation and forecast audits have run on the two available real viewer exports. Those exports predate the new selector/freeze and contain no usefulness ratings. Obtain later voluntary exports, review their actual feedback and compare frozen candidates on untouched games. The local QA journal is not a substitute for those observations.
 6. If authorized and accessible, run a bounded CFBD live trial measuring useful fields, missingness, revisions and latency. Add a protected server adapter/shared game cache only if the trial establishes a useful replacement or supplement. Evaluate richer licensed NFL access separately; no assumed college/NFL feature parity.
 7. Continue auditing the full original plan before declaring the goal complete. The first production deployment is verified below.
 

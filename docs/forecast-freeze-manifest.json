@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only",
+  "targetSeason": 2026,
+  "protocol": "FORECAST-REPLAY-PROTOCOL-2026-09-06.md",
+  "evaluationSha256": "691ff96905a7c72e756b34b7221afa227446040da25a871fd0eaaeb21b5653bd",
+  "leagues": {
+    "nfl": {
+      "trainingPlays": 276440,
+      "trainingGames": 2227,
+      "contextK": 10.0,
+      "identityK": 200.0,
+      "calibration": {
+        "slope": 1.0437998091104799,
+        "intercept": -0.024144978133867238
+      },
+      "alignment": {
+        "sourceLabelCorrections": 0,
+        "clockAudit": {
+          "eligibleWithExplicitSnapClock": 253613,
+          "eligibleClocksDiffer": 0,
+          "eligiblePhaseChanges": 0,
+          "fallback": "Structured source clock when the report has no explicit leading snap time; exact snap semantics are not independently verified."
+        }
+      },
+      "clientParity": {
+        "uniqueInputs": 274615,
+        "maxAbsoluteError": 2.220446049250313e-16,
+        "passed": true
+      },
+      "candidateFile": "context-nfl.json",
+      "candidateSha256": "a31f5ea41bb959956c041ec5316150fdf0b902ad88e2887eb143dd4626261d6c",
+      "baselineFile": "baseline-nfl.json",
+      "baselineSha256": "c5501f34f778169cb58c26d44aa1fdc5a6fa41d04cc295f8e0f1f6c09fa86ba0",
+      "inputFile": "data/coaching-pilot/plays_nfl_2018_2025.parquet",
+      "inputSha256": "b569d25a6e0feb6fe9fea6c19b16d878685ba0f4da40b1e8fcaba333f57eb4a1"
+    },
+    "cfb": {
+      "trainingPlays": 360260,
+      "trainingGames": 2761,
+      "contextK": 10.0,
+      "identityK": 200.0,
+      "calibration": {
+        "slope": 1.1007096650744987,
+        "intercept": -0.04898832926882082
+      },
+      "alignment": {
+        "sourceLabelCorrections": 242,
+        "clockAudit": {
+          "eligibleWithExplicitSnapClock": 45491,
+          "eligibleClocksDiffer": 41580,
+          "eligiblePhaseChanges": 219,
+          "fallback": "Structured source clock when the report has no explicit leading snap time; exact snap semantics are not independently verified."
+        }
+      },
+      "clientParity": {
+        "uniqueInputs": 358590,
+        "maxAbsoluteError": 2.220446049250313e-16,
+        "passed": true
+      },
+      "candidateFile": "context-cfb.json",
+      "candidateSha256": "e008cfb7494924fc108a7567e43a0ac7d8efc6ffb1eb191fd4e12e6e93d0eec3",
+      "baselineFile": "baseline-cfb.json",
+      "baselineSha256": "15ee4c02d1f961b818eea32271261eefa1df3e9a4bc29f475dede9411b21f7ea",
+      "inputFile": "data/plays_cfb.parquet",
+      "inputSha256": "edf40a4b879ad7e525024da150b5c7e713e05222fea7aa959a26f5d9708377f8"
+    }
+  },
+  "codeSha256": {
+    "engine/freeze_context_candidate.py": "12b7507c46bbf185c61212f4ea3cc4bb89d24b5c336346ff9706acce146412dc",
+    "engine/context_evaluation.py": "0cad8e196f21b18f2d955a00b6ebafa7ec95e386bfee2b2900fc1f7ec67118c0",
+    "engine/coaching_pilot.py": "22e122394da7aab613f37ef21c37a567da57cae8ec0187945aa2971ffa99ef10",
+    "engine/source_context.py": "568b1444c68b1b3d3c9e07c216da82ab822e038b4f0fc4c792d481a77048be0c",
+    "engine/ingest_cfb.py": "abf3240fc6a93081add493f9e8dff6af6864b8f421c3fd46852e3ff59dee1f15",
+    "engine/tendency.py": "e441c6db02998977432ee82565b379fe5c27ef8284f088a7a4e3ae2f4d3adc99",
+    "engine/buckets.py": "61fed742003e342d7109e990dd0ebb9b9705a2a2ac77da4119b49cf47df28662",
+    "engine/schema.py": "c3e1558281609872a590a28fc0f3bdee1fcbba2ac8f8c1ee7d265b0bda2c2284",
+    "web/context-model.js": "f9fb60b09198a8f8f1cb6ad35060716e6b94d9868e703eba228da3d01ca660ec",
+    "web/game-history.js": "97c43117908b687ba866bfb49ff6b51182218836a569961ce1c1658ecb9b122e"
+  },
+  "frozenAt": "2026-09-07T00:54:36.958077+00:00"
+}

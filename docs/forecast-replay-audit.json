@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only",
+  "freezeSha256": "69d05372212c7c6c69e3ae119274802a11225a85f4a7ce3e7a16368952bc55e5",
+  "frozenAt": "2026-09-07T00:54:36.958077+00:00",
+  "summary": {
+    "nfl": {
+      "journalGames": 0,
+      "cohorts": {
+        "development": {
+          "plays": 0,
+          "games": 0,
+          "displayedProbabilities": 0,
+          "scores": null,
+          "scoreUnavailable": "Development sample"
+        },
+        "prospective": {
+          "plays": 0,
+          "games": 0,
+          "displayedProbabilities": 0,
+          "scores": null,
+          "scoreUnavailable": "Needs 2000 eligible plays across 20 games"
+        }
+      },
+      "savedGuidance": 0,
+      "excludedRecords": 0,
+      "exclusions": {}
+    },
+    "cfb": {
+      "journalGames": 2,
+      "cohorts": {
+        "development": {
+          "plays": 21,
+          "games": 2,
+          "displayedProbabilities": 3,
+          "scores": null,
+          "scoreUnavailable": "Development sample"
+        },
+        "prospective": {
+          "plays": 0,
+          "games": 0,
+          "displayedProbabilities": 0,
+          "scores": null,
+          "scoreUnavailable": "Needs 2000 eligible plays across 20 games"
+        }
+      },
+      "savedGuidance": 43,
+      "excludedRecords": 22,
+      "exclusions": {
+        "no_explicit_target": 7,
+        "ineligible_outcome_family": 3,
+        "not_live_visible": 14
+      }
+    }
+  },
+  "accuracyImprovementEstablished": false,
+  "liveReplacementApproved": false,
+  "codeSha256": {
+    "engine/replay_forecasts.py": "ab9cd1a45e7ce088f88caf3d1d950ae7efc352f775e110d84aa15cc0db212433",
+    "engine/forecast_replay.js": "7a8bb597cd97678596629be9bba66f591be6a48383172eed0d3b5a574087b0d2",
+    "engine/audit_cfb_labels.py": "94f2f6ae499d40882a586a54d073bafacbd930e00dee79f17e3be4a9814c97e9",
+    "engine/ingest_cfb.py": "abf3240fc6a93081add493f9e8dff6af6864b8f421c3fd46852e3ff59dee1f15",
+    "engine/tendency.py": "e441c6db02998977432ee82565b379fe5c27ef8284f088a7a4e3ae2f4d3adc99",
+    "engine/coaching_pilot.py": "22e122394da7aab613f37ef21c37a567da57cae8ec0187945aa2971ffa99ef10",
+    "web/context-model.js": "f9fb60b09198a8f8f1cb6ad35060716e6b94d9868e703eba228da3d01ca660ec",
+    "web/game-history.js": "97c43117908b687ba866bfb49ff6b51182218836a569961ce1c1658ecb9b122e"
+  },
+  "games": [
+    {
+      "game": "cfb:401856668",
+      "summary": {
+        "savedGuidance": 23,
+        "eligibleCounterfactuals": 19,
+        "excludedRecords": 4,
+        "displayedProbabilityLinks": 3,
+        "prospective": 0,
+        "exclusions": {
+          "no_explicit_target": 2,
+          "ineligible_outcome_family": 2
+        }
+      },
+      "provenance": {
+        "journalSha256": "3a9c091d7a7bfb57d7d265a7e7482da34bbd8e808796ef227966e3ad2329b043",
+        "candidateSha256": "e008cfb7494924fc108a7567e43a0ac7d8efc6ffb1eb191fd4e12e6e93d0eec3",
+        "baselineSha256": "15ee4c02d1f961b818eea32271261eefa1df3e9a4bc29f475dede9411b21f7ea",
+        "reviewSha256": "94ce3652300bffdd6720ca31bcc430ba60ec097cc3e66e0bc9e5f124479f2cfb",
+        "sourceSha256": "a91f23e2b62d7ffcde4cf51b9feccc4e98097bae92e2f1ed62b8df7dd471fbfb",
+        "classifierSha256": "abf3240fc6a93081add493f9e8dff6af6864b8f421c3fd46852e3ff59dee1f15",
+        "rejectedSourceJoins": [
+          "401856668826"
+        ]
+      },
+      "laterContextDifferences": 17
+    },
+    {
+      "game": "cfb:401858437",
+      "summary": {
+        "savedGuidance": 20,
+        "eligibleCounterfactuals": 2,
+        "excludedRecords": 18,
+        "displayedProbabilityLinks": 0,
+        "prospective": 0,
+        "exclusions": {
+          "ineligible_outcome_family": 1,
+          "no_explicit_target": 5,
+          "not_live_visible": 14
+        }
+      },
+      "provenance": {
+        "journalSha256": "f0ddb1da2ed8d081c83a1c0cc78d83892351540e9266bbde0c487554a1b8d193",
+        "candidateSha256": "e008cfb7494924fc108a7567e43a0ac7d8efc6ffb1eb191fd4e12e6e93d0eec3",
+        "baselineSha256": "15ee4c02d1f961b818eea32271261eefa1df3e9a4bc29f475dede9411b21f7ea",
+        "reviewSha256": "5f229004e5cc28d4cae54ea9ba2c3caf12f6dff144a2665788441a0769a03322",
+        "sourceSha256": "c2c58976bbc1bd0948995d3cea174568d11d1c16e00105b76583fdd67f02750c",
+        "classifierSha256": "abf3240fc6a93081add493f9e8dff6af6864b8f421c3fd46852e3ff59dee1f15",
+        "rejectedSourceJoins": []
+      },
+      "laterContextDifferences": 2
+    }
+  ]
+}

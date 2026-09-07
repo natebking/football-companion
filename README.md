@@ -8,9 +8,9 @@ The app puts a concrete watching suggestion first, with the next down, field pos
 
 Open **Understand this play** for the meaning of a gain and, when verified, the yards through the air versus after the catch. The drive story separates progress on plays from penalties. **So far in this game** shows observed player involvement and direction with coverage counts. These views use the full released history, even though the visible feed keeps only the latest 25 rows.
 
-**Read the game** is the default teaching level: 11 lessons on defensive reactions, space, leverage, protection, and where yards come from. **Start with basics** keeps the original eight introductory lessons available in Games. Both levels use plain language and definitions on tap.
+**Read the game** is the default teaching level. Its main card prioritizes consequential score/clock decisions and supported patterns from released plays, including repeated targets, long third downs, drive penalties and sacks. Relevant previous-season team/opponent counts are available in **Past games**, when enough comparable data exists. **Beginner** is an explicit, remembered choice in Games for learning rules and basic terminology. Both levels use plain language and definitions on tap. The default allows a quiet waiting state instead of filling space with a generic lesson.
 
-**See the idea** opens an illustrative diagram and an optional observation question. Answers are self-reported, never checked against the feed or treated as mastery. **Explore plays** offers six real examples from nflverse, FTN Data, and CollegeFootballData, with source and license links.
+**See the idea** opens an illustrative diagram and an optional observation question. Answers are self-reported, never checked against the feed or treated as mastery. **Explore past plays**, near the footer, offers twelve source-checked examples from nflverse, FTN Data, and CollegeFootballData, with source and license links. Six practice pairs ask about a play from a different game. The separate, downloadable practice history preserves first answers and prior exposure; it does not measure mastery or video recognition.
 
 Choose a game, measure or set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
 
@@ -18,7 +18,7 @@ Choose a game, measure or set a TV delay, and use light, dark, or system appeara
 
 Open **post-game review** only when finished watching. Any saved game can request ESPN's final report; published college reviews also join available CFBD passing and rushing detail by exact game/play/offense IDs. The first enriched review is Boise State at Oregon. Reviews highlight different lessons, compare recorded explanations with later facts, and retain unmatched/missing data. Added detail is separated from corrections. Historical sessions from before journaling cannot be reconstructed.
 
-The completed [coaching/history pilot](docs/COACHING-PILOT-2026-09-05.md) tested eight NFL seasons and verified actual play-calling roles. Score/time context helped offline; extra years alone did not, and one caller's career transfer remains inconclusive. Production probabilities are unchanged.
+The completed [context evaluations](docs/CONTEXT-RESULTS-2026-09-06.md) found lower held-out historical probability error with score/time context in separate NFL and college studies. The expanded [three-caller transfer study](docs/COACHING-TRANSFER-RESULTS-2026-09-06.md) did not establish a reliable forecasting benefit from coaching history. [Frozen forecast replay](docs/FORECAST-REPLAY-RESULTS-2026-09-06.md) now compares candidates on original saved pre-snap inputs. The existing journals provide development examples, not prospective evidence. Production probabilities are unchanged.
 
 ## Data and limits
 

@@ -10,6 +10,8 @@ Beginner is an explicit preference and uses the original authored cards; the def
 
 Journals store read versions, support IDs, exact displayed wording and voluntary usefulness feedback. The offline journal audit reconstructs the evidence using only source revisions released before each visible prompt. Final review data is a correction reference, never a predictor input. These checks establish reproducibility and data support, not learning or forecasting accuracy.
 
+`engine/freeze_context_candidate.py` freezes separate research candidates and baseline tables without writing web assets. `engine/replay_forecasts.py` uses `forecast_replay.js` to compare them on saved context, with final outcomes joined separately by game/play/offense. A saved visible percentage, the frozen baseline and a counterfactual candidate are distinct values. Explicit pre-arrival target links and released basis evidence are required; later context cannot fill missing input. Development sessions and prospective sessions remain separate, as do NFL and college. See the [forecast protocol](FORECAST-REPLAY-PROTOCOL-2026-09-06.md) for sample gates and exclusions. No automatic retraining, background collection or live model promotion is introduced.
+
 ## Current evidence and learning views — September 5, 2026
 
 The NFL export now covers 2023–2025. Its 2025 holdout Brier is **0.21896** versus **0.21901** for the situation-only baseline. The paired difference interval **[−0.00085, +0.00083]** includes zero. There is no demonstrated NFL team-specific forecasting edge in this newer test. The historical measurements below explain the original estimator decisions; they are not current performance claims. See [the refresh audit](DATA-REFRESH-2026-09-05.md) for complete results.
