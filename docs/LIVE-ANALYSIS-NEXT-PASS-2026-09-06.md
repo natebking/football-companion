@@ -1,10 +1,10 @@
 # Next pass: make the last play worth understanding
 
-September 6, 2026. Assessment of shipped app commit `15e5b37` and repository `6f7cb6c`. **Plan and code assessment only; the changes proposed here are not implemented or deployed.** This incorporates Nathan’s report that useful live analysis is still occasional, the repeated waiting messages, and the suggestion to compare a YouTube TV broadcast with the feed.
+September 6, 2026. Original assessment of shipped app commit `15e5b37` and repository `6f7cb6c`. **Implementation follow-up:** [the player-focused pass](PLAYER-FOCUS-2026-09-06.md) now implements named-player priorities, revalidated read persistence, visible latest-play takeaways and a simpler layout. Explicit narrative links from the exact prior prompt to its resulting play, prospective usefulness measurement and synchronization improvements remain outstanding. The assessment below records the original gaps and broader proposal.
 
-**Viewing follow-up:** the [Louisville–Ole Miss broadcast audit](LIVE-BROADCAST-AUDIT-2026-09-06.md) now records specific misses, proposed wording and synchronization observations. It was a bounded diagnostic sample, not a completed continuous-play study. The implementation below remains planned.
+**Viewing follow-up:** the [Louisville–Ole Miss broadcast audit](LIVE-BROADCAST-AUDIT-2026-09-06.md) records specific misses, proposed wording and synchronization observations. It was a bounded diagnostic sample, not a completed continuous-play study. Its reports now supply regression and browser replay checks for the player-focused pass.
 
-**Formation follow-up:** Nathan clarified that better post-play summaries still fall short of formation-level understanding. The [visual-analysis feasibility note](FORMATION-ANALYSIS-FEASIBILITY-2026-09-06.md) defines a separate, narrow recognition experiment. The presentation work below should not be described as delivering that capability.
+**Formation follow-up:** Nathan subsequently chose to proceed without visual analysis. The [visual-analysis feasibility note](FORMATION-ANALYSIS-FEASIBILITY-2026-09-06.md) remains a reference, not an active implementation. The presentation work below does not deliver formation recognition.
 
 ## The missing payoff
 

@@ -4,11 +4,13 @@ A second screen for following a football game and learning what to watch. [Open 
 
 The two-F logo follows connected player routes: a rounded first F flows into a taller second F, with one starting dot and one forward arrow. Light and dark assets are `web/brand-mark.svg` and `web/brand-mark-dark.svg`. The header colors and matching favicon follow the selected appearance.
 
-The app puts a concrete watching suggestion first, with the next down, field position, and historical run/pass choices nearby. Completed plays include reported players and direction when available, plus the next down, possession change, or scoring outcome. The original ESPN report stays available, and penalties open that report by default. Corrections update existing plays in order; repeated unreliable clocks are flagged.
+The main question is **Who should I pay attention to?** The app names a player when reported targets or carries support a useful focus, shows the count behind that choice, and suggests something to watch. Current-drive and third-down evidence take precedence over game totals. Consequential fourth-down and late-game decisions still come first. A carry leader alone cannot take over a long third down.
 
-Open **Understand this play** for the meaning of a gain and, when verified, the yards through the air versus after the catch. The drive story separates progress on plays from penalties. **So far in this game** shows observed player involvement and direction with coverage counts. These views use the full released history, even though the visible feed keeps only the latest 25 rows.
+**Last play** makes the useful detail visible: reconciled yards before/after the catch, a named quarterback hurry, or a verified penalty ruling. It shows the latest play and two earlier plays; expand to see up to 25. **More about this play** holds additional detail and related lessons, with the original ESPN report available separately. Corrections replace existing plays in order; unreliable clocks are flagged.
 
-**Read the game** is the default teaching level. Its main card prioritizes consequential score/clock decisions and supported patterns from released plays, including repeated targets, long third downs, drive penalties and sacks. Relevant previous-season team/opponent counts are available in **Past games**, when enough comparable data exists. **Beginner** is an explicit, remembered choice in Games for learning rules and basic terminology. Both levels use plain language and definitions on tap. The default allows a quiet waiting state instead of filling space with a generic lesson.
+**Game context** combines the drive story, player involvement and historical comparisons in one collapsed section. These views use the full released history, including reports older than the visible feed. The game journal and historical lessons are footer links. There is no fixed bottom bar.
+
+**Read the game** is the default teaching level. It retains a player focus while the evidence remains relevant and updates its counts. **Beginner** is an explicit, remembered choice in Settings for learning rules and basic terminology. Both levels use plain language and definitions on tap. When no meaningful focus is supported, a small message leaves the situation and last play usable.
 
 **See the idea** opens an illustrative diagram and an optional observation question. Answers are self-reported, never checked against the feed or treated as mastery. **Explore past plays**, near the footer, offers twelve source-checked examples from nflverse, FTN Data, and CollegeFootballData, with source and license links. Six practice pairs ask about a play from a different game. The separate, downloadable practice history preserves first answers and prior exposure; it does not measure mastery or video recognition.
 
@@ -46,8 +48,9 @@ The tests cover curated real ESPN plays, scoring and penalty edge cases, predict
 To check logo stability, serve the repository root with `python3 -m http.server 8765 --bind 127.0.0.1` and open `/tests/logo-rendering.html`. These browser checks exercise the actual rendering functions through repeated refreshes, score and delay changes, game reordering, and image failures. Logos and focused game buttons must remain in place as their text updates.
 
 - [Live broadcast audit](docs/LIVE-BROADCAST-AUDIT-2026-09-06.md): observed Louisville–Ole Miss misses, better candidate explanations and timing limits; no new app release.
-- [Formation-analysis feasibility](docs/FORMATION-ANALYSIS-FEASIBILITY-2026-09-06.md): what a visual prototype could recognize, current source limits and how to test timing and accuracy (planned).
-- [Next live-analysis pass](docs/LIVE-ANALYSIS-NEXT-PASS-2026-09-06.md): current product gaps and linked post-play explanations (planned).
+- [Player-focused implementation](docs/PLAYER-FOCUS-2026-09-06.md): selection rules, simplified design, replay examples and verification.
+- [Formation-analysis feasibility](docs/FORMATION-ANALYSIS-FEASIBILITY-2026-09-06.md): source limits and a possible visual experiment; visual analysis is deferred.
+- [Next live-analysis pass](docs/LIVE-ANALYSIS-NEXT-PASS-2026-09-06.md): original assessment, implemented pieces and remaining prompt-to-result work.
 - [Review follow-up](docs/REVIEW-FOLLOWUP-2026-09-06.md): resolved findings, current fixes and remaining research.
 - [Data and privacy](web/data.html) and [third-party notices](NOTICE.md): data sources, adaptations and what stays in this browser.
 - [Build contract](docs/CONTRACT.md): interfaces, statistical validation, and truth boundaries.

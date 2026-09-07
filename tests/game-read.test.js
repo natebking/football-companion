@@ -8,11 +8,17 @@ const insights = require('../web/game-insights.js');
 const sit = { gameId: '123', down: 4, distance: 2, yardsToGoal: 25, period: 4,
   clockSeconds: 130, scoreDiff: -4, offenseTeam: { id: '68' } };
 const evidence = { gameId: '123', teams: [], drive: null };
-function target(id, name = '#19 R.Jones', distance = 8) {
-  return { id: String(id), driveId: 'drive-' + id, type: { text: 'Pass Incompletion' },
+function target(id, name = '#19 R.Jones', distance = 8, drive = 'drive-' + id, down = 3, team = '68') {
+  return { id: String(id), driveId: drive, type: { text: 'Pass Incompletion' },
     text: '#4 M.Madsen pass incomplete short right to ' + name, statYardage: 0,
-    start: { down: 3, distance, team: { id: '68' }, yardsToEndzone: 70, possessionText: 'BOIS 30' },
-    end: { down: 4, distance, team: { id: '68' }, yardsToEndzone: 70, possessionText: 'BOIS 30' } };
+    start: { down, distance, team: { id: team }, yardsToEndzone: 70, possessionText: 'BOIS 30' },
+    end: { down: Math.min(4, down + 1), distance, team: { id: team }, yardsToEndzone: 70, possessionText: 'BOIS 30' } };
+}
+function rush(id, name = '#26 S.Gaines', drive = 'drive-' + id, team = '68') {
+  return { id: String(id), driveId: drive, type: { text: 'Rush' },
+    text: name + ' rush middle for 2 yards gain', statYardage: 2,
+    start: { down: 1, distance: 10, team: { id: team }, yardsToEndzone: 70, possessionText: 'BOIS 30' },
+    end: { down: 2, distance: 8, team: { id: team }, yardsToEndzone: 68, possessionText: 'BOIS 32' } };
 }
 function observe(plays) { return insights.forRead(insights.summarize(plays, { teamAbbreviations: { 68: 'BOIS', 2483: 'ORE' } }), '123'); }
 
@@ -44,24 +50,31 @@ test('reported third-down targets drive a specific observation with source IDs',
   assert.match(c.detail, /3 of 4/);
   assert.match(c.headline, /R.Jones/);
   assert.deepEqual(c.playIds, ['1', '2', '3', '4']);
+  assert.deepEqual(c.focus, { name: '#19 R.Jones', role: 'receiver' });
+  assert.match(c.source, /count, not a forecast/);
+  assert.doesNotMatch(c.headline + c.detail + c.watch, /formation|coverage|assignment|will (?:get|receive)/i);
   assert.equal(c.question, null, 'Watching alignment is not graded as a run/pass guess.');
 });
 
-test('unknown targets and same-ID corrections prevent exaggerated player patterns', () => {
+test('partial target coverage is disclosed, while low coverage and corrections suppress the pattern', () => {
   const plays = [target(1), target(2), target(3), target(4)];
   const unknown = target(5); unknown.text = 'Pass incomplete.';
-  assert.ok(!read.candidates({ ...sit, down: 3 }, observe([...plays, unknown])).some(c => c.id === 'third_down_target'));
-  const corrected = target(3); corrected.type.text = 'Penalty'; corrected.text = 'PENALTY. NO PLAY';
-  const corrected2 = { ...corrected, id: '4' };
-  const e = observe([...plays, corrected, corrected2]);
-  assert.equal(e.teams[0].thirdDowns.attempts, 2);
+  const partial = read.candidates({ ...sit, down: 3 }, observe([...plays, unknown])).find(c => c.id === 'third_down_target');
+  assert.ok(partial); assert.match(partial.detail, /receiver is named on 4 of the 5 reports/i);
+  const unknown2 = { ...structuredClone(unknown), id: '6' }, unknown3 = { ...structuredClone(unknown), id: '7' };
+  assert.ok(!read.candidates({ ...sit, down: 3 }, observe([...plays, unknown, unknown2, unknown3])).some(c => c.id === 'third_down_target'));
+  const corrected = [2, 3, 4].map(id => { const p = target(id); p.type.text = 'Penalty'; p.text = 'PENALTY. NO PLAY'; return p; });
+  const e = observe([...plays, ...corrected]);
+  assert.equal(e.teams[0].thirdDowns.attempts, 1);
   assert.ok(!read.candidates({ ...sit, down: 3 }, e).some(c => c.id === 'third_down_target'));
 });
 
-test('long-third-down observation describes reported attempts, not guessed drives', () => {
+test('named game involvement outranks the generic long-third observation', () => {
   const e = observe([target(1), target(2), target(3), target(4, '#8 Receiver', 2)]);
   const c = read.select({ ...sit, down: 1, period: 1 }, e);
-  assert.equal(c.id, 'long_thirds'); assert.match(c.detail, /3 of 4 reported third-down plays/);
+  assert.equal(c.id, 'game_player'); assert.match(c.headline, /R.Jones/);
+  assert.ok(read.candidates({ ...sit, down: 1, period: 1 }, e).some(item =>
+    item.id === 'long_thirds' && /3 of 4 reported third-down plays/.test(item.detail)));
 });
 
 test('late-game clock decisions outrank old patterns and stay relevant on the next down', () => {
@@ -73,8 +86,8 @@ test('late-game clock decisions outrank old patterns and stay relevant on the ne
     assert.equal(read.select({ ...s, down: 3 }, e, [c.key]).id, c.id);
     assert.doesNotMatch(c.detail, /kneel|no timeouts|will win/i);
   }
-  assert.equal(read.select({ ...sit, down: 2, scoreDiff: null }, e).id, 'long_thirds');
-  assert.equal(read.select({ ...sit, down: 2, clockSeconds: null }, e).id, 'long_thirds');
+  assert.equal(read.select({ ...sit, down: 2, scoreDiff: null }, e).id, 'game_player');
+  assert.equal(read.select({ ...sit, down: 2, clockSeconds: null }, e).id, 'game_player');
 });
 
 test('penalty progress needs a verified current drive for the offense on screen', () => {
@@ -98,24 +111,109 @@ test('a different game or unsupported source fields cannot influence the read', 
   assert.deepEqual(read.select(input), read.select(sit));
   const projected = JSON.stringify(observe([target(1)]));
   assert.doesNotMatch(projected, /pass incomplete|yardsToEndzone|playText|statYardage/);
+  const unsupported = observe([target(1, '#19 R.Jones', 10, 'd1', 1), target(2, '#19 R.Jones', 10, 'd2', 1),
+    target(3, '#19 R.Jones', 10, 'd3', 1)]);
+  unsupported.teams[0].actions.passPlayIds = [];
+  assert.ok(!read.candidates({ ...sit, down: 1, distance: 10, period: 1 }, unsupported).some(c => c.focus));
 });
 
-test('ordinary repetition yields a quiet state; consequential fourth downs remain', () => {
+test('a still-valid read is the fallback after cooldown; consequential fourth downs remain', () => {
   const s = { ...sit, down: 2, distance: 10, period: 1 };
   const first = read.select(s);
   assert.equal(first.id, 'second_long');
-  assert.equal(read.select(s, evidence, [first.key]), null);
+  assert.equal(read.select(s, evidence, [first.key]).id, first.id);
   assert.equal(read.select(s, evidence, [first.key, 'q', 'q', 'q', 'q', 'q', 'q']).id, first.id);
   const fourth = read.select(sit);
   assert.equal(read.select(sit, evidence, [fourth.key]).id, fourth.id);
 });
 
-test('one more qualifying play does not reset a pattern cooldown', () => {
-  const s = { ...sit, down: 1, period: 1 };
-  const plays = [target(1), target(2), target(3), target(4)];
+test('a current player read keeps a stable key as its released count grows', () => {
+  const s = { ...sit, down: 1, distance: 10, period: 1 };
+  const plays = [target(1, '#19 R.Jones', 10, 'd1', 1), target(2, '#19 R.Jones', 10, 'd2', 1),
+    target(3, '#19 R.Jones', 10, 'd3', 1), target(4, '#88 M.Wagner', 10, 'd4', 1)];
   const c = read.select(s, observe(plays));
-  assert.equal(c.id, 'long_thirds');
-  assert.equal(read.select(s, observe([...plays, target(5)]), [c.key]), null);
+  assert.equal(c.id, 'game_player');
+  const next = read.select(s, observe([...plays, target(5, '#19 R.Jones', 10, 'd5', 1)]), [c.key]);
+  assert.equal(next.id, c.id); assert.equal(next.key, c.key); assert.match(next.detail, /4 of 5/);
+});
+
+test('current-drive receiving and rushing reports produce one named player focus', () => {
+  const passing = [target(1, '#19 R.Jones', 10, 'drive', 1), target(2, '#19 R.Jones', 10, 'drive', 2),
+    target(3, '#88 M.Wagner', 10, 'drive', 1)];
+  let c = read.select({ ...sit, down: 1, distance: 10, period: 1 }, observe(passing));
+  assert.equal(c.id, 'drive_player'); assert.deepEqual(c.focus, { name: '#19 R.Jones', role: 'receiver' });
+  assert.deepEqual(c.playIds, ['1', '2', '3']); assert.match(c.detail, /2 of 3 reported throws on this drive/);
+
+  const running = [rush(4, '#26 S.Gaines', 'run-drive'), rush(5, '#26 S.Gaines', 'run-drive'),
+    rush(6, '#0 D.Riley', 'run-drive')];
+  c = read.select({ ...sit, down: 1, distance: 10, period: 1 }, observe(running));
+  assert.equal(c.id, 'drive_player'); assert.deepEqual(c.focus, { name: '#26 S.Gaines', role: 'runner' });
+  assert.match(c.detail, /2 of 3 reported runs on this drive/);
+});
+
+test('game-leading runner needs enough reports and named-run coverage', () => {
+  const enough = [rush(1), rush(2), rush(3), rush(4), rush(5, '#0 D.Riley')];
+  let c = read.select({ ...sit, down: 1, distance: 10, period: 1 }, observe(enough));
+  assert.equal(c.id, 'game_player'); assert.deepEqual(c.focus, { name: '#26 S.Gaines', role: 'runner' });
+  assert.match(c.detail, /4 of 5 reported runs in this game/);
+  assert.equal(read.select({ ...sit, down: 1, distance: 10, period: 1 }, observe(enough.slice(0, 3))), null);
+  const unknown = rush(6); unknown.text = 'Rush for 2 yards.';
+  const unknown2 = { ...structuredClone(unknown), id: '7' };
+  assert.equal(read.select({ ...sit, down: 1, distance: 10, period: 1 }, observe([...enough.slice(0, 4), unknown, unknown2])), null);
+});
+
+test('a carry leader does not displace the conversion context on long third downs', () => {
+  const plays = [rush(1), rush(2), rush(3, '#26 S.Gaines', 'current'), rush(4, '#26 S.Gaines', 'current')];
+  const e = observe(plays), s = { ...sit, down: 3, distance: 11, period: 1 };
+  assert.ok(!read.candidates(s, e).some(c => c.focus && c.focus.role === 'runner'));
+  assert.equal(read.select(s, e).id, 'third_down_distance');
+  assert.equal(read.select({ ...s, distance: 2 }, e).focus.role, 'runner');
+});
+
+test('refreshing released evidence retains the player and updates the displayed count', () => {
+  const app = fs.readFileSync(require.resolve('../web/app.js'), 'utf8');
+  const plays = [rush(1), rush(2), rush(3), rush(4)];
+  const c = vm.createContext({
+    window: { FootballRead: read, FootballLearning: require('../web/learning.js') },
+    st: { sit: { ...sit, down: 2, distance: 10, period: 1 }, evidence: observe(plays),
+      read: null, readHistory: [], past: null, tendLine: '' }
+  });
+  vm.runInContext(app.slice(app.indexOf('function refreshRead('), app.indexOf('function setGuidance(')), c);
+  c.refreshRead(true);
+  const key = c.st.read.key;
+  c.st.evidence = observe([...plays, rush(5)]);
+  c.refreshRead(false);
+  assert.equal(c.st.read.key, key);
+  assert.match(c.st.read.detail, /5 of 5/);
+  c.st.sit.offenseTeam = { id: '2483' };
+  c.refreshRead(false);
+  assert.equal(c.st.read.focus, null, 'A refresh cannot carry the old team’s player into the new possession.');
+});
+
+test('higher-priority drive evidence replaces a game focus, then expires with the drive and possession', () => {
+  const earlier = [1, 2, 3, 4].map(id => target(id, id < 4 ? '#19 R.Jones' : '#88 M.Wagner', 10, 'old-' + id, 1));
+  const s = { ...sit, down: 1, distance: 10, period: 1 };
+  const game = read.select(s, observe(earlier));
+  assert.equal(game.id, 'game_player');
+  const current = observe([...earlier, rush(5, '#26 S.Gaines', 'current'), rush(6, '#26 S.Gaines', 'current')]);
+  const drive = read.select(s, current, [game.key]);
+  assert.equal(drive.id, 'drive_player'); assert.match(drive.key, /current/);
+  const completed = structuredClone(current); completed.drive.complete = true;
+  const after = read.select(s, completed, [game.key, drive.key]);
+  assert.equal(after.id, 'game_player'); assert.doesNotMatch(after.key, /current/);
+  assert.equal(read.select({ ...s, offenseTeam: { id: '2483' } }, current, [drive.key]), null);
+  assert.equal(read.select({ ...s, gameId: 'other' }, current, [drive.key]), null);
+});
+
+test('a verified negative-penalty and sack drive becomes the sole fourth-and-long read', () => {
+  const d = { id: 'stall', teamId: '68', team: 'LOU', complete: false, verified: true, playCount: 3,
+    playYards: 1, penaltyYards: -15, sacks: 1, playIds: ['penalty', 'sack'], actions: {}, coverage: {}, receivers: [], runners: [] };
+  const s = { ...sit, down: 4, distance: 24, yardsToGoal: 89, period: 3, clockSeconds: 600, scoreDiff: 0 };
+  const list = read.candidates(s, { ...evidence, drive: d });
+  assert.equal(list.length, 1); assert.equal(list[0].id, 'fourth_down');
+  assert.match(list[0].headline, /Penalties and a sack/);
+  assert.match(list[0].detail, /15 yards lost to penalties.*need 24 yards from their own 11/);
+  assert.deepEqual(list[0].playIds, ['penalty', 'sack']); assert.equal(list[0].focus, null);
 });
 
 test('switching modes at fourth down replaces the entire guidance, preserving explicit basics', () => {

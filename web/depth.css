@@ -6,7 +6,7 @@
 .watch-block { margin-top: 20px; padding-top: 0; border-top: 0; }
 #pTen { font-size: .9375rem; font-weight: 400; color: var(--dim); }
 #prime.low #pTen { color: var(--dim); }
-.drive-story { padding: 20px 22px; background: var(--card); border: 1px solid var(--line); border-radius: 15px; margin-bottom: 16px; }
+.drive-story { margin-bottom: 22px; }
 .depth-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
 .depth-heading h2 { font: 700 1.45rem/1.2 var(--heading); text-transform: uppercase; }
 .depth-heading span { font-size: .75rem; color: var(--accent); font-weight: 600; }
@@ -19,8 +19,8 @@
 .drive-ball { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
 .drive-legend { display: flex; justify-content: space-between; gap: 8px; font-size: .625rem; color: var(--dim); }
 #driveNote { margin-top: 12px; }
-.game-patterns { margin-bottom: 25px; padding: 0 4px 18px; border-bottom: 1px solid var(--line); }
-.game-patterns > summary { cursor: pointer; font-size: .875rem; color: var(--text); padding: 6px 0; }
+.game-patterns { margin-bottom: 8px; }
+.game-patterns > h2 { font-size: .875rem; color: var(--text); padding: 6px 0; }
 .pattern-team { margin-top: 14px; }
 .pattern-team h3 { font-size: .8125rem; margin-bottom: 5px; color: var(--accent); }
 .pattern-team p { font-size: .875rem; margin-top: 5px; color: var(--dim); }
@@ -78,3 +78,33 @@
 
 .learning-choices button:hover { border-color: var(--accent); }
 @media (forced-colors: active) { .learning-choices button[aria-pressed="true"] { border-width: 3px; } }
+
+/* Supporting information stays out of the primary viewing path. */
+.game-context { grid-column: 1 / -1; padding: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.game-context > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; min-height: 48px; padding: 14px 20px; list-style: none; font-size: .9375rem; font-weight: 600; }
+.game-context > summary::-webkit-details-marker { display: none; }
+.game-context > summary::after { content: '+'; margin-left: auto; color: var(--accent); }
+.game-context[open] > summary::after { content: '−'; }
+.game-context > summary small { font-size: .75rem; font-weight: 400; color: var(--dim); }
+.context-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; padding: 8px 20px 20px; }
+.history-context > h2 { font-size: .875rem; margin-bottom: 12px; }
+.history-context:has(#historyComparison:empty):has(#pSit:empty):has(#pTen:empty) { display: none; }
+.latest-play .pl2 { font-size: 1.375rem; font-weight: 600; letter-spacing: -.025em; }
+.play-takeaway { margin-top: 14px; line-height: 1.6; font-size: 1rem; }
+.takeaway-source { font-size: .6875rem; color: var(--dim); margin-top: 6px; }
+.earlier-label { text-transform: uppercase; letter-spacing: .1em; color: var(--dim); font-size: .6875rem; margin-bottom: 14px; }
+.older-play .play-players { font-size: .75rem; }
+.play:last-child { border-bottom: 0; padding-bottom: 0; }
+.play-details summary, .play-understand summary { min-height: 36px; }
+.play-understand, .play-details { margin-top: 5px; }
+#askz { margin-top: 0; }
+.learning-footer { margin-top: 0; }
+@media (max-width: 759px) {
+  .game-context { margin-top: 18px; }
+  .context-grid { grid-template-columns: 1fr; gap: 20px; }
+  .game-context > summary small { display: none; }
+  .latest-play .pl2 { font-size: 1.125rem; }
+  .play-takeaway { font-size: .9375rem; }
+  #askz { margin-top: 18px; }
+  .learning-footer { margin-top: 20px; }
+}

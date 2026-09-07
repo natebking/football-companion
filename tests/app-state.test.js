@@ -881,13 +881,13 @@ test('a queued correction retains order and holds newer plays until its full del
 function feedView(count = 8) {
   const saved = [], elements = {};
   const row = number => ({ id: String(number), version: 'v1', off: 'ORE', dd: '1st & 10',
-    when: 'Q1 10:00', kind: 'run', plain: 'Run for 4 yards.', facts: [], observedAt: 1 });
+    when: 'Q1 10:00', kind: 'run', plain: 'Run for 4 yards.', gamePlain: 'Run for 4 yards.', gameConsequence: '', takeaway: '', provenance: null, facts: [], observedAt: 1 });
   const rows = Array.from({ length: count }, (_, i) => row(count - i));
   const context = vm.createContext({
-    FEED_PREVIEW: 5,
+    FEED_PREVIEW: 3,
     st: { rows, released: Object.fromEntries(rows.map(r => [r.id, { id: r.id }])),
       sum: null, health: null, feedExpanded: false },
-    sh: { esc: value => String(value ?? ''), journalShown: entry => saved.push(entry) },
+    sh: { esc: value => String(value ?? ''), teachingLevel: () => 'game', journalShown: entry => saved.push(entry) },
     window: { FootballGlossary: { annotate: value => value }, FootballPlay: { describe: report => report } },
     teamAbbrs: () => ({}),
     $: id => elements[id] || (elements[id] = {
@@ -903,16 +903,16 @@ function feedView(count = 8) {
 test('collapsed older reports enter the viewing journal only when the feed is expanded', () => {
   const h = feedView();
   h.context.renderFeed();
-  assert.deepEqual(h.saved.map(entry => entry.playId), ['8', '7', '6', '5', '4']);
+  assert.deepEqual(h.saved.map(entry => entry.playId), ['8', '7', '6']);
   assert.equal(h.context.st.rows.length, 8, 'Collapsing does not discard available reports.');
   assert.equal(Object.keys(h.context.st.released).length, 8, 'Analysis retains every released report.');
   // A correction can arrive while its older report is hidden. The journal
   // should capture the version actually revealed, not either hidden version.
   h.context.st.rows[7].version = 'v2';
-  h.context.st.rows[7].plain = 'Run for 5 yards.';
+  h.context.st.rows[7].plain = h.context.st.rows[7].gamePlain = 'Run for 5 yards.';
   h.context.st.released['1'] = { id: '1', corrected: true };
   h.context.renderFeed();
-  assert.equal(h.saved.length, 5);
+  assert.equal(h.saved.length, 3);
   h.context.st.feedExpanded = true;
   h.context.renderFeed();
   assert.deepEqual(h.saved.map(entry => entry.playId), ['8', '7', '6', '5', '4', '3', '2', '1']);
@@ -936,4 +936,35 @@ test('an expanded feed stays expanded as newly released plays are rendered', () 
   assert.equal(h.elements.feedToggle.attributes['aria-expanded'], 'true');
   assert.equal(h.saved.length, 9);
   assert.equal(h.saved.at(-1).playId, '9');
+});
+
+
+test('latest takeaway is visible and journaled; advanced facts stay behind disclosure', () => {
+  const h = feedView(2), r = h.context.st.rows[0];
+  Object.assign(r, { plain: 'Sack. The quarterback was tackled before throwing.', gamePlain: 'Sack for a loss of 5 yards.',
+    takeaway: 'The report credits Banks with a hurry.', provenance: 'Reported by ESPN.', facts: ['Shotgun'], gameConsequence: 'Next: 3rd & 15.' });
+  h.context.renderFeed();
+  assert.equal(h.saved[0].lines.summary, r.gamePlain);
+  assert.equal(h.saved[0].lines.takeaway, r.takeaway);
+  assert.deepEqual(Array.from(h.saved[0].lines.facts), []);
+  assert.ok(h.elements.feed.innerHTML.indexOf('play-takeaway') < h.elements.feed.innerHTML.indexOf('data-understand'));
+  assert.ok(!h.elements.feed.innerHTML.includes('Quarterback starts back from center'));
+  h.elements.feed.querySelectorAll = selector => selector.includes('understand') ? [{ dataset: { understand: r.id }, open: true }] : [];
+  h.context.captureFeed();
+  assert.deepEqual(Array.from(h.saved.at(-1).lines.facts), ['Shotgun']);
+  h.context.sh.teachingLevel = () => 'basics';
+  h.context.renderFeed();
+  assert.ok(h.saved.some(entry => entry.lines.summary === r.plain && entry.teachingLevel === 'basics'));
+});
+
+test('a revised latest takeaway replaces the visible wording and is recorded as a correction', () => {
+  const h = feedView(1), r = h.context.st.rows[0];
+  r.takeaway = 'Initially reported detail.';
+  h.context.renderFeed();
+  r.version = 'v2'; r.takeaway = ''; r.gamePlain = 'Incomplete pass.';
+  h.context.st.released[r.id] = { id: r.id, revised: true };
+  h.context.renderFeed();
+  assert.equal(h.saved.length, 2);
+  assert.equal(h.saved.at(-1).lines.takeaway, null);
+  assert.ok(!h.elements.feed.innerHTML.includes('Initially reported detail'));
 });

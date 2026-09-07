@@ -133,6 +133,25 @@ test('a verified catch position is acknowledged without pretending to know the r
   assert.match(noDepth.reason, /does not locate the catch/);
 });
 
+test('dominant reconciled after-catch yardage selects the catch-and-run lesson', () => {
+  const play = {
+    type: { text: 'Pass Reception' },
+    text: 'No Huddle-Shotgun #6 T.Chambliss pass complete short right to #26 J.Lindsey caught at Miss41, for 4 yards to the Miss50 (#11 T.Capers)',
+    statYardage: 4,
+    start: { down: 1, distance: 10, yardsToEndzone: 54, possessionText: 'MISS 46', team: { id: '145' } },
+    end: { down: 2, distance: 6, yardsToEndzone: 50, possessionText: '50', team: { id: '145' } }
+  };
+  const report = require('../web/play-facts.js').describe(play, { '145': 'MISS', '97': 'LOU' });
+  const related = learning.relatedToReport(report);
+  assert.equal(related.lesson.id, 'catch_and_run');
+  assert.match(related.reason, /more of the gain came after the catch/);
+  assert.match(related.reason, /without assigning a cause/);
+  assert.equal(learning.relatedToReport(report, { level: 'basics' }).lesson.id, 'first_down_line');
+
+  report.yardsAfterCatch = 8;
+  assert.equal(learning.relatedToReport(report).lesson.id, 'first_down_line', 'Contradictory components are not enough.');
+});
+
 
 test('Read the game is the default, while basics keeps a simpler explanation of the same topic', () => {
   assert.equal(learning.choose(situation).level, 'game');

@@ -58,7 +58,7 @@ test('a disclosure re-render is not another prompt, and the last rating wins for
   assert.equal(report.summary.visibleGuidanceMoments, 1);
   assert.deepEqual(report.summary.feedback, { useful: 0, obvious: 1, unsupported: 0 });
 });
-test('candidate cooldown uses its own selections, including saved background moments', () => {
+test('candidate history retains an eligible named focus after a saved background moment', () => {
   const game = fixture();
   delete game.shown[0].read;
   game.shown[0].visibility = 'background';
@@ -68,7 +68,7 @@ test('candidate cooldown uses its own selections, including saved background mom
   assert.equal(report.summary.replayedGuidanceMoments, 2);
   assert.equal(report.summary.visibleGuidanceMoments, 1);
   assert.equal(report.rows[0].recordedRead, null);
-  assert.equal(report.rows[0].proposedRead, 'third_down_distance', 'The third-down target candidate was already used in the background.');
+  assert.equal(report.rows[0].proposedRead, 'third_down_target', 'A valid named focus remains useful after its background selection.');
 });
 test('repetition checks use the compact metadata saved by the real browser', () => {
   const game = fixture();
@@ -85,7 +85,7 @@ test('clock refreshes retain the same read without consuming cooldown history', 
   assert.equal(report.summary.repeatedWithinSixMoments, 0);
   assert.equal(report.rows.filter(r => r.refreshedContext).length, 8);
   assert.ok(report.rows.slice(0,9).every(r => r.proposedRead === 'third_down_target'));
-  assert.equal(report.rows.at(-1).proposedRead, 'third_down_distance');
+  assert.equal(report.rows.at(-1).proposedRead, 'third_down_target');
 });
 test('invalid source relationships and duplicate records fail explicitly', () => {
   for (const mutate of [

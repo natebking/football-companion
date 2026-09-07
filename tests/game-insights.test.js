@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const { summarize } = require('../web/game-insights.js');
+const { summarize, forRead } = require('../web/game-insights.js');
 const fixtures = require('./fixtures/play-facts.json');
 
 const abbr = { '68': 'BOIS', '2483': 'ORE' };
@@ -64,7 +64,8 @@ test('a real drive separates 11 play yards from 20 penalty yards', () => {
   assert.match(result.drive.summary, /11 yards gained on plays; penalties moved the ball 20 yards forward/);
   assert.equal(result.teams.length, 1);
   assert.deepEqual(result.teams[0].earlyDowns, { runs: 2, passes: 1, sacks: 0, total: 3 });
-  assert.deepEqual(result.teams[0].receivers, [{ name: '#88 M.Wagner', targets: 1, catches: 1, yards: 5 }]);
+  assert.deepEqual(result.teams[0].receivers, [{ name: '#88 M.Wagner', targets: 1, catches: 1, yards: 5,
+    playIds: ['401858433623'] }]);
 });
 
 test('repeated IDs from current/previous drives never double the totals', () => {
@@ -84,7 +85,7 @@ test('same-ID corrections replace yardage, names and directions at their origina
   assert.equal(before.drive.netYards, 2);
   assert.equal(after.drive.netYards, 5);
   assert.equal(after.drive.playCount, 1);
-  assert.deepEqual(after.teams[0].runners, [{ name: '#0 D.Riley', carries: 1, yards: 5 }]);
+  assert.deepEqual(after.teams[0].runners, [{ name: '#0 D.Riley', carries: 1, yards: 5, playIds: ['one'] }]);
   assert.deepEqual(after.teams[0].directions.run, { left: 0, middle: 0, right: 1, known: 1, total: 1 });
 });
 
@@ -206,7 +207,7 @@ test('an incomplete target adds no catch or receiving yards and missing names lo
     text: '#4 M.Madsen pass incomplete short right to #88 M.Wagner', start: spot(75), end: spot(75, 2, 10) };
   const unknown = structuredClone(pass); unknown.id = 'unknown'; unknown.text = 'Pass incomplete.';
   const team = inspect([pass, unknown]).teams[0];
-  assert.deepEqual(team.receivers, [{ name: '#88 M.Wagner', targets: 1, catches: 0, yards: 0 }]);
+  assert.deepEqual(team.receivers, [{ name: '#88 M.Wagner', targets: 1, catches: 0, yards: 0, playIds: ['pass'] }]);
   assert.equal(team.coverage.namedTargets, 1);
   assert.equal(team.coverage.passes, 2);
   assert.equal(team.directions.pass.known, 1);
@@ -232,6 +233,32 @@ test('a named runner with one unverified gain has no fabricated total yardage', 
   assert.equal(team.runners[0].yards, null);
   assert.equal(team.coverage.verifiedYardage, 1);
   assert.match(team.summaries.join(' '), /2 reported carries\. Yardage is incomplete\./);
+});
+
+test('the read whitelist keeps action, player, coverage and support scopes separate', () => {
+  const result = forRead(inspect(boiseDrive()), 'game-123');
+  const team = result.teams[0], drive = result.drive;
+  assert.equal(result.gameId, 'game-123');
+  assert.deepEqual({ runs: team.actions.runs, passes: team.actions.passes, sacks: team.actions.sacks,
+    dropbacks: team.actions.dropbacks }, { runs: 2, passes: 1, sacks: 0, dropbacks: 1 });
+  assert.deepEqual(team.coverage, { passes: 1, namedTargets: 1, runs: 2, namedCarries: 2 });
+  assert.deepEqual(team.receivers[0], { name: '#88 M.Wagner', targets: 1, playIds: ['401858433623'] });
+  assert.deepEqual(drive.actions.passPlayIds, ['401858433623']);
+  assert.deepEqual(drive.actions.runPlayIds, ['401858433608', '401858433619']);
+  assert.equal(drive.teamId, '68');
+  assert.doesNotMatch(JSON.stringify(result), /pass complete|yardsToEndzone|statYardage/);
+});
+
+test('sacks count as dropbacks without becoming throws or named-target opportunities', () => {
+  const sack = fromFixture('sack'); sack.start.down = 1; sack.end.down = 2;
+  const pass = { id: 'throw', driveId: sack.driveId, type: { text: 'Pass Incompletion' }, statYardage: 0,
+    text: '#4 M.Madsen pass incomplete short right to #88 M.Wagner', start: sack.end, end: spot(70, 3, 8) };
+  const team = forRead(inspect([sack, pass], fixtures.sack.abbr), 'game').teams[0];
+  assert.equal(team.actions.dropbacks, 2);
+  assert.equal(team.actions.sacks, 1);
+  assert.equal(team.actions.passes, 1);
+  assert.equal(team.coverage.namedTargets, 1);
+  assert.deepEqual(team.actions.passPlayIds, ['throw']);
 });
 
 test('a penalty correction removes the former run from every count', () => {

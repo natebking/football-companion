@@ -370,10 +370,15 @@
       id = 'deep_defenders'; reason = 'The report describes a deep pass. This example explains the defenders to watch; their coverage was not reported.';
     } else if (report.outcome === 'pass' && typeof report.need === 'number' && report.need > 0 &&
         typeof report.gained === 'number' && /^Pass complete\b/.test(report.summary || '')) {
-      id = 'first_down_line';
-      reason = typeof report.depthText === 'string' && report.depthText.trim() ?
-        'The catch position is reported. This example explains the marker; it does not show the receiver’s actual route.' :
-        'The report includes a completed pass and the yards needed. This example explains the marker; the report does not locate the catch itself.';
+      var reconciledRun = (report.depthSource === 'reported' || report.depthSource === 'reported spots') &&
+        Number.isInteger(report.airYards) && Number.isInteger(report.yardsAfterCatch) &&
+        report.airYards + report.yardsAfterCatch === report.gained && report.yardsAfterCatch > Math.max(0, report.airYards);
+      id = reconciledRun && levelOf(options) === 'game' ? 'catch_and_run' : 'first_down_line';
+      reason = reconciledRun && levelOf(options) === 'game' ?
+        'The reported distances show that more of the gain came after the catch. This example separates the throw from the run without assigning a cause.' :
+        typeof report.depthText === 'string' && report.depthText.trim() ?
+          'The catch position is reported. This example explains the marker; it does not show the receiver’s actual route.' :
+          'The report includes a completed pass and the yards needed. This example explains the marker; the report does not locate the catch itself.';
     }
     return id ? { lesson: get(id, options), reason: reason } : null;
   }

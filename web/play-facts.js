@@ -10,6 +10,40 @@
     return value > 0 ? ' for ' + yards(value) : value < 0 ? ' for a loss of ' + yards(value) : ' for no gain';
   }
 
+  function sentenceCase(value) {
+    value = String(value || '').trim().toLowerCase();
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
+  }
+
+  function playerLabel(value, fallback) {
+    value = String(value || '').replace(/^#\d{1,2}\s+/, '').trim();
+    return value || fallback;
+  }
+
+  function advancedConsequence(result) {
+    var value = result.consequence || '';
+    if (/^Sack\./.test(result.summary)) value = value.replace(/^Loss of \d+ yards?\.\s*/, '');
+    if (result.kind === 'score') {
+      value = value.replace(/^(?:Six points(?: for the defense)?|Three points|Two points(?: to the defense)?|One point)\.\s*/, '');
+    }
+    return value;
+  }
+
+  function namedHurry(text) {
+    var match = /\bQB hurried by\s+((?:#\d{1,2}\s+)?[A-Z][A-Za-z.\u2019\u0027-]*(?:\s+[A-Z][A-Za-z.\u2019\u0027-]*)?)(?=\s*(?:[,;(]|#\d|PENALTY\b|Original Play:|$))/i.exec(text);
+    return match ? match[1].trim() : '';
+  }
+
+  // Accept one explicit ruling only. Multiple, declined and offsetting rulings
+  // need the full report and should not be compressed into one penalty name.
+  function singleAcceptedPenalty(text) {
+    var parts = text.split(/\bPENALTY\s+/i).slice(1);
+    if (parts.length !== 1 || /\bdeclined\b|\boffset(?:ting)?\b/i.test(text)) return '';
+    var match = /^\s*\S+\s+(.+?)(?=\s+\(#|\s+\d+\s+(?:yards?|yds?)\b)/i.exec(parts[0]);
+    if (!match || /\b(?:declined|offset(?:ting)?)\b/i.test(match[1])) return '';
+    return sentenceCase(match[1].replace(/\s+/g, ' '));
+  }
+
   // A touchdown and its conversion can share one ESPN row. A penalty on the
   // conversion must not erase the touchdown or describe its formation.
   function primaryText(raw) {
@@ -128,7 +162,7 @@
   function describeBase(p, abbr) {
     p = p || {}; abbr = abbr || {};
     var type = String((p.type || {}).text || '').toLowerCase();
-    var raw = String(p.text || ''), primary = primaryText(raw);
+    var raw = String(p.text || ''), primary = primaryText(raw).split(/\bOriginal Play:/i)[0];
     var scoring = String((p.scoringType || {}).name || '').toLowerCase().replace(/[^a-z]/g, '');
     var result = { summary: '', consequence: '', facts: [], players: '', kind: '', raw: raw,
       outcome: 'other', voidReason: null, turnover: false, clockPlay: false, gained: null, need: null };
@@ -331,6 +365,8 @@
     var result = describeBase(p, abbr), text = primaryText(result.raw).split(/\bOriginal Play:/i)[0];
     result.meaning = ''; result.airYards = null; result.yardsAfterCatch = null;
     result.depthText = ''; result.depthSource = null;
+    result.takeaway = ''; result.provenance = null;
+    result.gameSummary = result.summary; result.gameConsequence = '';
     result.startYardsToGoal = yardsToGoal(p.start || {}, abbr);
     result.movement = validatedMovement(p, abbr, result, text);
     result.people = { passer: '', receiver: '', runner: '' };
@@ -380,6 +416,52 @@
         result.depthText += after >= 0 ? '; ' + yards(after) + ' after the catch.' : '; then lost ' + yards(after) + '.';
       }
     }
+
+    var penaltyName = result.movement && result.movement.penalty ? singleAcceptedPenalty(text) : '';
+    var hurry = namedHurry(text);
+    var remaining = result.gained !== null && result.need !== null ? result.need - result.gained : null;
+    var missedKick = /\bfield goal attempt from (\d+) yards?\s+(?:NO GOOD|MISSED)\b/i.exec(text);
+    var end = p.end || {}, endSpot = String(end.possessionText || '').trim();
+
+    if (penaltyName) {
+      if (/^Roughing the kicker$/i.test(penaltyName) && missedKick && /\bNO PLAY\b/i.test(text) &&
+          /\b1ST DOWN\b/i.test(text) && end.down === 1 && /^(?:\S+\s+\d{1,2}|50)$/.test(endSpot)) {
+        result.takeaway = 'The missed ' + missedKick[1] + '-yard field goal did not end the drive: a ' + Math.abs(movement.penalty) +
+          '-yard penalty for roughing the kicker gave the offense a first down at ' + endSpot + '.';
+      } else {
+        var ruling = result.consequence.replace(/^The penalty/, penaltyName);
+        result.takeaway = ruling === result.consequence ? penaltyName + ': ' +
+          ruling.charAt(0).toLowerCase() + ruling.slice(1) : ruling;
+      }
+      result.provenance = 'ESPN ruling; yardage checked against the reported field positions.';
+      result.gameSummary = 'Penalty: ' + penaltyName.toLowerCase() + '.';
+    } else if (hurry && !result.voidReason) {
+      result.takeaway = 'The play report credits ' + hurry + ' with a quarterback hurry.';
+      result.provenance = 'Quarterback hurry attributed by the play report.';
+    } else if (result.movement && result.movement.penalty === 0 && result.gained > 0 &&
+        result.need >= 15 && remaining >= 10) {
+      var carrier = result.outcome === 'pass' ? result.people.receiver : result.people.runner;
+      result.takeaway = playerLabel(carrier, 'The offense') + ' gained ' + yards(result.gained) + ', still leaving ' + yards(remaining) + ' to the first-down line.';
+      result.provenance = 'Calculated from the reported down, distance, gain, and end position.';
+    } else if (result.depthText && result.kind !== 'score') {
+      var catchPoint = result.airYards === 0 ? 'at the line of scrimmage' :
+        yards(result.airYards) + (result.airYards > 0 ? ' beyond' : ' behind') + ' the line of scrimmage';
+      var afterCatch = result.yardsAfterCatch >= 0 ? 'gained ' + yards(result.yardsAfterCatch) + ' after the catch' :
+        'lost ' + yards(result.yardsAfterCatch) + ' after the catch';
+      result.takeaway = playerLabel(result.people.receiver, 'The receiver') + ' caught it ' + catchPoint + ', then ' + afterCatch + ': ' + yards(result.gained) + ' overall.';
+      result.provenance = result.depthSource === 'reported spots' ?
+        'Calculated from the start, catch, and end positions in the play report.' :
+        'Passing distances supplied by the play report and reconciled with the total gain.';
+    }
+
+    if (/^Sack\./.test(result.summary)) {
+      result.gameSummary = result.movement && result.movement.play < 0 ?
+        'Sack for a loss of ' + yards(result.movement.play) + '.' : 'Sack.';
+    } else if (/^Intercepted\./.test(result.summary)) {
+      result.gameSummary = 'Interception.';
+    }
+    // A validated penalty takeaway already includes the movement and ruling.
+    result.gameConsequence = penaltyName ? '' : advancedConsequence(result);
     return result;
   }
 

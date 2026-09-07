@@ -29,7 +29,7 @@
  *
  * DELAY QUEUE, in LIVE. Nothing reaches the screen, card or feed or score,
  * before observed_at + the user's broadcast delay. The delay is a setting,
- * 0 to 90 seconds, default 0, persisted, changeable mid-game. Raising it
+ * 0 to 90 seconds, default 45, persisted, changeable mid-game. Raising it
  * re-bases everything still waiting.
  *
  * THE ASK, in PRIME. Temporal occlusion: commit before the reveal. Rationed to
@@ -43,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-06-tv-field';
+var VERSION = '2026-09-06-player-focus';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -493,8 +493,9 @@ sh.bus.on('evidenceChanged', function () {
 function refreshRead(remember) {
   var history = st.readHistory.slice();
   var previousKey = st.read && st.read.key;
-  // Re-rendering a preference or a correction may retain a still-valid read.
-  if (!remember && st.read) history = history.filter(function (key) { return key !== st.read.key; });
+  // Named-player reads use the last key to retain a still-valid focus. Other
+  // reads can remain eligible when only a preference or report is refreshed.
+  if (!remember && st.read && !st.read.focus) history = history.filter(function (key) { return key !== st.read.key; });
   st.read = window.FootballRead.select(st.sit, st.evidence, history, st.past);
   st.lesson = st.read && st.read.lessonId ? window.FootballLearning.get(st.read.lessonId, { level: 'game' }) : null;
   st.card = { id: st.read ? st.read.id : 'quiet_read', prints_number: !!st.tendLine, concepts: st.lesson ? st.lesson.concepts : [] };
@@ -792,6 +793,7 @@ function flash() {
   setTimeout(function () { p.classList.remove('fresh'); }, 60);
 }
 function quietPrime(msg) {
+  $('readLabel').textContent = 'Watch next';
   $('readFeedback').hidden = true;
   $('historyComparison').replaceChildren();
   $('readDetail').textContent = ''; $('readWatch').textContent = ''; $('readSource').textContent = '';
@@ -886,12 +888,13 @@ function render() {
   $('pQuiet').hidden = true;
   document.querySelector('.pTop').hidden = false;
   $('pDD').textContent = sit.ddText || (sit.down + ' & ' + sit.distance);
-  $('pSpot').textContent = (sit.spotText ? 'at ' + sit.spotText + ' · ' : '') +
-    sit.yardsToGoal + ' to the end zone';
+  $('pSpot').textContent = sit.yardsToGoal === 50 ? 'At midfield' :
+    (sit.spotText ? 'at ' + sit.spotText + ' · ' : '') + sit.yardsToGoal + ' to the end zone';
   $('pHold').textContent = st.hold;
 
   window.FootballHistoryUI.render($('historyComparison'), st.past);
-  $('readLabel').textContent = sh.teachingLevel() === 'game' ? 'Read the game' : 'Where to look';
+  $('readLabel').textContent = sh.teachingLevel() === 'game' ?
+    (st.read && st.read.focus ? 'Player to watch' : 'What to watch') : 'Where to look';
   $('readDetail').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.detail : '');
   $('readWatch').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.watch : '');
   $('readSource').textContent = st.read ? st.read.source : '';
@@ -904,7 +907,7 @@ function render() {
   }
   if (sh.teachingLevel() === 'game' && !st.read) {
     $('pQuiet').hidden = false;
-    $('pQuiet').textContent = 'Waiting for a new pattern or decision.';
+    $('pQuiet').textContent = 'No clear player focus yet. See what changed on the last play.';
   }
 
   if (!st.card) {
@@ -913,7 +916,7 @@ function render() {
     $('pTen').textContent = '';
     $('pWatch').textContent = '';
     $('pQuiet').hidden = false;
-    $('pQuiet').textContent = 'Waiting for the next situation.';
+    $('pQuiet').textContent = 'The next situation will appear when the report arrives.';
     $('pFoot').innerHTML = '';
     $('prime').className = '';
     return;
@@ -969,7 +972,8 @@ function captureGuidance() {
     cardId: st.card.id, lessonId: st.lesson && st.lesson.id, teachingLevel: sh.teachingLevel(), selectionReason: st.selectionReason,
     historicalVisible: historyVisible,
     historyRefs: st.past ? st.past.rows.map(function (r) { return window.FootballHistory.reference(st.past, r); }) : [],
-    read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source, playIds: st.read.playIds, historyRefs: st.read.historyRefs || [] },
+    read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source,
+      focus: st.read.focus, playIds: st.read.playIds, historyRefs: st.read.historyRefs || [] },
     probabilityShown: shown, modelProbability: st.ten && st.ten.pass_rate,
     baselineProbability: st.ten && st.ten.league_pass_rate, attributed: st.attributed });
   if (result && result.ok && result.id) st.journalIds.push(result.id);
@@ -1074,7 +1078,7 @@ sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedg
 // Everything ESPN. Allowed to know what happened.
 (function initLive(sh) {
 
-var FEED_PREVIEW = 5;
+var FEED_PREVIEW = 3;
 var st = {
   gameId: null, games: [], gameLabel: '', gameState: '',
   sum: null,                 // latest raw summary, this scope only
@@ -1242,7 +1246,8 @@ function feedRow(p, abbr, facts) {
     off: s.team && s.team.id ? (abbr[String(s.team.id)] || '') : '',
     when: (p.period && p.period.number ? 'Q' + p.period.number + ' ' : '') +
           ((p.clock && p.clock.displayValue) || ''),
-    plain: facts.summary, kind: facts.kind, raw: facts.raw,
+    plain: facts.summary, gamePlain: facts.gameSummary, gameConsequence: facts.gameConsequence,
+    takeaway: facts.takeaway, provenance: facts.provenance, kind: facts.kind, raw: facts.raw,
     players: facts.players, facts: facts.facts, consequence: facts.consequence,
     meaning: facts.meaning || '', depthText: facts.depthText || '', depthSource: facts.depthSource,
     related: window.FootballLearning.relatedToReport(facts, { level: sh.teachingLevel ? sh.teachingLevel() : 'game' }),
@@ -1625,64 +1630,91 @@ function paintConnection() {
 function renderFeed() {
   var el = $('feed');
   var visibleRows = st.feedExpanded ? st.rows : st.rows.slice(0, FEED_PREVIEW);
-  var more = st.rows.length > FEED_PREVIEW;
   var remaining = st.rows.length - visibleRows.length;
-  $('feedControls').hidden = !more;
+  $('feedControls').hidden = st.rows.length <= FEED_PREVIEW;
   $('feedToggle').setAttribute('aria-expanded', String(st.feedExpanded));
   $('feedToggle').textContent = st.feedExpanded ? 'Show fewer plays' : 'Show ' + remaining + ' more ' + (remaining === 1 ? 'play' : 'plays');
   $('feedCount').textContent = 'Showing ' + visibleRows.length + ' of ' + st.rows.length + ' recent plays';
   if (!st.rows.length) {
-    el.innerHTML = '<div class="empty">Waiting for the first play.</div>';
+    el.innerHTML = '<div class="empty">The latest play will appear here.</div>';
     return;
   }
   var expanded = {}, understood = {};
   el.querySelectorAll('details[data-play]').forEach(function (details) { expanded[details.dataset.play] = details.open; });
   el.querySelectorAll('details[data-understand]').forEach(function (details) { understood[details.dataset.understand] = details.open; });
-  var h = '';
-  for (var i = 0; i < st.rows.length; i++) {
-    var r = st.rows[i];
+  var basic = sh.teachingLevel() === 'basics';
+  el.innerHTML = st.rows.map(function (r, i) {
+    var latest = i === 0;
     var detailsOpen = expanded[r.id] === undefined ? r.reportFirst : expanded[r.id];
-    var facts = r.facts.map(function (fact) {
-      // Keep the feed's optional formation labels readable without a glossary.
-      var label = fact === 'Shotgun' ? 'Quarterback starts back from center' :
-        fact === 'No huddle' ? 'Offense lines up without a huddle' : fact;
-      return '<span class="play-fact">' + sh.esc(label) + '</span>';
+    var copy = feedCopy(r, i, understood[r.id], detailsOpen);
+    var facts = copy.allFacts.map(function (fact) {
+      return '<span class="play-fact">' + window.FootballGlossary.annotate(fact) + '</span>';
     }).join('');
-    h += '<div class="play"' + (i >= visibleRows.length ? ' hidden' : '') + '>' +
-      '<div class="pl1">' + (r.off ? '<b>' + sh.esc(r.off) + '</b>' : '') +
-      '<span>' + sh.esc(r.dd) + '</span>' +
-      '<span class="t num">' + sh.esc(st.health && st.health.unreliableIds.indexOf(r.id) >= 0 ? (r.period ? 'Q' + r.period : '') : r.when) + '</span></div>' +
-      '<div class="pl2 ' + r.kind + '">' + window.FootballGlossary.annotate(r.plain) + '</div>' +
-      (r.revised ? '<span class="report-update">Updated report</span>' : '') +
+    var lesson = r.related ? '<button type="button" class="depth-link" data-lesson="' + sh.esc(r.related.lesson.id) +
+      '" data-lesson-origin="reported-play" data-lesson-play="' + sh.esc(r.id) + '" data-lesson-journal-key="' +
+      sh.esc(sh.journalKey ? sh.journalKey() : '') + '" data-lesson-context="' + sh.esc(r.related.reason) +
+      '" aria-haspopup="dialog" aria-controls="learningSheet">' + sh.esc(r.related.lesson.title) + ' ↗</button>' : '';
+    var more = (!latest && r.takeaway ? '<p>' + window.FootballGlossary.annotate(r.takeaway) + '</p>' +
+        (r.provenance ? '<p class="depth-caption">' + sh.esc(r.provenance) + '</p>' : '') : '') +
+      ((!latest || basic) && r.meaning ? '<p>' + window.FootballGlossary.annotate(r.meaning) + '</p>' : '') +
+      (!latest && copy.allConsequence ? '<p>' + window.FootballGlossary.annotate(copy.allConsequence) + '</p>' : '') +
+      (!basic && facts ? '<div class="play-facts" aria-label="Details reported by ESPN">' + facts + '</div>' : '') + lesson;
+    return '<div class="play' + (latest ? ' latest-play' : ' older-play') + '"' + (i >= visibleRows.length ? ' hidden' : '') + '>' +
+      (i === 1 ? '<div class="earlier-label">Earlier</div>' : '') +
+      '<div class="pl1">' + (r.off ? '<b>' + sh.esc(r.off) + '</b>' : '') + '<span>' + sh.esc(r.dd) + '</span>' +
+      '<span class="t num">' + sh.esc(copy.clock) + '</span></div>' +
+      '<div class="pl2 ' + r.kind + '">' + window.FootballGlossary.annotate(copy.summary) + '</div>' +
       (r.players ? '<p class="play-players">' + sh.esc(r.players) + '</p>' : '') +
-      (facts ? '<div class="play-facts" aria-label="Details reported by ESPN">' + facts + '</div>' : '') +
-      (r.consequence ? '<p class="play-after">' + window.FootballGlossary.annotate(r.consequence) + '</p>' : '') +
-      ((r.meaning || r.depthText || r.related) ? '<details class="play-understand" data-understand="' + sh.esc(r.id) + '"' + (understood[r.id] ? ' open' : '') + '><summary>Understand this play</summary>' +
-        (r.depthText ? '<p>' + sh.esc(r.depthText) + '</p><span class="depth-caption">' + (r.depthSource === 'reported spots' ? 'Calculated from the positions in the play report.' : 'Distances supplied by the play report.') + '</span>' : '') +
-        (r.meaning ? '<p>' + window.FootballGlossary.annotate(r.meaning) + '</p>' : '') +
-        (r.related ? '<button type="button" class="depth-link" data-lesson="' + sh.esc(r.related.lesson.id) + '" data-lesson-origin="reported-play" data-lesson-play="' + sh.esc(r.id) + '" data-lesson-journal-key="' + sh.esc(sh.journalKey ? sh.journalKey() : '') + '" data-lesson-context="' + sh.esc(r.related.reason) + '" aria-haspopup="dialog" aria-controls="learningSheet">' + sh.esc(r.related.lesson.title) + ' <span aria-hidden="true">↗</span></button>' : '') + '</details>' : '') +
-      (r.raw ? '<details class="play-details" data-play="' + sh.esc(r.id) + '"' +
-        (detailsOpen ? ' open' : '') + '><summary>ESPN play report</summary><p class="pl3">' +
-        sh.esc(r.raw) + '</p></details>' : '') +
-      '</div>';
-  }
-  el.innerHTML = h;
-  if (sh.journalShown) {
-    st.journalFeed = st.journalFeed || {};
-    visibleRows.forEach(function (r) {
-      if (st.journalFeed[r.id] === r.version || !st.released[r.id]) return;
-      st.journalFeed[r.id] = r.version;
-      sh.journalShown({ kind: 'play', playId: r.id, report: st.released[r.id],
-        facts: window.FootballPlay.describe(st.released[r.id], teamAbbrs(st.sum)),
-        lines: { summary: r.plain, consequence: r.consequence, players: r.players,
-          situation: r.dd, offense: r.off,
-          clock: st.health && st.health.unreliableIds.indexOf(r.id) >= 0 ? (r.period ? 'Q' + r.period : '') : r.when,
-          facts: r.facts.map(function (f) { return f === 'Shotgun' ? 'Quarterback starts back from center' : f === 'No huddle' ? 'Offense lines up without a huddle' : f; }),
-          meaning: understood[r.id] ? r.meaning : null, depth: understood[r.id] ? r.depthText : null,
-          report: (expanded[r.id] === undefined ? r.reportFirst : expanded[r.id]) ? r.raw : null },
-        historicalOnArrival: r.observedAt === null, timingIssue: r.timingIssue });
-    });
-  }
+      (copy.takeaway ? '<p class="play-takeaway">' + window.FootballGlossary.annotate(copy.takeaway) + '</p>' : '') +
+      (copy.provenance ? '<p class="takeaway-source">' + sh.esc(copy.provenance) + '</p>' : '') +
+      (basic && facts ? '<div class="play-facts" aria-label="Details reported by ESPN">' + facts + '</div>' : '') +
+      (copy.consequence ? '<p class="play-after">' + window.FootballGlossary.annotate(copy.consequence) + '</p>' : '') +
+      (more ? '<details class="play-understand" data-understand="' + sh.esc(r.id) + '"' + (understood[r.id] ? ' open' : '') +
+        '><summary>' + (basic ? 'Understand this play' : 'More about this play') + '</summary>' + more + '</details>' : '') +
+      (r.raw ? '<details class="play-details" data-play="' + sh.esc(r.id) + '"' + (detailsOpen ? ' open' : '') +
+        '><summary>ESPN report' + (r.revised ? ' · updated' : '') + '</summary><p class="pl3">' + sh.esc(r.raw) + '</p></details>' : '') + '</div>';
+  }).join('');
+  captureFeed();
+}
+function feedCopy(r, index, understood, expanded) {
+  var basic = sh.teachingLevel() === 'basics', latest = index === 0;
+  var facts = (r.facts || []).map(function (fact) {
+    return basic && fact === 'Shotgun' ? 'Quarterback starts back from center' :
+      basic && fact === 'No huddle' ? 'Offense lines up without a huddle' : fact;
+  });
+  var consequence = basic ? r.consequence : r.gameConsequence;
+  return {
+    summary: basic ? r.plain : r.gamePlain,
+    consequence: latest ? consequence || null : null, allConsequence: consequence,
+    players: r.players, situation: r.dd, offense: r.off,
+    clock: st.health && st.health.unreliableIds.indexOf(r.id) >= 0 ? (r.period ? 'Q' + r.period : '') : r.when,
+    takeaway: latest ? r.takeaway || null : null, provenance: latest ? r.provenance : null,
+    allFacts: facts, facts: basic || understood ? facts : [],
+    meaning: understood && (basic || !latest) ? r.meaning : null,
+    detailTakeaway: understood && !latest ? r.takeaway : null,
+    detailConsequence: understood && !latest ? consequence : null,
+    report: expanded ? r.raw : null
+  };
+}
+function captureFeed() {
+  if (!sh.journalShown) return;
+  var visibleRows = st.feedExpanded ? st.rows : st.rows.slice(0, FEED_PREVIEW);
+  var details = {}, understood = {};
+  $('feed').querySelectorAll('details[data-play]').forEach(function (el) { details[el.dataset.play] = el.open; });
+  $('feed').querySelectorAll('details[data-understand]').forEach(function (el) { understood[el.dataset.understand] = el.open; });
+  st.journalFeed = st.journalFeed || {};
+  visibleRows.forEach(function (r, i) {
+    if (!st.released[r.id]) return;
+    var copy = feedCopy(r, i, understood[r.id], details[r.id] === undefined ? r.reportFirst : details[r.id]);
+    // Only record rendered lines, not the private fields used to build details.
+    delete copy.allFacts; delete copy.allConsequence;
+    var signature = JSON.stringify([r.version, sh.teachingLevel(), copy]);
+    if (st.journalFeed[r.id] === signature) return;
+    st.journalFeed[r.id] = signature;
+    sh.journalShown({ kind: 'play', playId: r.id, report: st.released[r.id],
+      facts: window.FootballPlay.describe(st.released[r.id], teamAbbrs(st.sum)), lines: copy,
+      teachingLevel: sh.teachingLevel(), historicalOnArrival: r.observedAt === null, timingIssue: r.timingIssue });
+  });
 }
 function renderInsights() {
   var plays = Object.keys(st.released).map(function (id) { return st.released[id]; }).sort(function (a, b) {
@@ -1933,6 +1965,8 @@ function selectGame(id) {
 }
 
 // ---------------------------------------------------------------- wiring
+$('feed').addEventListener('toggle', captureFeed, true);
+sh.bus.on('teaching', renderFeed);
 $('feedToggle').addEventListener('click', function () {
   st.feedExpanded = !st.feedExpanded;
   renderFeed();

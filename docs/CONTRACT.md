@@ -4,6 +4,10 @@ Interfaces every module codes against. Written before implementation so parallel
 
 ## Evidence reads — September 6, 2026
 
+The player-focused pass uses `FootballRead` version `read-4`. Safe aggregates include named receivers/runners, eligible throw/run denominators, naming coverage and the exact supporting play IDs. A focus is rebuilt from released evidence on each selection; missing names, tied leaders, insufficient coverage or a changed possession can invalidate it. Overall carry share does not justify a runner focus on third-and-seven or longer. These are descriptive selection rules, not a fitted forecast or evidence of who is currently on the field.
+
+`FootballPlay.describe` additionally returns `gameSummary`, `gameConsequence`, `takeaway` and `provenance`. The default feed uses the concise summaries and shows the newest takeaway directly. Unsupported takeaways remain empty; source revisions can remove previously valid details. Journals distinguish teaching levels, collapsed details and the actual lines rendered. The combined Game context disclosure controls whether historical percentages count as displayed. See [player-focus verification](PLAYER-FOCUS-2026-09-06.md).
+
 The default main card is now selected by `FootballRead` from the pre-snap whitelist and `FootballInsights.forRead` aggregates of already released plays. This explicitly extends PRIME's input with safe named counts, supporting play IDs and verified drive totals; raw reports still never cross into PRIME. LIVE emits the evidence before the final next-snap event in a queue pump. Corrections recompute the evidence and cannot let newer queued plays jump ahead.
 
 Beginner is an explicit preference and uses the original authored cards; the default does not use that fallback. Prediction questions are opt-in and tied to the main read. A quiet card is valid when there is no supported new observation. Existing historical probability tables are unchanged, displayed in a disclosure with their limitations, and suppressed for fourth-down and urgent late-game decisions.

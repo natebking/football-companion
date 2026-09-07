@@ -27,19 +27,27 @@
   }
 
   function directionCounts() { return { left: 0, middle: 0, right: 0, known: 0, total: 0 }; }
+  function actionCounts() {
+    return { runs: 0, passes: 0, sacks: 0, dropbacks: 0,
+      runPlayIds: [], passPlayIds: [], dropbackPlayIds: [] };
+  }
   function newTeam(id, abbr) {
     return { teamId: id, team: abbr[id] || 'Team ' + id, summaries: [],
       earlyDowns: { runs: 0, passes: 0, sacks: 0, total: 0 },
       directions: { run: directionCounts(), pass: directionCounts() },
+      actions: actionCounts(),
       receivers: [], runners: [],
-      thirdDowns: { attempts: 0, knownDistances: 0, long: 0, conversions: 0, throws: 0, namedTargets: 0, receivers: [], playIds: [] },
+      thirdDowns: { attempts: 0, knownDistances: 0, long: 0, conversions: 0, throws: 0, namedTargets: 0,
+        receivers: [], playIds: [], throwPlayIds: [] },
       playIds: [],
       coverage: { reports: 0, observedPlays: 0, excludedReports: 0, namedTargets: 0, passes: 0,
         namedCarries: 0, runs: 0, verifiedYardage: 0, text: '' } };
   }
-  function named(list, name, receiver) {
+  function named(list, name, receiver, playId) {
     var entry = list.find(function (item) { return item.name === name; });
-    if (!entry) { entry = receiver ? { name: name, targets: 0, catches: 0, yards: 0 } : { name: name, carries: 0, yards: 0 }; list.push(entry); }
+    if (!entry) { entry = receiver ? { name: name, targets: 0, catches: 0, yards: 0, playIds: [] } :
+      { name: name, carries: 0, yards: 0, playIds: [] }; list.push(entry); }
+    if (playId !== undefined) entry.playIds.push(String(playId));
     return entry;
   }
   function addYards(entry, yards) { entry.yards = entry.yards === null || yards === null ? null : entry.yards + yards; }
@@ -48,7 +56,11 @@
     c.reports++;
     if (!action || r.clockPlay) { c.excludedReports++; return; }
     c.observedPlays++;
-    team.playIds.push(String(r.p.id));
+    var playId = String(r.p.id), actions = team.actions;
+    team.playIds.push(playId);
+    if (action === 'run') { actions.runs++; actions.runPlayIds.push(playId); }
+    if (action === 'pass') { actions.passes++; actions.dropbacks++; actions.passPlayIds.push(playId); actions.dropbackPlayIds.push(playId); }
+    if (action === 'sack') { actions.sacks++; actions.dropbacks++; actions.dropbackPlayIds.push(playId); }
     if ((r.p.start || {}).down === 3) {
       var third = team.thirdDowns;
       third.attempts++;
@@ -61,9 +73,10 @@
       if (!f.turnover && Number.isFinite(f.gained) && Number.isFinite(f.need) && f.gained >= f.need) third.conversions++;
       if (action === 'pass') {
         third.throws++;
+        third.throwPlayIds.push(playId);
         if (f.people.receiver) {
           third.namedTargets++;
-          named(third.receivers, f.people.receiver, true).targets++;
+          named(third.receivers, f.people.receiver, true, playId).targets++;
         }
       }
     }
@@ -82,13 +95,13 @@
       c.runs++;
       if (f.people.runner) {
         c.namedCarries++;
-        var runner = named(team.runners, f.people.runner, false); runner.carries++; addYards(runner, f.gained);
+        var runner = named(team.runners, f.people.runner, false, playId); runner.carries++; addYards(runner, f.gained);
       }
     } else if (action === 'pass') {
       c.passes++;
       if (f.people.receiver) {
         c.namedTargets++;
-        var receiver = named(team.receivers, f.people.receiver, true); receiver.targets++;
+        var receiver = named(team.receivers, f.people.receiver, true, playId); receiver.targets++;
         var complete = !/\bincomplete\b|\bintercepted\b/i.test(r.text) &&
           (/\bpass complete\b/i.test(r.text) || /reception/i.test((r.p.type || {}).text || ''));
         if (complete) { receiver.catches++; addYards(receiver, f.gained); }
@@ -142,8 +155,9 @@
     var result = { id: id, teamId: first.teamId, team: abbr[first.teamId] || 'Team ' + first.teamId,
       label: 'Latest drive', summary: '', complete: false, verified: true, playCount: 0,
       netYards: null, playYards: null, penaltyYards: null, progress: [],
-      sacks: 0, playIds: [],
-      coverage: { reports: 0, verifiedMovements: 0, unverifiedReports: 0 } };
+      sacks: 0, playIds: [], actions: actionCounts(), receivers: [], runners: [],
+      coverage: { reports: 0, verifiedMovements: 0, unverifiedReports: 0,
+        passes: 0, namedTargets: 0, runs: 0, namedCarries: 0 } };
     var previous = null, playTotal = 0, penaltyTotal = 0, end = '', started = false;
     members.forEach(function (r) {
       if (r.kickoff || r.conversion) return;
@@ -156,8 +170,27 @@
       }
       if (/^\s*PENALTY\b/i.test(r.text) && /\bdeclined\b/i.test(r.text) && !r.penalty && !r.noPlay) return;
       result.coverage.reports++;
-      result.playIds.push(String(r.p.id));
-      if (r.action === 'sack') result.sacks++;
+      var playId = String(r.p.id);
+      result.playIds.push(playId);
+      if (r.action === 'sack' && r.teamId === result.teamId) result.sacks++;
+      if (r.teamId === result.teamId && !r.clockPlay) {
+        if (r.action === 'run') {
+          result.actions.runs++; result.actions.runPlayIds.push(playId); result.coverage.runs++;
+          if (r.f.people.runner) {
+            result.coverage.namedCarries++;
+            named(result.runners, r.f.people.runner, false, playId).carries++;
+          }
+        } else if (r.action === 'pass') {
+          result.actions.passes++; result.actions.dropbacks++; result.actions.passPlayIds.push(playId);
+          result.actions.dropbackPlayIds.push(playId); result.coverage.passes++;
+          if (r.f.people.receiver) {
+            result.coverage.namedTargets++;
+            named(result.receivers, r.f.people.receiver, true, playId).targets++;
+          }
+        } else if (r.action === 'sack') {
+          result.actions.sacks++; result.actions.dropbacks++; result.actions.dropbackPlayIds.push(playId);
+        }
+      }
       if (!started) {
         started = true;
         if ((r.p.start || {}).down !== 1) result.verified = false;
@@ -178,6 +211,8 @@
       end = ending(r) || end;
     });
     result.complete = !!end;
+    result.receivers.sort(function (a, b) { return b.targets - a.targets || a.name.localeCompare(b.name); });
+    result.runners.sort(function (a, b) { return b.carries - a.carries || a.name.localeCompare(b.name); });
     result.verified = result.verified && result.coverage.verifiedMovements > 0;
     if (result.verified) {
       result.playYards = playTotal; result.penaltyYards = penaltyTotal; result.netYards = playTotal + penaltyTotal;
@@ -217,15 +252,27 @@
     var d = summary.drive;
     return {
       gameId: String(gameId || ''),
-      drive: d ? { id: d.id, teamId: d.teamId, complete: d.complete, verified: d.verified,
+      drive: d ? { id: d.id, teamId: d.teamId, team: d.team, complete: d.complete, verified: d.verified,
         playCount: d.playCount, playYards: d.playYards, penaltyYards: d.penaltyYards,
-        sacks: d.sacks, playIds: d.playIds.slice() } : null,
+        sacks: d.sacks, playIds: d.playIds.slice(), actions: Object.assign({}, d.actions, {
+          runPlayIds: d.actions.runPlayIds.slice(), passPlayIds: d.actions.passPlayIds.slice(),
+          dropbackPlayIds: d.actions.dropbackPlayIds.slice() }),
+        coverage: { passes: d.coverage.passes, namedTargets: d.coverage.namedTargets,
+          runs: d.coverage.runs, namedCarries: d.coverage.namedCarries },
+        receivers: d.receivers.map(function (r) { return { name: r.name, targets: r.targets, playIds: r.playIds.slice() }; }),
+        runners: d.runners.map(function (r) { return { name: r.name, carries: r.carries, playIds: r.playIds.slice() }; }) } : null,
       teams: summary.teams.map(function (t) { return { teamId: t.teamId, team: t.team,
         earlyDowns: Object.assign({}, t.earlyDowns), playIds: t.playIds.slice(),
+        actions: Object.assign({}, t.actions, { runPlayIds: t.actions.runPlayIds.slice(), passPlayIds: t.actions.passPlayIds.slice(),
+          dropbackPlayIds: t.actions.dropbackPlayIds.slice() }),
+        coverage: { passes: t.coverage.passes, namedTargets: t.coverage.namedTargets,
+          runs: t.coverage.runs, namedCarries: t.coverage.namedCarries },
+        receivers: t.receivers.map(function (r) { return { name: r.name, targets: r.targets, playIds: r.playIds.slice() }; }),
+        runners: t.runners.map(function (r) { return { name: r.name, carries: r.carries, playIds: r.playIds.slice() }; }),
         thirdDowns: { attempts: t.thirdDowns.attempts, knownDistances: t.thirdDowns.knownDistances, long: t.thirdDowns.long,
           conversions: t.thirdDowns.conversions, throws: t.thirdDowns.throws,
-          namedTargets: t.thirdDowns.namedTargets, playIds: t.thirdDowns.playIds.slice(),
-          receivers: t.thirdDowns.receivers.map(function (r) { return { name: r.name, targets: r.targets }; }) }
+          namedTargets: t.thirdDowns.namedTargets, playIds: t.thirdDowns.playIds.slice(), throwPlayIds: t.thirdDowns.throwPlayIds.slice(),
+          receivers: t.thirdDowns.receivers.map(function (r) { return { name: r.name, targets: r.targets, playIds: r.playIds.slice() }; }) }
       }; })
     };
   }

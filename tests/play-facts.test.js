@@ -11,6 +11,42 @@ function fixture(name) {
 }
 function copy(name) { return structuredClone(fixtures[name]); }
 
+// Reports inspected in the September 6 Louisville–Ole Miss live audit.
+function auditedPlay(id) {
+  const abbr = { '145': 'MISS', '97': 'LOU' };
+  const plays = {
+    '693': {
+      id: '401856661693', type: { text: 'Pass Reception' },
+      text: 'No Huddle-Shotgun #6 T.Chambliss pass complete short right to #26 J.Lindsey caught at Miss41, for 4 yards to the Miss50 (#11 T.Capers)',
+      statYardage: 4,
+      start: { down: 1, distance: 10, yardsToEndzone: 54, possessionText: 'MISS 46', team: { id: '145' } },
+      end: { down: 2, distance: 6, yardsToEndzone: 50, possessionText: '50', team: { id: '145' } }
+    },
+    '709': {
+      id: '401856661709', type: { text: 'Pass Reception' },
+      text: 'No Huddle-Shotgun #6 T.Chambliss pass complete short left to #11 H.Fields caught at Lou48, for 14 yards to the Lou40 (#4 T.Banks; #11 T.Capers)',
+      statYardage: 14,
+      start: { down: 1, distance: 25, yardsToEndzone: 54, possessionText: 'MISS 46', team: { id: '145' } },
+      end: { down: 2, distance: 11, yardsToEndzone: 40, possessionText: 'LOU 40', team: { id: '145' } }
+    },
+    '714': {
+      id: '401856661714', type: { text: 'Pass Incompletion' },
+      text: 'No Huddle-Shotgun #6 T.Chambliss pass incomplete deep right thrown to Lou20 QB hurried by #4 T.Banks',
+      statYardage: 0,
+      start: { down: 2, distance: 11, yardsToEndzone: 40, possessionText: 'LOU 40', team: { id: '145' } },
+      end: { down: 3, distance: 11, yardsToEndzone: 40, possessionText: 'LOU 40', team: { id: '145' } }
+    },
+    '720': {
+      id: '401856661720', type: { text: 'Penalty' }, isPenalty: true,
+      text: '#17 L.Carneiro field goal attempt from 57 yards NO GOOD (H: #33 O.Bird, LS: #50 C.Blankenship), clock 00:00, End Of Play PENALTY Lou Roughing The Kicker (#12 D.Waller) 15 yards from Lou40 to Lou25, 1ST DOWN. NO PLAY',
+      statYardage: 15,
+      start: { down: 4, distance: 11, yardsToEndzone: 40, possessionText: 'LOU 40', team: { id: '145' } },
+      end: { down: 1, distance: 10, yardsToEndzone: 25, possessionText: 'LOU 25', team: { id: '145' } }
+    }
+  };
+  return { play: structuredClone(plays[id]), abbr };
+}
+
 test('ordinary run: gives the next down and explicit direction', () => {
   const p = fixture('normalRun');
   assert.equal(p.summary, 'Run for 4 yards.');
@@ -409,4 +445,86 @@ test('sacks and knees can contribute verified drive movement while staying ungra
   assert.equal(p.movement.net, -1);
   assert.equal(p.gained, null);
   assert.equal(p.outcome, 'other');
+});
+
+test('audited catch and long-distance reports produce compact reconciled takeaways', () => {
+  let f = auditedPlay('693');
+  let p = describe(f.play, f.abbr);
+  assert.equal(p.takeaway, 'J.Lindsey caught it 5 yards behind the line of scrimmage, then gained 9 yards after the catch: 4 yards overall.');
+  assert.match(p.provenance, /start, catch, and end positions/);
+
+  f = auditedPlay('709'); p = describe(f.play, f.abbr);
+  assert.equal(p.takeaway, 'H.Fields gained 14 yards, still leaving 11 yards to the first-down line.');
+  assert.match(p.provenance, /down, distance, gain, and end position/);
+});
+
+test('catch takeaways disappear when component distances contradict the reported catch spot', () => {
+  const f = auditedPlay('693');
+  f.play.airYards = -4; f.play.yardsAfterCatch = 8;
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.airYards, null);
+  assert.equal(p.depthText, '');
+  assert.equal(p.takeaway, '');
+  assert.equal(p.provenance, null);
+});
+
+test('a named quarterback hurry stays an attributed report fact across revisions', () => {
+  const f = auditedPlay('714');
+  let p = describe(f.play, f.abbr);
+  assert.equal(p.takeaway, 'The play report credits #4 T.Banks with a quarterback hurry.');
+  assert.equal(p.provenance, 'Quarterback hurry attributed by the play report.');
+  assert.doesNotMatch(p.takeaway, /caused|blitz|block/i);
+  assert.equal(p.depthText, '', 'An intended throw location is not a catch position.');
+
+  f.play.text = 'No Huddle-Shotgun #6 T.Chambliss pass incomplete deep right thrown to Lou20 Original Play: #6 T.Chambliss pass incomplete short right QB hurried by #4 T.Banks';
+  p = describe(f.play, f.abbr);
+  assert.equal(p.takeaway, '', 'A stale Original Play clause cannot restore a removed hurry.');
+  assert.equal(p.outcome, 'pass');
+});
+
+test('audited roughing ruling names the accepted penalty and possession consequence', () => {
+  const f = auditedPlay('720');
+  const p = describe(f.play, f.abbr);
+  assert.equal(p.gameSummary, 'Penalty: roughing the kicker.');
+  assert.equal(p.takeaway, 'The missed 57-yard field goal did not end the drive: a 15-yard penalty for roughing the kicker gave the offense a first down at LOU 25.');
+  assert.match(p.provenance, /yardage checked/);
+  assert.equal(p.gameConsequence, '', 'The advanced view states the complete ruling once.');
+  assert.deepEqual(p.movement, { start: 40, end: 25, net: 15, play: 0, penalty: 15 });
+});
+
+test('declined, offsetting, multiple, and unreconciled penalties get no compressed ruling', () => {
+  const base = auditedPlay('720');
+  const changes = [
+    text => text.replace('15 yards from', '15 yards declined from'),
+    text => text.replace('15 yards from', '15 yards offsetting from'),
+    text => text + ' PENALTY Miss Holding (#70 A.Player) 10 yards from Lou25 to Lou35.',
+    text => text.replace('15 yards from', '10 yards from')
+  ];
+  for (const change of changes) {
+    const f = structuredClone(base); f.play.text = change(f.play.text);
+    const p = describe(f.play, f.abbr);
+    assert.equal(p.takeaway, '', f.play.text);
+    assert.equal(p.provenance, null, f.play.text);
+  }
+});
+
+test('advanced summaries omit beginner definitions for sacks and interceptions', () => {
+  assert.equal(fixture('sack').gameSummary, 'Sack for a loss of 5 yards.');
+  assert.equal(fixture('sack').gameConsequence, 'Next: 3rd & 10 at OSU 37.');
+  assert.equal(fixture('interception').gameSummary, 'Interception.');
+  assert.equal(fixture('interception').gameConsequence, 'IU takes possession.');
+  assert.equal(fixture('touchdownPass').gameSummary, '48-yard touchdown pass.');
+  assert.equal(fixture('touchdownPass').gameConsequence, 'Extra point good.');
+  assert.equal(fixture('touchdownPass').takeaway, '', 'The scoring result is more useful than a zero-YAC breakdown.');
+  assert.doesNotMatch(fixture('sack').gameSummary, /before throwing/);
+  assert.doesNotMatch(fixture('interception').gameSummary, /defender caught/);
+});
+
+test('advanced consequences keep useful state changes and drop bare scoring definitions', () => {
+  assert.equal(fixture('normalRun').gameConsequence, fixture('normalRun').consequence);
+  assert.equal(fixture('penalty').gameConsequence, '');
+  assert.equal(fixture('penalty').takeaway, 'Delay of game moved the ball 5 yards back. Next: 1st & 15 at BALL 20.');
+  assert.equal(describe({ type: { text: 'Field Goal Good' }, scoringPlay: true,
+    scoringType: { name: 'fieldGoal' }, text: '42 yard field goal is GOOD' }).gameConsequence, '');
+  assert.equal(describe({ type: { text: 'Safety' }, scoringType: { name: 'safety' } }).gameConsequence, '');
 });
