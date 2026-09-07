@@ -45,7 +45,7 @@ function auditGame(game, review, historyData) {
     if (entry.kind === 'read_feedback' && moment && ['useful', 'obvious', 'unsupported'].includes(entry.rating)) moment.feedback = entry.rating;
   }
   const retained = new Map(), recordedHistory = [], proposedHistory = [], rows = [];
-  let cursor = 0;
+  let cursor = 0, lastShown = null, lastRecorded = null, lastProposed = null;
   for (const moment of moments.values()) {
     const shown = moment.shown;
     const at = shown.shownAt ?? shown.at;
@@ -56,7 +56,9 @@ function auditGame(game, review, historyData) {
     const summary = insights.summarize([...retained.values()], { teamAbbreviations: abbr });
     const evidence = insights.forRead(summary, game.meta.gameId);
     const past = history.lookup(historyData, shown.situation, game.meta.league);
-    const proposed = read.select(shown.situation, evidence, proposedHistory, past);
+    const refresh = shown.selectionReason === 'context' && lastShown && shown.basisPlayId === lastShown.basisPlayId &&
+      shown.situation.sitKey === lastShown.situation.sitKey;
+    const proposed = read.select(shown.situation, evidence, refresh && lastProposed ? proposedHistory.filter(key => key !== lastProposed.key) : proposedHistory, past);
     const eligible = read.candidates(shown.situation, evidence, past);
     const recorded = shown.read;
     const refs = recorded && recorded.historyRefs || [];
@@ -66,14 +68,15 @@ function auditGame(game, review, historyData) {
     const sameVersion = recorded && recorded.version === read.version;
     const reproducible = sameVersion && historyAvailable ? eligible.some(c => c.key === recorded.key &&
       c.headline === shown.lines.watch && c.detail === shown.lines.detail && c.watch === shown.lines.observation) : null;
-    const repeated = !!recorded && recordedHistory.slice(-6).includes(recorded.key) &&
+    const repeated = !!recorded && !(refresh && lastRecorded && recorded.key === lastRecorded.key) && recordedHistory.slice(-6).includes(recorded.key) &&
       !['fourth_down', 'protect_clock', 'chasing_score'].includes(recorded.id);
     if (moment.visible) rows.push({ shownId: shown.id, at, basisPlayId: shown.basisPlayId, recordedRead: recorded ? recorded.id : null,
       proposedRead: proposed ? proposed.id : null, sameVersion: !!sameVersion,
-      reproducible, missingSupport, historyAvailable, repeated, feedback: moment.feedback,
+      reproducible, missingSupport, historyAvailable, refreshedContext: !!refresh, repeated, feedback: moment.feedback,
       releasedReports: retained.size, predictionScored: false });
-    recordedHistory.push(recorded ? recorded.key : 'quiet');
-    proposedHistory.push(proposed ? proposed.key : 'quiet');
+    if (!refresh || (recorded && recorded.key) !== (lastRecorded && lastRecorded.key)) recordedHistory.push(recorded ? recorded.key : 'quiet');
+    if (!refresh || (proposed && proposed.key) !== (lastProposed && lastProposed.key)) proposedHistory.push(proposed ? proposed.key : 'quiet');
+    lastShown = shown; lastRecorded = recorded; lastProposed = proposed;
   }
   const comparison = journal.compare(game, review);
   return {

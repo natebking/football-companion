@@ -147,3 +147,25 @@ test('questions are off unless explicitly enabled and do not force coin-flip gue
   enabled = true; assert.equal(c.askEligible({ kind: 'gokick', priority: 80 }), true);
   assert.equal(c.askEligible({ kind: 'passrun', priority: 80 }), false);
 });
+
+test('a context refresh updates late-game guidance without a new exposure or question', () => {
+  const app = fs.readFileSync(require.resolve('../web/app.js'), 'utf8'), handlers = {}, closed = [];
+  const s = { ...sit, down:2, distance:10, period:4, clockSeconds:301, scoreDiff:3, sitKey:'2|10|25|68' };
+  const c = vm.createContext({
+    window: { FootballRead:read, FootballHistory:require('../web/game-history.js'), FootballLearning:require('../web/learning.js') },
+    st: { sit:s, sitKey:s.sitKey, rate:null, ten:null, read:null, readHistory:[], evidence, selectionReason:'snap', sinceAsk:5 },
+    sh: { teachingLevel:()=> 'game', history:()=>null, league:()=> 'cfb', bus:{on:(name,fn)=>handlers[name]=fn} },
+    closePending:reason=>closed.push(reason), render:()=>{}
+  });
+  vm.runInContext(app.slice(app.indexOf('function refreshRead('), app.indexOf('// ---------------------------------------------------------------- the ask')), c);
+  const begin=app.indexOf("sh.bus.on('context'");
+  vm.runInContext(app.slice(begin, app.indexOf('// ---------------------------------------------------------------- render',begin)),c);
+  c.setGuidance(true); c.st.pending={answer:'run'};
+  assert.equal(c.st.read.id,'second_long');
+  handlers.context({...s,clockSeconds:299});
+  assert.equal(c.st.read.id,'protect_clock'); assert.equal(closed.length,1); assert.equal(c.st.sinceAsk,5);
+  const n=c.st.readHistory.length;
+  handlers.context({...s,clockSeconds:290});
+  assert.equal(c.st.readHistory.length,n); assert.match(c.st.read.detail,/4:50/);
+  handlers.context({...s,gameId:'different'}); assert.equal(c.st.sit.clockSeconds,290);
+});

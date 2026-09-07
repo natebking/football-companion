@@ -76,6 +76,17 @@ test('repetition checks use the compact metadata saved by the real browser', () 
   game.shown.push({ ...structuredClone(game.shown[0]), id: 'shown:2', shownAt: 1501, basisPlayId: '4' });
   assert.equal(auditGame(game).summary.repeatedWithinSixMoments, 1);
 });
+test('clock refreshes retain the same read without consuming cooldown history', () => {
+  const game = fixture(); game.shown[0].situation.sitKey = '3|8|70|68';
+  for (let i = 0; i < 8; i++) game.shown.push({ ...structuredClone(game.shown[0]), id: 'refresh:' + i,
+    shownAt: 1501 + i, selectionReason: 'context', situation: { ...game.shown[0].situation, clockSeconds: 599 - i } });
+  game.shown.push({ ...structuredClone(game.shown[0]), id:'next-play', shownAt:1600, basisPlayId:'next', read:null });
+  const report = auditGame(game);
+  assert.equal(report.summary.repeatedWithinSixMoments, 0);
+  assert.equal(report.rows.filter(r => r.refreshedContext).length, 8);
+  assert.ok(report.rows.slice(0,9).every(r => r.proposedRead === 'third_down_target'));
+  assert.equal(report.rows.at(-1).proposedRead, 'third_down_distance');
+});
 test('invalid source relationships and duplicate records fail explicitly', () => {
   for (const mutate of [
     g => g.sources.push(g.sources[0]), g => g.releases[0].revisionId = 'missing',

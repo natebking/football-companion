@@ -222,6 +222,71 @@ test('historical season context travels with the delayed snap and is never infer
   assert.equal(snap.season, 2026);
 });
 
+test('score and clock refresh the same upcoming play only after the TV delay', () => {
+  const h = liveQueue(), play = runPlay(), summary = summaryOf([play]);
+  const comp = summary.header.competitions[0];
+  comp.competitors[0].homeAway = 'home'; comp.competitors[1].homeAway = 'away';
+  comp.status.period = 4; comp.status.displayClock = '5:01';
+  h.context.applySummary(summary); h.tick(110000);
+  assert.equal(h.context.st.shownBoard.detail, 'Q4 5:01');
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 1);
+  const transitions = h.events.filter(e => e.name === 'transition').length;
+  h.setNow(111000); comp.status.displayClock = '4:59'; comp.competitors[0].score = '7';
+  summary.header.season = { year: 2026, type: 2 };
+  h.context.applySummary(summary); h.tick(120999);
+  assert.equal(h.context.st.shownBoard.homeScore, 0);
+  assert.equal(h.events.filter(e => e.name === 'context').length, 0);
+  h.tick(121000);
+  const next = h.events.find(e => e.name === 'context').value;
+  assert.equal(next.clockSeconds, 299); assert.equal(next.scoreDiff, 7); assert.equal(next.season, 2026);
+  assert.equal(h.context.st.shownBoard.detail, 'Q4 4:59'); assert.equal(h.context.st.shownBoard.homeScore, 7);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 1);
+  assert.equal(h.events.filter(e => e.name === 'transition').length, transitions);
+  h.setNow(122000); h.context.applySummary(summary); h.tick(132000);
+  assert.equal(h.events.filter(e => e.name === 'context').length, 1, 'Identical polls are not new context.');
+});
+
+test('a later report with identical end position is a new snap, not a clock refresh', () => {
+  const h = liveQueue(), a = runPlay(), b = runPlay(); b.id = 'another-play-same-end';
+  h.context.applySummary(summaryOf([a])); h.tick(110000);
+  h.setNow(111000); h.context.applySummary(summaryOf([a,b])); h.tick(121000);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 2);
+  assert.equal(h.events.filter(e => e.name === 'context').length, 0);
+});
+
+test('catch-up publishes one new snap with its latest due clock', () => {
+  const h = liveQueue(), summary = summaryOf([runPlay()]);
+  h.context.applySummary(summary);
+  h.setNow(101000); summary.header.competitions[0].status.displayClock = '9:57'; h.context.applySummary(summary);
+  h.tick(111000);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 1);
+  assert.equal(h.events.find(e => e.name === 'snap').value.clockSeconds, 597);
+  assert.equal(h.events.filter(e => e.name === 'context').length, 0);
+});
+
+test('a corrected report also holds its dependent clock refresh behind the full delay', () => {
+  const h = liveQueue(), play = runPlay(), summary = summaryOf([play]);
+  h.context.applySummary(summary);
+  h.setNow(101000); summary.header.competitions[0].status.displayClock = '9:57'; h.context.applySummary(summary);
+  h.setNow(102000); play.text += ' Corrected report.'; h.context.applySummary(summary);
+  h.tick(111000);
+  assert.equal(h.events.filter(e => ['snap','context'].includes(e.name)).length, 0);
+  h.tick(112000);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 1);
+  assert.equal(h.events.find(e => e.name === 'snap').value.clockSeconds, 597);
+});
+
+test('unknown scoreboard values stay unknown and final status follows its delay', () => {
+  const h = liveQueue(), summary = summaryOf([runPlay()]), comp = summary.header.competitions[0];
+  comp.competitors[0].homeAway = 'home'; comp.competitors[0].score = null;
+  comp.competitors[1].homeAway = 'away'; comp.competitors[1].score = '';
+  h.context.applySummary(summary); h.tick(110000);
+  assert.equal(h.context.st.shownBoard.homeScore, null); assert.equal(h.context.st.shownBoard.awayScore, null);
+  h.setNow(111000); comp.status.type = { state:'post', name:'STATUS_FINAL', detail:'Final' }; h.context.applySummary(summary);
+  assert.notEqual(h.context.st.shownBoard.detail, 'Final');
+  h.tick(121000); assert.equal(h.context.st.shownBoard.detail, 'Final');
+});
+
 test('a delayed game never reveals the current score before a historical score is available', () => {
   const elements = {};
   const context = vm.createContext({

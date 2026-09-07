@@ -301,7 +301,7 @@ var shell = {
 (function initPrime(sh) {
 
 var st = {
-  evidence: null, read: null, readHistory: [], past: null,
+  evidence: null, read: null, readHistory: [], past: null, selectionReason: 'snap',
   sit: null, sitKey: '', card: null, ten: null, lesson: null,
   sitLine: '', tendLine: '', watchLine: '', attributed: false, rate: null,
   ask: null,          // {id, kind, q, opts, priority}
@@ -462,13 +462,14 @@ sh.bus.on('evidenceChanged', function () {
 
 function refreshRead(remember) {
   var history = st.readHistory.slice();
+  var previousKey = st.read && st.read.key;
   // Re-rendering a preference or a correction may retain a still-valid read.
   if (!remember && st.read) history = history.filter(function (key) { return key !== st.read.key; });
   st.read = window.FootballRead.select(st.sit, st.evidence, history, st.past);
   st.lesson = st.read && st.read.lessonId ? window.FootballLearning.get(st.read.lessonId, { level: 'game' }) : null;
   st.card = { id: st.read ? st.read.id : 'quiet_read', prints_number: !!st.tendLine, concepts: st.lesson ? st.lesson.concepts : [] };
   st.watchLine = st.read ? st.read.headline : '';
-  if (remember) {
+  if (remember || (st.selectionReason === 'context' && previousKey !== (st.read && st.read.key))) {
     st.readHistory.push(st.read ? st.read.key : 'quiet');
     st.readHistory = st.readHistory.slice(-6);
   }
@@ -696,6 +697,7 @@ sh.bus.on('snap', function (sit) {
   st.skippedGrade = false;
 
   st.sit = sit;
+  st.selectionReason = 'snap';
   st.sitKey = sit.sitKey;
   st.sinceAsk += 1;
 
@@ -739,6 +741,18 @@ sh.bus.on('snap', function (sit) {
   }
   render();
   flash();
+});
+
+// The same upcoming play can acquire a different clock, score or data-quality
+// state. Refresh its read without advancing exposure/cooldown or opening a pick.
+sh.bus.on('context', function (sit) {
+  if (!st.sit || st.sitKey !== sit.sitKey || st.sit.gameId !== sit.gameId) return;
+  var previousCard = st.card && st.card.id;
+  st.sit = sit;
+  st.selectionReason = 'context';
+  setGuidance(false);
+  if (st.pending && previousCard !== (st.card && st.card.id)) closePending('The situation changed before this pick was resolved.');
+  render();
 });
 
 // ---------------------------------------------------------------- render
@@ -893,7 +907,7 @@ function captureGuidance() {
   var shown = printed && historyVisible ? Number(printed[1]) / 100 : null;
   if (shown !== null && /\brun\b/i.test(st.tendLine)) shown = 1 - shown;
   var result = sh.journalShown({ kind: 'guidance', lines: lines, situation: st.sit,
-    cardId: st.card.id, lessonId: st.lesson && st.lesson.id, teachingLevel: sh.teachingLevel(),
+    cardId: st.card.id, lessonId: st.lesson && st.lesson.id, teachingLevel: sh.teachingLevel(), selectionReason: st.selectionReason,
     historicalVisible: historyVisible,
     historyRefs: st.past ? st.past.rows.map(function (r) { return window.FootballHistory.reference(st.past, r); }) : [],
     read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source, playIds: st.read.playIds, historyRefs: st.read.historyRefs || [] },
@@ -1007,7 +1021,8 @@ var st = {
   sum: null,                 // latest raw summary, this scope only
   seen: {}, order: {}, queue: [], rows: [], released: {}, shownPlay: null, feedExpanded: false,
   health: null, lastQueuedHealth: '', lastChange: 0, syncCandidate: null, syncSample: null, timingBreak: null,
-  lastQueuedSit: '', lastQueuedBasis: '', primed: false, lastOk: 0, sheet: false
+  lastQueuedSit: '', lastQueuedBasis: '', lastQueuedContext: '', lastQueuedBoard: '', shownBoard: null,
+  primed: false, lastOk: 0, sheet: false
 };
 
 function etDate(offsetDays) {
@@ -1273,6 +1288,22 @@ function playSitKey(p, abbr) {
 }
 
 // ---------------------------------------------------------------- delay queue
+function boardSnapshot(sum) {
+  var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
+  if (!comp) return null;
+  var cs = comp.competitors || [], status = comp.status || {}, type = status.type || {};
+  function score(side) {
+    var c = cs.find(function (item) { return item.homeAway === side; });
+    return c && c.score != null && String(c.score).trim() !== '' && Number.isInteger(Number(c.score)) && Number(c.score) >= 0 ? Number(c.score) : null;
+  }
+  var period = Number(status.period) || 0, clock = String(status.displayClock || '');
+  var inPlay = type.state === 'in' && type.name !== 'STATUS_HALFTIME' && type.name !== 'STATUS_DELAYED';
+  return { homeScore: score('home'), awayScore: score('away'), period: period,
+    detail: inPlay ? (Number.isInteger(period) && period >= 1 ?
+      (period > 4 ? 'OT' + (period > 5 ? ' ' + (period - 4) : '') : 'Q' + period) +
+      (clockToSeconds(clock) !== null ? ' ' + clock : ' · Clock unavailable') : 'Clock unavailable') :
+      (type.shortDetail || type.detail || '') };
+}
 function due(item) { return item.at === 0 ? 0 : item.at + sh.delayMs(); }
 function pump(trigger) {
   var now = Date.now(), moved = false, nextSnap = null;
@@ -1311,6 +1342,12 @@ function pump(trigger) {
     } else if (it.kind === 'snap' || it.kind === 'nosnap') {
       sh.bus.emit('transition');
       nextSnap = it;
+    } else if (it.kind === 'context') {
+      // If this pump also advances to a new play, publish its final context as
+      // one new snap. A context-only refresh never closes an existing pick.
+      nextSnap = Object.assign({}, it, { kind: nextSnap && nextSnap.kind !== 'context' ? 'snap' : 'context' });
+    } else if (it.kind === 'board') {
+      st.shownBoard = it.board;
     } else if (it.kind === 'health') {
       st.health = it.health;
     }
@@ -1322,9 +1359,9 @@ function pump(trigger) {
   if (sh.journalSources && journalReleases.length) sh.journalSources(journalReleases);
   if (nextSnap) {
     if (sh.journalBasis) sh.journalBasis(nextSnap.basis, nextSnap.version);
-    sh.diag(nextSnap.kind, nextSnap.kind === 'snap' ?
+    sh.diag(nextSnap.kind, nextSnap.kind !== 'nosnap' ?
       { sit: nextSnap.sit.sitKey, basis: nextSnap.basis, version: nextSnap.version } : nextSnap.msg);
-    sh.bus.emit(nextSnap.kind, nextSnap.kind === 'snap' ? nextSnap.sit : nextSnap.msg);
+    sh.bus.emit(nextSnap.kind, nextSnap.kind !== 'nosnap' ? nextSnap.sit : nextSnap.msg);
   }
   if (released.length) sh.diag('queue_release', {
     trigger: trigger || 'tick', ids: released, count: released.length,
@@ -1399,7 +1436,7 @@ function applySummary(sum) {
     // corrected version is waiting for the same broadcast delay.
     var queuedPlay = st.queue.find(function (item) { return item.kind === 'play' && item.row.id === id; });
     st.queue = st.queue.filter(function (item) {
-      var remove = (item.kind === 'snap' || item.kind === 'nosnap') && item.basis === id;
+      var remove = (item.kind === 'snap' || item.kind === 'nosnap' || item.kind === 'context') && item.basis === id;
       if (remove && item.kind !== 'play' && item.basis === st.lastQueuedBasis) st.lastQueuedSit = null;
       return !remove;
     });
@@ -1440,15 +1477,24 @@ function applySummary(sum) {
     last_change_at: st.lastChange, delay_ms: sh.delayMs(), next_release_at: st.queue.length ? due(st.queue[0]) : null
   });
   if (sit) {
-    if (sit.sitKey !== st.lastQueuedSit) {
+    var contextKey = JSON.stringify(sit);
+    if (sit.sitKey !== st.lastQueuedSit || basis !== st.lastQueuedBasis) {
       st.lastQueuedSit = sit.sitKey; st.lastQueuedBasis = basis;
       st.queue.push({ kind: 'snap', at: now, sit: sit, basis: basis, version: version });
+    } else if (contextKey !== st.lastQueuedContext) {
+      st.queue.push({ kind: 'context', at: now, sit: sit, basis: basis, version: version });
     }
+    st.lastQueuedContext = contextKey;
   } else if (st.lastQueuedSit !== '' || first) {
-    st.lastQueuedSit = ''; st.lastQueuedBasis = basis;
+    st.lastQueuedSit = ''; st.lastQueuedBasis = basis; st.lastQueuedContext = '';
     st.queue.push({ kind: 'nosnap', at: now, msg: waitingMessage(), basis: basis, version: version });
   } else {
     sh.bus.emit('quiet', waitingMessage());
+  }
+  var board = boardSnapshot(sum), boardKey = JSON.stringify(board);
+  if (boardKey !== st.lastQueuedBoard) {
+    st.lastQueuedBoard = boardKey;
+    st.queue.push({ kind: 'board', at: now, board: board });
   }
   var healthKey = JSON.stringify(health);
   if (healthKey !== st.lastQueuedHealth) {
@@ -1483,12 +1529,11 @@ function renderHeader() {
     for (var i = 0; i < cs.length; i++) { if (cs[i].homeAway === 'home') h = cs[i]; else a = cs[i]; }
     var an = a && a.team ? (a.team.abbreviation || a.team.shortDisplayName) : '?';
     var hn = h && h.team ? (h.team.abbreviation || h.team.shortDisplayName) : '?';
-    // With a delay set, the score bug would otherwise spoil a touchdown he has
-    // not watched yet. Show the game as of the last play released to him.
-    var delayed = sh.delayMs() > 0;
-    var held = delayed && st.shownPlay && st.shownPlay.awayScore !== null && st.shownPlay.homeScore !== null;
-    var as = delayed ? (held ? st.shownPlay.awayScore : '—') : (a ? a.score : '');
-    var hs = delayed ? (held ? st.shownPlay.homeScore : '—') : (h ? h.score : '');
+    // Clock and score snapshots wait in the same ordered delay queue as plays.
+    // They can advance between plays without revealing the raw current score.
+    var board = st.shownBoard;
+    var as = board && board.awayScore !== null ? board.awayScore : '—';
+    var hs = board && board.homeScore !== null ? board.homeScore : '—';
     var awayLogo = teamLogo(a && a.team), homeLogo = teamLogo(h && h.team);
     var teamsKey = JSON.stringify([an, hn, awayLogo, homeLogo]);
     // Keep decoded images attached across polls, clock changes and delayed
@@ -1504,12 +1549,8 @@ function renderHeader() {
       scores[0].textContent = as == null ? '' : String(as);
       scores[1].textContent = hs == null ? '' : String(hs);
     }
-    var status = comp.status || {};
-    var detail = held
-      ? (st.shownPlay.period ? 'Q' + st.shownPlay.period + ' ' + st.shownPlay.clock : '')
-      : delayed ? 'Waiting for TV delay' : ((status.type && (status.type.shortDetail || status.type.detail)) || '');
+    var detail = board ? board.detail : sh.delayMs() > 0 ? 'Waiting for TV delay' : 'Waiting for the game update';
     if (st.health && st.health.stalled) detail = 'Q' + st.health.period + ' · ESPN clock not updating';
-    else if (held && st.health && st.health.unreliableIds.indexOf(st.shownPlay.id) >= 0) detail = 'Q' + st.shownPlay.period + ' · Clock unavailable';
     $('hmeta').textContent = detail;
     st.gameLabel = an + ' at ' + hn;
   }
@@ -1809,7 +1850,8 @@ function resetGame() {
   st.health = null; st.lastQueuedHealth = ''; st.lastChange = 0;
   st.syncCandidate = null; st.syncSample = null; st.timingBreak = null;
   $('syncApply').hidden = true; $('syncResult').textContent = '';
-  st.shownPlay = null; st.lastQueuedSit = ''; st.lastQueuedBasis = ''; st.primed = false;
+  st.shownPlay = null; st.shownBoard = null; st.lastQueuedBoard = ''; st.lastQueuedContext = '';
+  st.lastQueuedSit = ''; st.lastQueuedBasis = ''; st.primed = false;
   st.lastOk = 0; st.gameState = ''; st.statusName = '';
   sh.bus.emit('clear');
 }
