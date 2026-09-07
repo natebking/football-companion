@@ -1,10 +1,10 @@
-# Player-focused live companion
+# Live reads: players, patterns and decisions
 
-September 6, 2026. Product direction: **“Who should I pay attention to?”** Runtime version `2026-09-06-player-focus`; selector version `read-4`.
+September 6, 2026. **“Who should I pay attention to?”** is one useful question within the broader goal of understanding the game. Nathan clarified that it should not narrow the product to player tracking. Runtime version `2026-09-06-live-reads`; selector version `read-5`.
 
 ## What changed
 
-The primary card names one player, gives the reported involvement behind that choice, and offers an observation for the viewer. Fourth-down and urgent clock decisions take precedence. The newest completed play has a visible explanation; extra detail is available on demand.
+The primary card selects one supported read: a player worth following, a drive pattern or a consequential decision. Player suggestions include reported involvement and an observation for the viewer. Major penalty/sack patterns, fourth-down and urgent clock decisions take precedence over workload leaders. The newest completed play has a visible explanation; extra detail is available on demand.
 
 To keep that path clear, the separate drive, player-stat and historical panels now share a collapsed **Game context** section. The journal moved to the footer. The feed starts with three plays, expandable to 25. Advanced mode hides basic definitions and formation/direction labels behind **More about this play**; Beginner remains an explicit preference. No bottom overlay was added.
 
@@ -22,7 +22,7 @@ Only released reports contribute. Revised play IDs replace prior versions. Sacks
 
 A tied leader is not selected within its category. Partial naming coverage is disclosed. Every candidate carries the complete denominator's play IDs. Third-down receiver evidence ranks above drive evidence, which ranks above game totals. Competing receiver/runner leaders within a scope are compared by their share of their respective action, then count. Carry leaders are suppressed on third-and-seven or longer.
 
-These thresholds are conservative product heuristics, not calibrated probabilities. Reports establish prior involvement, not current participation, injury status, formation or the next assignment. A recommendation is revalidated for the current game, offense, drive and situation; it is retained only while eligible. Cooldown exhaustion no longer blanks an otherwise supported card.
+These thresholds are conservative product heuristics, not calibrated probabilities. Reports establish prior involvement, not current participation, injury status, formation or the next assignment. All read types are revalidated for the current game, offense, drive and situation. The highest-priority eligible read is selected; an equally useful current read stays stable. Recent display neither blanks the card nor demotes a meaningful pattern just to rotate in a player.
 
 ## What the replay now explains
 
@@ -40,7 +40,7 @@ Passing components must reconcile with the gain and any reported catch spot. Sin
 
 ## Verification
 
-- 253 JavaScript tests passed, including name coverage, denominator IDs, corrections, possession changes, current-drive priority, long-third suppression, display persistence and journal disclosure behavior.
+- 254 JavaScript tests passed, including name coverage, denominator IDs, corrections, possession changes, current-drive priority, long-third suppression, pattern priority over player workload, display persistence and journal disclosure behavior.
 - 36 Python tests passed. Historical probability tables and forecast candidates were not modified.
 - Browser replay inspected at 1280px desktop and 390px mobile widths, in light and dark themes. Context, play-detail disclosure and Beginner switching were checked. No horizontal overflow or browser errors were found.
 - A fresh browser visit correctly shows “Pick a game to start” and hides empty Game context. Raw replay fixtures and screenshots remain ignored under `data/qa/player-focus/`.

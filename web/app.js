@@ -43,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-06-player-focus';
+var VERSION = '2026-09-06-live-reads';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -493,9 +493,6 @@ sh.bus.on('evidenceChanged', function () {
 function refreshRead(remember) {
   var history = st.readHistory.slice();
   var previousKey = st.read && st.read.key;
-  // Named-player reads use the last key to retain a still-valid focus. Other
-  // reads can remain eligible when only a preference or report is refreshed.
-  if (!remember && st.read && !st.read.focus) history = history.filter(function (key) { return key !== st.read.key; });
   st.read = window.FootballRead.select(st.sit, st.evidence, history, st.past);
   st.lesson = st.read && st.read.lessonId ? window.FootballLearning.get(st.read.lessonId, { level: 'game' }) : null;
   st.card = { id: st.read ? st.read.id : 'quiet_read', prints_number: !!st.tendLine, concepts: st.lesson ? st.lesson.concepts : [] };
@@ -907,7 +904,7 @@ function render() {
   }
   if (sh.teachingLevel() === 'game' && !st.read) {
     $('pQuiet').hidden = false;
-    $('pQuiet').textContent = 'No clear player focus yet. See what changed on the last play.';
+    $('pQuiet').textContent = 'No clear read yet. See what changed on the last play.';
   }
 
   if (!st.card) {

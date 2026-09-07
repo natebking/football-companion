@@ -3,7 +3,7 @@
  * selections. An observation never establishes the next formation or call. */
 (function (root) {
   'use strict';
-  var VERSION = 'read-4';
+  var VERSION = 'read-5';
   var history = typeof module !== 'undefined' && module.exports ? require('./game-history.js') : root.FootballHistory;
   function valid(s) {
     return s && Number.isInteger(s.down) && s.down >= 1 && s.down <= 4 &&
@@ -116,7 +116,7 @@
         'Watch whether the runner stays inbounds, and whether the defense uses a timeout.'));
     }
     if (d && d.verified && d.playCount >= 2 && d.penaltyYards >= 10 && d.penaltyYards > Math.max(0, d.playYards)) {
-      add(candidate('penalty_progress', 86, 'Flags have moved this drive farther than the offense’s plays.',
+      add(candidate('penalty_progress', 95, 'Flags have moved this drive farther than the offense’s plays.',
         'Penalties: ' + d.penaltyYards + ' yards forward. Plays: ' + (d.playYards < 0 ? Math.abs(d.playYards) + ' yards lost' : d.playYards + ' yards gained') + '.',
         '', { source: 'ESPN · released drive reports', playIds: d.playIds, key: 'penalty_progress:' + d.id }));
     }
@@ -169,7 +169,7 @@
       }
     }
     if (d && d.sacks >= 2) {
-      add(candidate('drive_sacks', 82, 'Two or more sacks have interrupted this drive.',
+      add(candidate('drive_sacks', 95, 'Two or more sacks have interrupted this drive.',
         'They have allowed ' + d.sacks + ' sacks on this possession. Another loss would leave more ground to make up.',
         'On a pass, watch whether the quarterback can step forward or has to leave the pocket.',
         { source: 'ESPN · released drive reports', playIds: d.playIds, lessonId: 'pocket_edges', key: 'drive_sacks:' + d.id }));
@@ -195,18 +195,13 @@
   }
   function select(s, evidence, recent, past) {
     var list = candidates(s, evidence, past), seen = (recent || []).slice(-6);
-    var urgent = list.find(function (c) { return c.priority >= 96; });
-    if (urgent) return urgent;
+    if (!list.length) return null;
     var previousKey = seen[seen.length - 1];
-    var retained = list.find(function (c) { return c.focus && c.key === previousKey; });
-    if (retained) {
-      var stronger = list.find(function (c) { return c.focus && c.priority > retained.priority; });
-      return stronger || retained;
-    }
-    // Prefer a new observation, but never erase the card solely because every
-    // currently valid option appeared recently. Every option was rebuilt and
-    // revalidated against this game, offense, drive and situation above.
-    return list.find(function (c) { return seen.indexOf(c.key) < 0; }) || list[0] || null;
+    var retained = list.find(function (c) { return c.key === previousKey && c.priority === list[0].priority; });
+    // Keep an equally useful current read stable, whatever kind it is. A more
+    // consequential drive pattern or decision can replace a player focus.
+    // Recent display never disqualifies the best supported read.
+    return retained || list[0];
   }
   var api = { version: VERSION, valid: valid, candidates: candidates, select: select };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

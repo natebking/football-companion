@@ -4,7 +4,7 @@ A second screen for following a football game and learning what to watch. [Open 
 
 The two-F logo follows connected player routes: a rounded first F flows into a taller second F, with one starting dot and one forward arrow. Light and dark assets are `web/brand-mark.svg` and `web/brand-mark-dark.svg`. The header colors and matching favicon follow the selected appearance.
 
-The main question is **Who should I pay attention to?** The app names a player when reported targets or carries support a useful focus, shows the count behind that choice, and suggests something to watch. Current-drive and third-down evidence take precedence over game totals. Consequential fourth-down and late-game decisions still come first. A carry leader alone cannot take over a long third down.
+The app helps you understand what is unfolding: who matters, what changed, and what to notice next. The main card can spotlight a player, a drive pattern or a consequential decision. Reported targets and carries support named-player suggestions, with the count behind each choice. Current-drive and third-down evidence take precedence over game totals; major penalty/sack patterns and fourth-down or clock decisions can take the lead over a player's workload. A carry leader alone cannot take over a long third down.
 
 **Last play** makes the useful detail visible: reconciled yards before/after the catch, a named quarterback hurry, or a verified penalty ruling. It shows the latest play and two earlier plays; expand to see up to 25. **More about this play** holds additional detail and related lessons, with the original ESPN report available separately. Corrections replace existing plays in order; unreliable clocks are flagged.
 

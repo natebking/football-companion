@@ -51,7 +51,7 @@ test('a past-game card cannot leak across possession, situation or game changes'
     assert.equal(h.read({ ...s, ...change }, past), null);
   }
   const c = read.select(s, null, [], past);
-  assert.notEqual(read.select(s, null, [c.key], past)?.id, c.id);
+  assert.equal(read.select(s, null, [c.key], past)?.key, c.key, 'Still-valid history is not suppressed merely because it was just shown.');
   const fourth = { ...s, down: 4 };
   assert.equal(read.select(fourth, null, [], h.lookup(data, fourth, 'cfb')).id, 'fourth_down');
 });

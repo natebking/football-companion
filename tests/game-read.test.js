@@ -170,6 +170,22 @@ test('a carry leader does not displace the conversion context on long third down
   assert.equal(read.select({ ...s, distance: 2 }, e).focus.role, 'runner');
 });
 
+test('consequential drive patterns replace a player focus and remain stable while relevant', () => {
+  const s = { ...sit, down: 2, distance: 8, period: 1 };
+  const e = observe([rush(1), rush(2), rush(3), rush(4)]);
+  const player = read.select(s, e);
+  assert.equal(player.id, 'game_player');
+  for (const [id, change] of [
+    ['penalty_progress', { penaltyYards: 15, sacks: 0 }],
+    ['drive_sacks', { penaltyYards: 0, sacks: 2 }]
+  ]) {
+    const updated = { ...e, drive: { ...e.drive, playCount: 4, verified: true, playYards: 4, ...change } };
+    const pattern = read.select(s, updated, [player.key]);
+    assert.equal(pattern.id, id);
+    assert.equal(read.select(s, updated, [player.key, pattern.key]).key, pattern.key);
+  }
+});
+
 test('refreshing released evidence retains the player and updates the displayed count', () => {
   const app = fs.readFileSync(require.resolve('../web/app.js'), 'utf8');
   const plays = [rush(1), rush(2), rush(3), rush(4)];
