@@ -47,4 +47,10 @@ All 235 JavaScript tests pass. Six new tests cover first-visit defaults, explici
 
 Browser verification uses isolated sessions and controlled ESPN fixtures, not the user’s browser history or a live broadcast. New visitor: no selected game or summary requests; Read the game default; Sync TV; picker scores hidden. Explicit selection holds the score behind the delay; choosing zero saves and releases it. Desktop light / mobile dark checks cover the separate Settings panel, concise help, source page and responsive layout. These checks establish application behavior, not TV synchronization accuracy or learning outcomes.
 
-Deployment verification is recorded below once the preview and production artifacts match.
+## Deployment
+
+App commit `15e5b37` is pushed to main. Final preview `dpl_2QfGw4M45KhG2QTAXz51avzzqudU` and production `dpl_Erp1vcr2QUyTJo4nDhgebCXJ6c2m` are READY. The production URL is `https://football-companion-e629vsu8c-nates-projects-925609f4.vercel.app`, with fluentin.football and the rose alias attached.
+
+Local, final preview and public manifest match build `466bec1f0c4fc6f5bde130ed5a5f32868642063eb91afb71961387f95478ea53`. The actual public index, app, stylesheet, theme, depth UI and data page separately match their SHA-256 manifest entries. No QA assets appear in the clean build. The earlier preview was superseded before promotion to include the keyboard-focus fix.
+
+An isolated production browser with controlled source fixtures confirmed no initial game-summary requests, Choose a game, Sync TV, Read the game, hidden picker scores, and Settings opening with focus on its Close button. No JavaScript errors or horizontal overflow were detected. The local mobile checks also confirmed explicit zero-delay persistence across reload, source-chip wrapping, the visible FTN adaptation notice, and the data page in dark mode. These remain behavior checks with mocked source reports, not evidence of live feed accuracy.

@@ -2,6 +2,12 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Eighth checkpoint: reconcile Claude’s review**
+
+The [review follow-up](REVIEW-FOLLOWUP-2026-09-06.md) maps the old findings to the current build and separates remaining experiments from verified fixes. New visitors choose a game explicitly and start with a labelled 45-second delay estimate. Existing explicit delays are preserved. Settings is separate from Games, help starts with three steps, sources/privacy and FTN adaptation notices are visible, and diagnostic storage writes are reduced. The stale briefs and copying instruction were corrected. Read the game remains the default; logos and the TV field remain.
+
+App commit `15e5b37` is pushed and deployed. Production `dpl_Erp1vcr2QUyTJo4nDhgebCXJ6c2m` is READY at fluentin.football. Local, final preview and public build `466bec1f0c4fc6f5bde130ed5a5f32868642063eb91afb71961387f95478ea53` match; public asset hashes were checked separately. All 235 JavaScript tests pass. Browser checks include the first-visit spoiler boundary, explicit zero preservation, settings keyboard focus, mobile dark layouts, source notices and the new data page. No probability tables, research freezes, practice bank records, analytics or upload behavior changed.
+
 **Seventh checkpoint: TV field direction and practice auditing**
 
 The user's added field request is implemented with Match TV / Flip field below the main diagram. It mirrors the ball, target line and defended-end labels, preserves the teams' ends on regulation possession changes and reverses them for the second/fourth quarters through the existing TV-delay queue. It remembers choices by game, requests a new match after halftime or at the start of an overtime period, and respects the college overtime shared-end rule. See [implementation, rule sources and browser checks](TV-FIELD-2026-09-06.md). All 229 JavaScript tests pass; desktop light and mobile dark checks have no overflow or JavaScript errors.
