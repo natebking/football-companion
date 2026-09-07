@@ -2,6 +2,8 @@
 
 September 6, 2026. Assessment of shipped app commit `15e5b37` and repository `6f7cb6c`. **Plan and code assessment only; the changes proposed here are not implemented or deployed.** This incorporates Nathan’s report that useful live analysis is still occasional, the repeated waiting messages, and the suggestion to compare a YouTube TV broadcast with the feed.
 
+**Viewing follow-up:** the [Louisville–Ole Miss broadcast audit](LIVE-BROADCAST-AUDIT-2026-09-06.md) now records specific misses, proposed wording and synchronization observations. It was a bounded diagnostic sample, not a completed continuous-play study. The implementation below remains planned.
+
 ## The missing payoff
 
 The app needs to connect what it suggested watching before a play with what the released report and visible broadcast can actually establish afterward. More features, successful unit tests and more historical rows do not by themselves establish that it is useful to watch with.
