@@ -42,6 +42,41 @@ test('repeated wake-up polls share one active request and one next timer', async
   assert.deepEqual([...h.timers.values()].map(t => t.delay), [3000]);
 });
 
+test('replay wake-ups and forced refreshes never fetch a live game or scoreboard', () => {
+  const h = polling();
+  h.context.sh.replay = () => true;
+  h.context.pollGame();
+  h.context.pollScoreboard(true);
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.timers.size, 0);
+});
+
+test('replay leaves live journals, predictions, term exposure and saved delay alone', () => {
+  const writes = [];
+  const context = vm.createContext({
+    replayMode: true, delaySec: 45, journalContext: { key: 'cfb:live' },
+    journal: new Proxy({}, { get: () => () => { throw new Error('Replay attempted a live journal write'); } }),
+    ledger: { concepts: { pocket: { exposures: 2 } } },
+    askLog: [{ lg: 'cfb', game: 'A', play_id: 'p', correct: true }],
+    league: 'cfb', lsSet: (...args) => writes.push(args)
+  });
+  vm.runInContext(source.slice(source.indexOf('function journalGame('), source.indexOf('window.FootballReview.init(')), context);
+  vm.runInContext(source.slice(source.indexOf('function delayMs('), source.indexOf('function seasonsLabel(')), context);
+  vm.runInContext(source.slice(source.indexOf('function bumpExposure('), source.indexOf('// ---------------------------------------------------------------- ask log')), context);
+  vm.runInContext(source.slice(source.indexOf('function logAsk('), source.indexOf('// ---------------------------------------------------------------- diagnostics')), context);
+  assert.equal(context.journalGame({ gameId: 'A' }), null);
+  assert.equal(context.journalSources([{ report: {} }]), null);
+  assert.equal(context.journalShown({ kind: 'play' }), null);
+  assert.equal(context.journalObservation({ kind: 'resolution' }, 'cfb:live'), null);
+  context.bumpExposure(['pocket']); context.logAsk({}); context.invalidateCalls('A', 'p');
+  assert.equal(context.ledger.concepts.pocket.exposures, 2);
+  assert.equal(context.askLog.length, 1);
+  assert.equal(context.askLog[0].correct, true);
+  assert.equal(context.delayMs(), 0);
+  assert.equal(context.delaySec, 45);
+  assert.equal(writes.length, 0);
+});
+
 test('a late response cannot overwrite a newly selected game, even if abort is ignored', async () => {
   const h = polling();
   h.context.st.feedExpanded = true;
@@ -183,6 +218,38 @@ function liveQueue(delay = 10000) {
   return { context, events, diagnostics, insightInputs, insights,
     setNow: value => { now = value; }, tick: value => { now = value; context.pump(); } };
 }
+
+test('seeking backward rebuilds live analysis without later reports, scores or totals', () => {
+  const replay = require('../web/replay.js');
+  const model = replay.prepare(require('../web/replays/louisville-ole-miss-2026.json'));
+  const h = liveQueue(0), c = h.context;
+  Object.assign(c, { URL, gameGeneration: 0, pollTimer: null, pollRequest: null,
+    clearTimeout: () => {}, $: () => ({}), renderReplayControls: () => {},
+    replaySession: model, replayCount: null });
+  Object.assign(c.window, { FootballReplay: replay,
+    location: { href: 'https://example.test/?replay=louisville-ole-miss-2026' },
+    history: { replaceState: (_state, _title, url) => { c.window.location.href = String(url); } } });
+  vm.runInContext(source.slice(source.indexOf('function resetGame('), source.indexOf('function clearLeague(')), c);
+  vm.runInContext(source.slice(source.indexOf('function seekReplay('), source.indexOf('function startReplay(')), c);
+  c.seekReplay(model.plays.length);
+  assert.equal(c.st.gameState, 'post');
+  assert.equal(c.st.shownBoard.homeScore, 41);
+  c.seekReplay(161);
+  assert.equal(c.st.gameState, 'in');
+  assert.equal(c.st.shownBoard.homeScore, 31);
+  assert.equal(c.st.shownBoard.awayScore, 24);
+  assert.equal(c.st.rows[0].id, '401856661693');
+  const allowed = new Set(model.plays.slice(0, 161).map(p => p.id));
+  assert.ok(Object.keys(c.st.released).every(id => allowed.has(id)));
+  const fresh = liveQueue(0);
+  fresh.context.applySummary(replay.snapshot(model, 161));
+  assert.deepEqual(h.insights.at(-1), fresh.insights.at(-1));
+  c.seekReplay(0);
+  assert.equal(c.st.rows.length, 0);
+  assert.equal(Object.keys(c.st.released).length, 0);
+  assert.equal(c.st.shownBoard.homeScore, null);
+  assert.equal(c.st.shownBoard.awayScore, null);
+});
 
 test('reported play facts and the next hint both wait behind the TV delay', () => {
   const h = liveQueue();
@@ -410,7 +477,7 @@ test('a corrected result invalidates only its own prediction, without adding a s
     { lg: 'cfb', game: 'A', play_id: 'play', correct: true, voided: false },
     { lg: 'cfb', game: 'B', play_id: 'play', correct: true, voided: false }
   ];
-  const context = vm.createContext({ askLog: rows, league: 'cfb', LS: { asks: 'asks' }, lsSet: () => {} });
+  const context = vm.createContext({ askLog: rows, league: 'cfb', replayMode: false, LS: { asks: 'asks' }, lsSet: () => {} });
   const start = source.indexOf('function invalidateCalls(');
   vm.runInContext(source.slice(start, source.indexOf('// ---------------------------------------------------------------- diagnostics', start)), context);
   context.invalidateCalls('A', 'play');

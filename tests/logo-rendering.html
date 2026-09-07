@@ -40,19 +40,20 @@
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g,
     char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   function setup() {
-    byId('fixture').innerHTML = '<div id="score"></div><div id="hmeta"></div>' +
+    byId('fixture').innerHTML = '<div id="replayInvite"></div><div id="score"></div><div id="hmeta"></div>' +
       '<button id="pickBtn">Games</button><div class="seg"><button data-lg="cfb">College</button><button data-lg="nfl">NFL</button></div>' +
       '<label for="gameSearch">Search teams</label><input id="gameSearch" type="search" aria-controls="games">' +
       '<button id="clearGameSearch" type="button" hidden>Clear</button><p id="gameSearchStatus" role="status"></p><div id="games"></div>';
     const state = {
       gameId: 'test-a', gameLabel: '', delay: 0, league: 'cfb', shownPlay: null,
+      shownBoard: { awayScore: 3, homeScore: 17, detail: '10:00 - 1st' },
       sum: { header: { competitions: [{ competitors: [
         { homeAway: 'away', score: 3, team: { abbreviation: 'TULN', logos: [{ href: logos[0], rel: ['default'] }] } },
         { homeAway: 'home', score: 17, team: { abbreviation: 'DUKE', logos: [{ href: logos[1], rel: ['default'] }] } }
       ], status: { type: { shortDetail: '10:00 - 1st' } } }] } },
       games: [game('test-a', 'in'), game('test-b', 'pre')]
     };
-    const render = createRenderer(document, { esc, delayMs: () => state.delay, league: () => state.league }, state, byId, () => {});
+    const render = createRenderer(document, { esc, delayMs: () => state.delay, league: () => state.league, replay: () => false }, state, byId, () => {});
     return { state, ...render };
   }
   function game(id, state) {
@@ -83,19 +84,24 @@
     const h = setup(); h.header(); const before = images('#score');
     const comp = h.state.sum.header.competitions[0];
     comp.competitors[0].score = 10; comp.competitors[1].score = 24;
-    comp.status.type.shortDetail = '9:20 - 2nd'; h.header();
+    comp.status.type.shortDetail = '9:20 - 2nd';
+    h.header();
+    assert(scores() === '3,17', 'Raw scores bypassed the released scoreboard.');
+    h.state.shownBoard = { awayScore: 10, homeScore: 24, detail: '9:20 - 2nd' }; h.header();
     assert(scores() === '10,24', 'Scores did not update.');
     assert(byId('hmeta').textContent === '9:20 - 2nd', 'Clock did not update.');
     sameImages(before, '#score');
   });
   check('TV delay holds scores and releases them without replacing logos', () => {
-    const h = setup(); h.state.delay = 10000; h.header(); const before = images('#score');
+    const h = setup(); h.state.delay = 10000; h.state.shownBoard = null; h.header(); const before = images('#score');
     assert(scores() === '—,—', 'A held score was revealed early.');
     assert(byId('hmeta').textContent === 'Waiting for TV delay', 'Missing delay label.');
-    h.state.shownPlay = { id: 'released', awayScore: 0, homeScore: 7, period: 1, clock: '12:00' }; h.header();
+    h.state.shownBoard = { awayScore: 0, homeScore: 7, detail: 'Q1 12:00' }; h.header();
     assert(scores() === '0,7', 'Released scores did not appear.');
     h.state.delay = 0; h.header();
-    assert(scores() === '3,17', 'Live scores did not return after disabling delay.');
+    assert(scores() === '0,7', 'Changing delay bypassed the released scoreboard.');
+    h.state.shownBoard = { awayScore: 3, homeScore: 17, detail: '10:00 - 1st' }; h.header();
+    assert(scores() === '3,17', 'Latest released scores did not update.');
     sameImages(before, '#score');
   });
   check('Clearing and reselecting a game rebuilds the correct header', () => {

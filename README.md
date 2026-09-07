@@ -2,6 +2,8 @@
 
 A second screen for following a football game and learning what to watch. [Open Fluent in Football](https://fluentin.football/).
 
+No live game? [Replay Louisville–Ole Miss from September 6](https://fluentin.football/?replay=louisville-ole-miss-2026). Use Previous/Next or jump to a selected moment. It runs the current analysis on final ESPN reports through the selected point, with no future scores or player totals. Final details and timing may differ from the original live feed. Replay leaves live journals, predictions and saved TV delay untouched. See [replay implementation and verification](docs/REPLAY-2026-09-07.md).
+
 The two-F logo follows connected player routes: a rounded first F flows into a taller second F, with one starting dot and one forward arrow. Light and dark assets are `web/brand-mark.svg` and `web/brand-mark-dark.svg`. The header colors and matching favicon follow the selected appearance.
 
 The app helps you understand what is unfolding: who matters, what changed, and what to notice next. The main card can spotlight a player, a drive pattern or a consequential decision. Reported targets and carries support named-player suggestions, with the count behind each choice. Current-drive and third-down evidence take precedence over game totals; major penalty/sack patterns and fourth-down or clock decisions can take the lead over a player's workload. A carry leader alone cannot take over a long third down.

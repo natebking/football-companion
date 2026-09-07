@@ -1,0 +1,32 @@
+.replay-invite, .replay-controls { grid-column: 1 / -1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; }
+.replay-invite { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.replay-invite p { font-size: .875rem; color: var(--dim); margin-top: 4px; }
+.replay-invite a, .replay-picker a { color: var(--accent); font-weight: 600; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.replay-invite a { flex-shrink: 0; padding: 10px 0; }
+.replay-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 28px; row-gap: 8px; padding: 16px 20px; }
+.replay-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.replay-heading h1 { font-size: 1.25rem; letter-spacing: -.025em; margin-top: 3px; }
+#replayDate, .replay-note, .replay-status { font-size: .8125rem; color: var(--dim); }
+.replay-note { grid-column: 1; }
+.replay-actions { grid-column: 2; grid-row: 1 / 4; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; }
+.replay-step-buttons { display: flex; gap: 8px; }
+.replay-actions button, .replay-actions select { min-height: 44px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: .875rem; padding: 10px 13px; }
+.replay-next { background: var(--accent); color: var(--card); font-weight: 600 !important; }
+.replay-actions button:disabled { opacity: .5; }
+.replay-actions label { display: grid; gap: 4px; font-size: .75rem; color: var(--dim); }
+.replay-actions select { background: var(--card); color: var(--text); max-width: 100%; }
+.replay-status { grid-column: 1; min-height: 1.5em; }
+.replay-keyboard { color: var(--faint); margin-left: 12px; }
+.replay-picker { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 20px; margin-top: 24px; }
+.replay-picker small { color: var(--dim); }
+select:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+@media (max-width: 759px) {
+  .replay-invite, .replay-controls { margin-bottom: 18px; padding: 17px; }
+  .replay-controls { grid-template-columns: minmax(0, 1fr); }
+  .replay-invite { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .replay-actions { grid-column: 1; grid-row: auto; margin-top: 4px; }
+  .replay-step-buttons button { flex: 1; }
+  .replay-heading { align-items: flex-start; }
+  #replayDate { text-align: right; }
+}
+@media (pointer: coarse) { .replay-keyboard { display: none; } }

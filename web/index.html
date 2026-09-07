@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="learning.css">
 <link rel="stylesheet" href="depth.css">
 <link rel="stylesheet" href="review.css">
+<link rel="stylesheet" href="replay.css">
 </head>
 <body>
 
@@ -53,6 +54,21 @@
 <div id="err" role="status"></div>
 
 <main class="workspace">
+
+  <aside id="replayInvite" class="replay-invite">
+    <div><b>Try it with a finished game</b><p>Step through Louisville–Ole Miss and see what the companion picks up.</p></div>
+    <a href="?replay=louisville-ole-miss-2026">Open replay <span aria-hidden="true">→</span></a>
+  </aside>
+
+  <section id="replayControls" class="replay-controls" aria-label="Game replay" hidden>
+    <div class="replay-heading"><div><span class="eyebrow">Game replay</span><h1 id="replayGameTitle">Louisville at Ole Miss</h1></div><span id="replayDate"></span></div>
+    <p class="replay-note">Final reports. Live details and timing may have differed.</p>
+    <div class="replay-actions">
+      <div class="replay-step-buttons"><button id="replayPrevious" class="ghost" type="button" aria-keyshortcuts="ArrowLeft" disabled>← Previous play</button><button id="replayNext" class="replay-next" type="button" aria-keyshortcuts="ArrowRight" disabled>Next play →</button></div>
+      <label for="replayMoment">Jump to a moment <select id="replayMoment" disabled><option value="">Choose a moment</option></select></label>
+    </div>
+    <p class="replay-status"><span id="replayStatus" role="status" aria-live="polite">Loading the replay…</span><span class="replay-keyboard">← / → keys to step</span></p>
+  </section>
 
   <div class="read-column">
     <section id="prime" aria-label="Watch next" tabindex="-1">
@@ -156,6 +172,7 @@
       <li><b>Know what to watch.</b> Watch next highlights a player, pattern or decision that matters now. Last play explains what changed. Tap an underlined term whenever you need it.</li>
     </ol>
     <p class="note"><b>Read the game</b> is the default. Choose <b>Beginner</b> in Settings for help with the rules. The app reads play reports, not your TV picture.</p>
+    <p class="note">No game on? Open <b>Replay Louisville–Ole Miss</b> in Games. Step through the September 6 game or jump to a moment. Replay uses the current analysis and final reports; details and timing may differ from what was available live.</p>
     <details class="help-details"><summary>More about the features</summary>
     <p class="note"><b>Past games</b> compares the offense and defense using the preceding season, where enough similar plays are available. The counts match down, distance, field position, score and clock bands. Different opponents, players and coaches mean they are context, not a forecast. The separate run/pass percentage uses down, distance and field position only. The app does not watch your TV picture or know how players are lined up.</p>
     <p class="note"><b>Last play</b> explains what happened and what changed. Open <b>Game context</b> for the drive story, player involvement and historical comparisons. Updates can arrive late or be corrected.</p>
@@ -189,6 +206,7 @@
       <p id="gameSearchStatus" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
     <div id="games"><div class="empty">Loading games…</div></div>
+    <div class="replay-picker"><b>Want to try the companion?</b><a href="?replay=louisville-ole-miss-2026">Replay Louisville–Ole Miss →</a><small>Step through a finished game, with the same reads and explanations.</small></div>
     <button id="gameSettingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings: hints and appearance ↗</button>
   </div>
 </div>
@@ -208,7 +226,7 @@
     <label class="teaching-option" for="teachingLevel"><b>Teaching level</b><select id="teachingLevel"><option value="game">Read the game</option><option value="basics">Beginner</option></select><small>Read the game assumes you know the rules. Beginner explains them. Tap underlined terms in either mode.</small></label>
     <label class="hint-option"><span><b>Shorter hints</b><small>Leave out definitions. You can still tap a term to look it up.</small></span><input type="checkbox" id="shortHints"></label>
     <div class="grouphead">Your calls</div>
-    <label class="hint-option"><span><b>Offer prediction questions</b><small>Optional calls at relevant moments. These do not measure football knowledge.</small></span><input type="checkbox" id="predictionQuestions"></label>
+    <label class="hint-option"><span><b>Offer prediction questions</b><small id="predictionNote">Optional calls at relevant moments. These do not measure football knowledge.</small></span><input type="checkbox" id="predictionQuestions"></label>
     <p class="note" id="callSummary">No graded picks yet.</p>
     <p class="note">These scores track your predictions, not your understanding of the terms below.</p>
     <div class="grouphead">Terms you have seen</div>
@@ -287,6 +305,7 @@
 <script src="depth-ui.js"></script>
 <script src="journal.js"></script>
 <script src="review-ui.js"></script>
+<script src="replay.js"></script>
 <script src="app.js"></script>
 <script src="ui.js"></script>
 </body>

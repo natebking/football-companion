@@ -2,6 +2,10 @@
 
 Interfaces every module codes against. Written before implementation so parallel work composes. If an implementation needs to deviate, it says so in its output rather than silently diverging.
 
+## Finished-game replay — September 7, 2026
+
+`FootballReplay.prepare` validates the bundled final report dataset. `snapshot(model, count)` creates an ESPN-shaped summary containing only the selected prefix, preserving original drive boundaries. Score, status and clock come from that prefix; unknown values remain unknown. Seeking resets LIVE and PRIME before applying the snapshot through the normal analysis pipeline. No future play's start block, final boxscore or full-game leader table enters the snapshot. Replay has zero effective delay without changing the saved setting, never polls live endpoints, and does not write simulated arrivals, journal entries, prediction results or concept exposures. This is a demonstration of current analysis using final reports, not a reconstruction of historical live availability. See [replay verification](REPLAY-2026-09-07.md).
+
 ## Evidence reads — September 6, 2026
 
 The live-read pass uses `FootballRead` version `read-5`. Safe aggregates include named receivers/runners, eligible throw/run denominators, naming coverage and the exact supporting play IDs. A focus is rebuilt from released evidence on each selection; missing names, tied leaders, insufficient coverage or a changed possession can invalidate it. Overall carry share does not justify a runner focus on third-and-seven or longer. Consequential drive patterns and decisions can outrank player workload. All read types use the same priority rule, with the current read retained on ties. These are descriptive selection rules, not a fitted forecast or evidence of who is currently on the field.

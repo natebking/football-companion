@@ -43,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-06-live-reads';
+var VERSION = '2026-09-07-replay';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -96,7 +96,8 @@ function makeBus() {
 var bus = makeBus();
 
 // ---------------------------------------------------------------- settings
-var league = lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
+var replayMode = new URLSearchParams(window.location.search).get('replay') === 'louisville-ole-miss-2026';
+var league = replayMode ? 'cfb' : lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
 var shortHints = lsGet(LS.shortHints) === '1';
 var teachingLevel = lsGet(LS.teachingLevel) === 'basics' ? 'basics' : 'game';
 var predictionQuestions = lsGet(LS.questions) === '1';
@@ -122,15 +123,18 @@ function journalResult(result) {
   return result;
 }
 function journalGame(meta) {
+  if (replayMode) return null;
   var result = journalResult(journal.beginGame(meta));
   journalContext.key = meta.league + ':' + meta.gameId;
   return result;
 }
 function journalSources(entries) {
+  if (replayMode) return null;
   if (!journalContext.key || !entries.length) return;
   return journalResult(journal.recordSources(journalContext.key, entries));
 }
 function journalShown(entry) {
+  if (replayMode) return null;
   if (!journalContext.key) return null;
   return journalResult(journal.recordShown(journalContext.key, Object.assign({
     shownAt: Date.now(), basisPlayId: journalContext.basisPlayId, basisRevision: journalContext.basisRevision,
@@ -140,6 +144,7 @@ function journalShown(entry) {
   }, entry)));
 }
 function journalObservation(entry, key) {
+  if (replayMode) return null;
   key = key || journalContext.key;
   if (key) return journalResult(journal.recordObservation(key, entry));
 }
@@ -149,7 +154,7 @@ window.addEventListener('football-observation', function (event) {
   if (entry && entry.isLiveContext && entry.journalKey) journalObservation(Object.assign({ kind: 'learning' }, entry), entry.journalKey);
 });
 
-function delayMs() { return delaySec * 1000; }
+function delayMs() { return replayMode ? 0 : delaySec * 1000; }
 function seasonsLabel() {
   var s = (TEND && TEND.seasons) || [];
   if (!s.length) return '';
@@ -173,6 +178,7 @@ function loadLedger() {
 }
 function saveLedger() { lsSet(LS.ledger, JSON.stringify(ledger)); }
 function bumpExposure(list) {
+  if (replayMode) return;
   if (!list || !list.length) return;
   var now = new Date().toISOString();
   for (var i = 0; i < list.length; i++) {
@@ -192,12 +198,14 @@ function loadAsks() {
   } catch (e) { askLog = []; }
 }
 function logAsk(row) {
+  if (replayMode) return;
   askLog.push(row);
   if (askLog.length > ASK_LOG_MAX) askLog = askLog.slice(-ASK_LOG_MAX);
   lsSet(LS.asks, JSON.stringify(askLog));
 }
 
 function invalidateCalls(game, playId) {
+  if (replayMode) return;
   var changed = false;
   askLog.forEach(function (row) {
     if (row.lg === league && row.game === game && row.play_id === playId && !row.voided) {
@@ -222,6 +230,7 @@ function loadDiag() {
   } catch (e) { diagRing = []; }
 }
 function diag(kind, data) {
+  if (replayMode) return;
   // Coalesce consecutive unchanged polls, retaining their cadence and time span.
   // Arrival timestamps alone are not a change in the feed. Resumptions, errors,
   // revisions, queue changes and clock changes still get their own records.
@@ -301,12 +310,13 @@ var shell = {
   distanceBand: distanceBand, fieldZone: fieldZone, bucketKey: bucketKey,
   sameSnap: sameSnap, delayMs: delayMs,
   league: function () { return league; },
+  replay: function () { return replayMode; },
   tend: function () { return TEND; },
   history: function () { return HISTORY; },
   cards: function () { return CARDS; },
   shortHints: function () { return shortHints; },
   teachingLevel: function () { return teachingLevel; },
-  predictionQuestions: function () { return predictionQuestions; },
+  predictionQuestions: function () { return !replayMode && predictionQuestions; },
   journalReset: function () { journalContext = { key: null, basisPlayId: null, basisRevision: null }; },
   journalGame: journalGame, journalSources: journalSources, journalShown: journalShown,
   journalObservation: journalObservation,
@@ -895,7 +905,7 @@ function render() {
   $('readDetail').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.detail : '');
   $('readWatch').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.watch : '');
   $('readSource').textContent = st.read ? st.read.source : '';
-  $('readFeedback').hidden = !st.read;
+  $('readFeedback').hidden = !st.read || sh.replay();
   var feedbackKey = st.sitKey + ':' + (st.read ? st.read.key : '');
   if ($('readFeedback').dataset.key !== feedbackKey) {
     $('readFeedback').dataset.key = feedbackKey;
@@ -1578,6 +1588,7 @@ function waitingMessage() {
 
 // ---------------------------------------------------------------- render
 function renderHeader() {
+  $('replayInvite').hidden = !!st.gameId || (sh.replay && sh.replay());
   var sum = st.sum;
   var comp = sum && sum.header && sum.header.competitions && sum.header.competitions[0];
   if (!comp) {
@@ -1611,13 +1622,19 @@ function renderHeader() {
       scores[1].textContent = hs == null ? '' : String(hs);
     }
     var detail = board ? board.detail : sh.delayMs() > 0 ? 'Waiting for TV delay' : 'Waiting for the game update';
-    if (st.health && st.health.stalled) detail = 'Q' + st.health.period + ' · ESPN clock not updating';
+    if (st.health && st.health.stalled) detail = 'Q' + st.health.period +
+      (sh.replay && sh.replay() ? ' · Reported clock unreliable' : ' · ESPN clock not updating');
     $('hmeta').textContent = detail;
     st.gameLabel = an + ' at ' + hn;
   }
   paintConnection();
 }
 function paintConnection() {
+  if (sh.replay()) {
+    $('dot').className = 'dot';
+    $('connectionLabel').textContent = 'Replay';
+    return;
+  }
   var fresh = Date.now() - st.lastOk < (st.gameState === 'post' ? 45000 : sh.STALE_MS);
   var clockBad = st.health && st.health.stalled;
   $('dot').className = 'dot' + (fresh && !clockBad ? ' ok' : '');
@@ -1795,6 +1812,12 @@ $('syncApply').addEventListener('click', function () {
 });
 
 function renderPicker() {
+  if (sh.replay()) {
+    $('pickBtn').textContent = 'Exit replay';
+    $('pickBtn').setAttribute('aria-label', 'Exit replay and return to games');
+    $('pickBtn').removeAttribute('aria-haspopup');
+    return;
+  }
   $('pickBtn').dataset.gameLabel = st.gameLabel;
   $('pickBtn').setAttribute('aria-label', st.gameLabel ? 'Change game, currently ' + st.gameLabel : 'Choose a game');
 
@@ -1877,6 +1900,7 @@ var pollTimer = null, sbTimer = null;
 var pollRequest = null, gameGeneration = 0, scoreboardGeneration = 0;
 function pollGame() {
   clearTimeout(pollTimer);
+  if (sh.replay && sh.replay()) return;
   if (pollRequest) return;
   if (!st.gameId) { pollTimer = setTimeout(pollGame, sh.POLL_MS); return; }
   var t0 = Date.now();
@@ -1905,6 +1929,7 @@ function pollGame() {
 }
 function pollScoreboard(force) {
   clearTimeout(sbTimer);
+  if (sh.replay && sh.replay()) return;
   if (!sh.tend() || !(force || st.sheet || !st.gameId)) {
     sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
     return;
@@ -1961,7 +1986,78 @@ function selectGame(id) {
   pollGame();
 }
 
+// A replay is a separate page session. It never polls a live game, changes
+// saved TV delay, or records final reports as if they arrived live.
+var replaySession = null, replayCount = null;
+function renderReplayControls() {
+  var steps = replaySession.steps, index = steps.indexOf(replayCount);
+  $('replayPrevious').disabled = index <= 0;
+  $('replayNext').disabled = index >= steps.length - 1;
+  $('replayNext').textContent = index >= steps.length - 1 ? 'Replay complete' : 'Next play →';
+  $('replayMoment').value = replaySession.moments.some(function (m) { return m.count === replayCount; }) ? String(replayCount) : '';
+  $('replayStatus').textContent = index === 0 ? 'Before the opening play. Choose Next play to begin.' :
+    index === steps.length - 1 ? 'End of the game. Go back or choose another moment.' :
+    'Step ' + index + ' of ' + (steps.length - 1);
+}
+function seekReplay(count) {
+  if (!replaySession || replaySession.steps.indexOf(count) < 0) return;
+  resetGame();
+  st.gameId = replaySession.gameId;
+  st.gameLabel = replaySession.label;
+  replayCount = count;
+  applySummary(window.FootballReplay.snapshot(replaySession, count));
+  renderReplayControls();
+  var url = new URL(window.location.href);
+  url.searchParams.set('at', String(count));
+  window.history.replaceState(null, '', url);
+}
+function startReplay() {
+  $('replayInvite').hidden = true;
+  $('replayControls').hidden = false;
+  $('delayBtn').hidden = true;
+  $('journalStatus').textContent = 'Replay is not saved';
+  sh.bus.emit('quiet', 'Loading the replay…');
+  var controller = new AbortController();
+  var timeout = setTimeout(function () { controller.abort(); }, 15000);
+  sh.jget('replays/louisville-ole-miss-2026.json', controller.signal).then(function (data) {
+    if (!sh.tend() || !sh.cards()) throw new Error('Analysis data is unavailable.');
+    replaySession = window.FootballReplay.prepare(data);
+    $('replayGameTitle').textContent = replaySession.label;
+    $('replayDate').textContent = new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York'
+    }).format(new Date(replaySession.playedAt));
+    $('replayMoment').innerHTML = '<option value="">Choose a moment</option>' + replaySession.moments.map(function (m) {
+      return '<option value="' + m.count + '">' + sh.esc(m.label) + '</option>';
+    }).join('');
+    $('replayMoment').disabled = false;
+    var requested = new URLSearchParams(window.location.search).get('at');
+    var count = requested !== null && /^\d+$/.test(requested) ? Number(requested) : null;
+    seekReplay(replaySession.steps.indexOf(count) >= 0 ? count : replaySession.initialCount);
+  }).catch(function () {
+    $('replayStatus').textContent = 'The replay could not be loaded. Refresh to try again, or use Exit replay.';
+    sh.bus.emit('quiet', 'Replay unavailable.');
+  }).finally(function () { clearTimeout(timeout); });
+}
+
 // ---------------------------------------------------------------- wiring
+$('replayPrevious').addEventListener('click', function () {
+  if (replaySession) seekReplay(replaySession.steps[replaySession.steps.indexOf(replayCount) - 1]);
+});
+$('replayNext').addEventListener('click', function () {
+  if (replaySession) seekReplay(replaySession.steps[replaySession.steps.indexOf(replayCount) + 1]);
+});
+$('replayMoment').addEventListener('change', function () {
+  if (this.value !== '') seekReplay(Number(this.value));
+});
+document.addEventListener('keydown', function (event) {
+  if (!sh.replay() || !replaySession || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  if (document.querySelector('.sheet.on, :popover-open')) return;
+  if (event.target.closest('input, select, textarea, a, [contenteditable]') ||
+      (event.target.closest('button') && !event.target.closest('.replay-step-buttons'))) return;
+  event.preventDefault();
+  seekReplay(replaySession.steps[replaySession.steps.indexOf(replayCount) + (event.key === 'ArrowRight' ? 1 : -1)]);
+});
 $('feed').addEventListener('toggle', captureFeed, true);
 sh.bus.on('teaching', renderFeed);
 $('feedToggle').addEventListener('click', function () {
@@ -1973,6 +2069,7 @@ $('feedToggle').addEventListener('click', function () {
   }
 });
 $('pickBtn').addEventListener('click', function () {
+  if (sh.replay()) { window.location.assign(window.location.pathname); return; }
   st.sheet = true;
   $('sheet').className = 'sheet on';
   $('sheet').querySelector('.sheetInner').scrollTop = 0;
@@ -2021,6 +2118,7 @@ setInterval(paintConnection, 1000);
 sh.bus.on('boot', function () {
   renderHeader();
   renderPicker();
+  if (sh.replay()) { startReplay(); return; }
   var requestedLeague = sh.league(), generation = gameGeneration;
   var saved = sh.lsGet(sh.LS.game + requestedLeague);
   fetchGames(requestedLeague).then(function (rows) {
@@ -2054,7 +2152,9 @@ $('closeSettings').addEventListener('click', function () { $('settingsSheet').cl
 $('settingsSheet').addEventListener('click', function (ev) {
   if (ev.target === this) this.classList.remove('on');
 });
-$('predictionQuestions').checked = predictionQuestions;
+$('predictionQuestions').checked = !replayMode && predictionQuestions;
+$('predictionQuestions').disabled = replayMode;
+if (replayMode) $('predictionNote').textContent = 'Predictions are paused in replay. Your saved setting is unchanged.';
 $('predictionQuestions').addEventListener('change', function () {
   predictionQuestions = this.checked;
   lsSet(LS.questions, predictionQuestions ? '1' : '0');

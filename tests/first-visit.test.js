@@ -42,21 +42,30 @@ test('confirming the starting delay saves it, including when the value stays 45'
   assert.equal(h.elements.delayBtn.textContent, 'TV +0s');
 });
 
-function selection(saved, rows) {
-  const handlers = {}, picked = [], messages = [];
+function selection(saved, rows, replay = false) {
+  const handlers = {}, picked = [], messages = [], counts = { fetches: 0, replays: 0 };
   const c = vm.createContext({
     gameGeneration: 1, st: {},
-    sh: { LS: { game: 'game_' }, lsGet: () => saved, league: () => 'cfb',
+    sh: { LS: { game: 'game_' }, lsGet: () => saved, league: () => 'cfb', replay: () => replay,
       bus: { on: (key, fn) => { handlers[key] = fn; }, emit: (...args) => messages.push(args) }, showErr: () => {} },
-    fetchGames: () => Promise.resolve(rows), selectGame: id => picked.push(id),
+    fetchGames: () => { counts.fetches++; return Promise.resolve(rows); }, selectGame: id => picked.push(id),
+    startReplay: () => { counts.replays++; },
     renderPicker: () => {}, renderHeader: () => {}, pollGame: () => {}, pollScoreboard: () => {}
   });
   let start = source.indexOf("sh.bus.on('leagueChanged',");
   vm.runInContext(source.slice(start, source.indexOf("sh.bus.on('delay',", start)), c);
   start = source.indexOf("sh.bus.on('boot',");
   vm.runInContext(source.slice(start, source.indexOf('})(shell);', start)), c);
-  return { handlers, picked, messages };
+  return { handlers, picked, messages, counts };
 }
+
+test('replay boot does not fetch a scoreboard or restore the saved live game', async () => {
+  const h = selection('live', [{ id: 'live', state: 'in' }], true);
+  h.handlers.boot(); await flush();
+  assert.equal(h.counts.replays, 1);
+  assert.equal(h.counts.fetches, 0);
+  assert.deepEqual(h.picked, []);
+});
 
 test('boot and league changes restore only the saved unfinished game', async () => {
   const rows = [{ id: 'live', state: 'in' }, { id: 'saved', state: 'in' }, { id: 'finished', state: 'post' }];
@@ -89,11 +98,11 @@ test('scoreboard refresh never starts a game on behalf of the viewer', async () 
   assert.equal(selected.length, 0);
 });
 
-function diagnostics() {
+function diagnostics(replay = false) {
   let now = 100;
   const writes = [], intervals = [], listeners = {};
   const c = vm.createContext({
-    DIAG_MAX: 500, LS: { diag: 'diag' }, lsGet: () => null,
+    DIAG_MAX: 500, LS: { diag: 'diag' }, lsGet: () => null, replayMode: replay,
     lsSet: (_, value) => writes.push(JSON.parse(value)), Date: { now: () => now },
     setInterval: (fn, ms) => intervals.push({ fn, ms }),
     window: { addEventListener: (key, fn) => { listeners[key] = fn; } },
@@ -117,6 +126,14 @@ test('unchanged polls retain timing while corrections and resumed feeds stay dis
   h.c.diag('poll', { source_id: 'a', source_version: 2, revised: 1, received_at: 53000, response_gap_ms: 3000, resumed: false });
   h.c.diag('err', { where: 'summary' });
   assert.equal(h.c.diagRing.length, 4);
+});
+
+test('replay does not record simulated arrivals in live diagnostics', () => {
+  const h = diagnostics(true);
+  h.c.diag('poll', { source_id: 'a' });
+  h.listeners.pagehide();
+  assert.equal(h.c.diagRing.length, 0);
+  assert.equal(h.writes.length, 0);
 });
 
 test('diagnostics persist on the 30-second timer and on leaving, without redundant writes', () => {
