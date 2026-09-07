@@ -4,6 +4,8 @@ September 6, 2026. Assessment of shipped app commit `15e5b37` and repository `6f
 
 **Viewing follow-up:** the [Louisville–Ole Miss broadcast audit](LIVE-BROADCAST-AUDIT-2026-09-06.md) now records specific misses, proposed wording and synchronization observations. It was a bounded diagnostic sample, not a completed continuous-play study. The implementation below remains planned.
 
+**Formation follow-up:** Nathan clarified that better post-play summaries still fall short of formation-level understanding. The [visual-analysis feasibility note](FORMATION-ANALYSIS-FEASIBILITY-2026-09-06.md) defines a separate, narrow recognition experiment. The presentation work below should not be described as delivering that capability.
+
 ## The missing payoff
 
 The app needs to connect what it suggested watching before a play with what the released report and visible broadcast can actually establish afterward. More features, successful unit tests and more historical rows do not by themselves establish that it is useful to watch with.

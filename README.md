@@ -46,6 +46,7 @@ The tests cover curated real ESPN plays, scoring and penalty edge cases, predict
 To check logo stability, serve the repository root with `python3 -m http.server 8765 --bind 127.0.0.1` and open `/tests/logo-rendering.html`. These browser checks exercise the actual rendering functions through repeated refreshes, score and delay changes, game reordering, and image failures. Logos and focused game buttons must remain in place as their text updates.
 
 - [Live broadcast audit](docs/LIVE-BROADCAST-AUDIT-2026-09-06.md): observed Louisville–Ole Miss misses, better candidate explanations and timing limits; no new app release.
+- [Formation-analysis feasibility](docs/FORMATION-ANALYSIS-FEASIBILITY-2026-09-06.md): what a visual prototype could recognize, current source limits and how to test timing and accuracy (planned).
 - [Next live-analysis pass](docs/LIVE-ANALYSIS-NEXT-PASS-2026-09-06.md): current product gaps and linked post-play explanations (planned).
 - [Review follow-up](docs/REVIEW-FOLLOWUP-2026-09-06.md): resolved findings, current fixes and remaining research.
 - [Data and privacy](web/data.html) and [third-party notices](NOTICE.md): data sources, adaptations and what stays in this browser.
