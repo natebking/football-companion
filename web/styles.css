@@ -191,7 +191,7 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 
 /* Game and delay sheets are keyboard-accessible dialogs in both themes. */
 .sheet { position: fixed; inset: 0; z-index: 9; background: var(--overlay); display: flex; align-items: flex-end; justify-content: center; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 160ms ease-out, visibility 160ms; }
-.sheet.on { opacity: 1; visibility: visible; pointer-events: auto; }
+.sheet.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 160ms ease-out; }
 .sheetInner { width: 100%; max-width: 580px; max-height: 86dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); border: 1px solid var(--line); border-bottom: 0; border-radius: 22px 22px 0 0; padding: 18px 24px calc(24px + env(safe-area-inset-bottom)); }
 .sheetTop { display: flex; align-items: center; gap: 12px; position: sticky; top: -18px; padding: 4px 0 16px; background: var(--bg); z-index: 1; }
 .sheetTop .ttl { font: 700 1.75rem/1.2 var(--heading); text-transform: uppercase; }
@@ -360,6 +360,19 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 .help-link { border: 0; background: none; padding: 8px 0; min-height: 44px; color: var(--dim); font: inherit; font-size: .75rem; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
 .help-link:hover { color: var(--text); }
 #howSheet .note { margin: 0 0 18px; font-size: .9375rem; line-height: 1.6; color: var(--dim); }
+.how-steps { padding-left: 1.4em; line-height: 1.6; }
+.how-steps li { padding-left: .25em; margin-bottom: 16px; }
+.how-steps b { display: block; color: var(--text); }
+.help-details { border-top: 1px solid var(--line); margin: 16px 0; }
+.help-details > summary { padding: 14px 0; cursor: pointer; color: var(--dim); }
+#howSheet a { color: var(--accent); }
+.footer-links { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
+.footer-links a { color: var(--dim); padding: 12px 0; }
+.data-page { max-width: 780px; padding: 36px 24px 64px; margin: auto; line-height: 1.65; }
+.data-page h1 { font: 700 clamp(2.5rem, 7vw, 4rem)/1.1 var(--heading); margin: 28px 0 20px; }
+.data-page h2 { margin: 32px 0 12px; font-size: 1.25rem; }
+.data-page a { color: var(--accent); text-underline-offset: 3px; }
+.data-page p, .data-page li { color: var(--dim); margin-bottom: 14px; }
 @media (max-width: 759px) {
   .masthead { gap: 8px; }
   .help-link { width: 48px; white-space: normal; line-height: 1.25; text-decoration: none; font-size: .6875rem; }

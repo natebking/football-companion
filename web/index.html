@@ -44,8 +44,8 @@
       </div>
     </div>
     <div class="scorebar">
-      <div class="hgrow"><div id="score">Loading game…</div><div class="hmeta" id="hmeta"></div></div>
-      <button id="delayBtn" aria-label="TV delay">TV +0s</button>
+      <div class="hgrow"><div id="score">Choose a game</div><div class="hmeta" id="hmeta"></div></div>
+      <button id="delayBtn" aria-label="TV delay">Sync TV</button>
     </div>
   </div>
 </header>
@@ -126,6 +126,7 @@
   <footer class="learning-footer">
     <button id="exploreExamples" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="learningSheet">Explore past plays <span aria-hidden="true">↗</span></button>
     <p>Examples and diagrams from past games.</p>
+    <div class="footer-links"><button id="settingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings</button><a href="data.html" target="_blank" rel="noopener">Data and privacy ↗</a></div>
   </footer>
 </main>
 
@@ -135,16 +136,24 @@
       <span class="ttl" id="howTitle">How it works</span>
       <button id="closeHow" class="closex" type="button">Close</button>
     </div>
-    <p class="note">Pick a game, then keep watching on TV. <b>Read the game</b> connects the situation with patterns in the plays reported so far. It is the default; <b>Beginner</b> explains the rules. Tap an underlined term for a definition in either mode.</p>
+    <ol class="how-steps">
+      <li><b>Choose the game you’re watching.</b> Open Games and search for either team.</li>
+      <li><b>Match the timing.</b> Open Sync TV. We start with a 45-second delay; your broadcast may need more or less.</li>
+      <li><b>Read the situation, then watch the play.</b> The main card points out a pattern worth watching. Recent plays explains what happened. Tap an underlined term whenever you need it.</li>
+    </ol>
+    <p class="note"><b>Read the game</b> is the default. Choose <b>Beginner</b> in Settings for help with the rules. The app reads play reports, not your TV picture.</p>
+    <details class="help-details"><summary>More about the features</summary>
     <p class="note"><b>Past games</b> compares the offense and defense using the preceding season, where enough similar plays are available. The counts match down, distance, field position, score and clock bands. Different opponents, players and coaches mean they are context, not a forecast. The separate run/pass percentage uses down, distance and field position only. The app does not watch your TV picture or know how players are lined up.</p>
     <p class="note">Recent plays explains what happened and what changed. The drive story connects those plays, including progress from penalties. Open <b>So far in this game</b> to see which players and parts of the field have been involved. Updates can arrive late or be corrected.</p>
     <p class="note">Use <b>See the idea</b> for a diagram and a question about what you noticed. Those answers are your observations, not a graded quiz. Diagrams explain the concept; they do not reconstruct the players’ actual paths.</p>
     <p class="note"><b>Explore past plays</b>, at the bottom of the page, uses named examples from past games, including NFL charting from FTN Data via nflverse. Historical examples are separate from the live game. Passing detail is shown only when its numbers agree with the play report.</p>
-    <p class="note">If the app gets ahead of your TV, use <b>TV delay</b> to hold cards, plays, and scores by 0–90 seconds. Adjust it as you watch. Prediction questions are optional in Games; they do not measure your understanding of football.</p>
+    <p class="note">If the app gets ahead of your TV, use <b>TV delay</b> to hold cards, plays, and scores by 0–90 seconds. Adjust it as you watch. Prediction questions are optional in Settings; they do not measure your understanding of football.</p>
     <p class="note"><b>Match TV</b> under the field lets you choose which way the offense is attacking. The diagram keeps each team’s end consistent through possession changes in regulation and switches ends for the second and fourth quarters. Match it again after halftime or when a new overtime period starts. Use <b>Flip field</b> to change the view at any time.</p>
     <p class="note"><b>Game journal</b> keeps the guidance you saw and the reports that arrived, including later corrections. Open a finished game for a review. Your journal stays in this browser on this website; use Download to keep a copy. It does not follow you between the old Vercel address and fluentin.football.</p>
     <p class="note"><b>Was this useful?</b> saves feedback with the card in your journal. It stays in this browser and is included when you download the journal.</p>
     <p class="note"><b>Explore plays</b> pairs worked examples with a different past play to try. Questions use recorded facts, not video. Your first answer in each attempt is saved separately in Practice history, where you can download or clear it. These answers do not change the live analysis.</p>
+    </details>
+    <p class="note"><a href="data.html" target="_blank" rel="noopener">Data, sources and privacy ↗</a></p>
   </div>
 </div>
 
@@ -166,6 +175,13 @@
       <p id="gameSearchStatus" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
     <div id="games"><div class="empty">Loading games…</div></div>
+    <button id="gameSettingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings: hints and appearance ↗</button>
+  </div>
+</div>
+
+<div id="settingsSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" inert>
+  <div class="sheetInner">
+    <div class="sheetTop"><span class="ttl" id="settingsTitle">Settings</span><button id="closeSettings" class="closex" type="button">Close</button></div>
     <div class="settings-section">
       <div class="grouphead">Appearance</div>
       <div class="theme-options" role="group" aria-label="Appearance">
@@ -184,11 +200,13 @@
     <div class="grouphead">Terms you have seen</div>
     <div class="ledger" id="ledgerView"></div>
     <p class="note" id="ledgerNote"></p>
+    <details class="help-details"><summary>Troubleshooting</summary>
     <div class="btnRow">
       <button id="copyDiag" class="ghost">Copy diagnostics</button>
       <button id="resetLedger" class="ghost">Reset picks and term history</button>
     </div>
     <p class="note" id="buildNote"></p>
+    </details>
   </div>
 </div>
 
@@ -202,10 +220,10 @@
        Cards, plays, and scores will wait the number of seconds you choose.</p>
     <div class="dRow">
       <button id="dMinus" aria-label="one second less">&minus;</button>
-      <div id="dVal">0s</div>
+      <div id="dVal">45s</div>
       <button id="dPlus" aria-label="one second more">+</button>
     </div>
-    <input id="dSlide" type="range" min="0" max="90" step="1" value="0" aria-label="TV delay in seconds">
+    <input id="dSlide" type="range" min="0" max="90" step="1" value="45" aria-label="TV delay in seconds">
     <div class="dScale"><span>0s</span><span>45s</span><span>90s</span></div>
     <p class="note" id="dNote"></p>
     <section class="sync-check" aria-labelledby="syncTitle">

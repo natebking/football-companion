@@ -366,3 +366,13 @@ Answers are interpretations of supplied historical evidence, not reports of what
 The optional history holds at most 200 attempts and never drops earlier ones automatically. It can be downloaded or explicitly cleared. Storage failures are visible; in-memory answers remain downloadable and unreadable stored records are not overwritten. Unknown prior history is recorded as unknown. Opening/rendering an example is not evidence that a viewer read it, and these answers alone cannot establish learning gains or video recognition.
 
 The [practice audit](PRACTICE-AUDIT-2026-09-06.md) verifies exports against their exact source bank and separates first recorded, repeated and unknown exposure. It does not pool browser exports as unique viewers, turn “Not sure” into an incorrect answer, or treat QA as viewer evidence.
+
+### First visit, settings and diagnostics (September 6, 2026)
+
+A new browser waits for explicit game selection. Boot and league changes may restore a saved unfinished game but may not substitute another live game. Scoreboard refresh never selects a game. Without a valid saved delay, hold updates for 45 seconds and label the control Sync TV; the delay sheet must state that this is an unmeasured estimate. Explicit settings, including zero, are preserved. Manual adjustment is a chosen delay, not a claim of measured synchronization.
+
+Games contains team search and the schedule. Settings is a separate dialog, reachable from Games and the footer. Read the game remains the default and prediction questions remain opt-in. Opening a dialog makes it focusable immediately; the visibility transition must not prevent focus from entering it.
+
+Diagnostics remain browser-local. Consecutive unchanged polls may be coalesced, retaining their count, first and last time, and latest/maximum response gap; meaningful source, queue, clock, correction and resumption changes are not coalesced. Consumers must not equate event-row counts with the number of polls. Dirty records persist every 30 seconds and when the page hides or backgrounds. Copy diagnostics reads the current in-memory ring.
+
+The public source/privacy explanation is `web/data.html`; source-specific notices are in `NOTICE.md`. FTN-derived examples and practice display attribution and adaptation notices. This does not change the historical bank, probability tables, or data-sharing behavior.

@@ -1,6 +1,8 @@
 # Prior art: has anyone built this?
 
-Research run 2026-08-29 by a 10-agent sweep across commercial companion apps, beginner education products, indie/GitHub attempts, betting and analytics tools, legal and data licensing, market and retention history, and cross-domain teaching precedent. Verdict and citations below are the synthesis agent output, unedited.
+> **Historical research notes, not current implementation instructions.** The claims below were not all independently verified. Competitive, legal, pricing and learning-effect claims require their primary sources to be checked before use. See [the review follow-up](REVIEW-FOLLOWUP-2026-09-06.md) and [current contract](CONTRACT.md). Section 5’s copying instruction was removed on September 6.
+
+Research run 2026-08-29 by a 10-agent sweep across commercial companion apps, beginner education products, indie/GitHub attempts, betting and analytics tools, legal and data licensing, market and retention history, and cross-domain teaching precedent. Verdict and citations below are the synthesis agent output, with the September 6 correction noted above.
 
 # HAS THIS BEEN BUILT? — SYNTHESIS
 
@@ -125,9 +127,9 @@ The design consequence, and it is not free: **ration the commitment.** Do not as
 
 ---
 
-## 5. COPY THESE OUTRIGHT
+## 5. Design ideas to evaluate with original implementation
 
-1. **See the Field's pre-snap scripts, verbatim as card templates.** They are public, free, unprotected, and independently converged on the same sequence — which is the best available evidence that the sequence is right. The four-step coverage read (count safeties → check corner depth → watch the snap → check your read) and the five-step formation read. Also steal its expectation-setter: *"You'll be wrong a lot at first. Defenses are designed to disguise their coverage."* That single sentence is what makes a wrong guess feel like progress instead of failure.
+1. **Write original cue-and-observation prompts.** A short sequence can ask the viewer to locate a relevant feature, make an observation, then compare it with the released report. Public guides are research references, not permission to copy their wording or code. Reuse expressive content only under an applicable licence or explicit permission, preserving required attribution. Visibility alone does not establish a licence.
 2. **FirstDown's Leitner scheduler.** ~20 lines: cards carry `{bucket, lastSeen, nextDue, streak}`, queue is `SR_CARDS.filter(c => c.bucket < 2 && c.nextDue <= now)`, new-first-then-due mixing, persisted to localStorage in a try/catch, mastered cards drop out. It is the only working concept-mastery mechanic in football, and it already implements "shortens cards as they learn."
 3. **But sequence it on Kellman's rule, not See the Field's.** ARTS schedules on **accuracy AND response latency** to mastery. A concept is learned when the user calls it *fast* and right, not when they have seen it five times.
 4. **undercut-f1's user-adjustable delay slider** (901 stars, actively maintained, "variable delay to sync to your TV"). It is the only project in any sport treating broadcast delay as a first-class user-facing control. Its existence proves users will configure the offset themselves rather than expect ACR magic. Then make it **re-checkable mid-game**, because YouTube TV ships a "Broadcast Delay: Decreased" toggle and Sky's Live Sync cuts ~22s to ~8s, and a user can flip either at halftime.

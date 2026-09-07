@@ -1,6 +1,6 @@
 # Football Companion: Project Context
 
-Pairs with `football-companion-prompt-scaffold.md`. Drop both into a new chat to resume without re-explaining.
+> **Archived concept brief.** This preserves the original proposal, not the current build. The app does not run an LLM during a game, cannot watch the broadcast, and never uses a withheld outcome to choose pre-snap guidance. Coaching transfer and learning gains remain research questions. For a handoff, use the [current contract](CONTRACT.md), [advanced-mode plan](ADVANCED-MODE-PLAN-2026-09-06.md) and [implementation record](IMPLEMENTATION-2026-09-06.md).
 
 ---
 

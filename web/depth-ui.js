@@ -81,6 +81,12 @@
       pressure: 'pocket_edges', 'yards-after-catch': teachingLevel === 'basics' ? 'first_down_line' : 'catch_and_run' };
     return lessons[topic] ? root.FootballLearning.get(lessons[topic], { level: teachingLevel }) : null;
   }
+  function adaptationNotice(example) {
+    if (!(example.sources || []).some(function (source) { return source.label === 'FTN Data via nflverse'; })) return '';
+    return '<p class="depth-caption">Adapted from FTN Data via nflverse: charted facts joined with play-by-play, summarized and illustrated for this lesson. ' +
+      'This adaptation is available under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. ' +
+      '<a href="data.html#charting" target="_blank" rel="noopener">Source and licence details ↗</a></p>';
+  }
   function showExample(id) {
     var example = examples && examples.examples.find(function (entry) { return entry.id === id; });
     if (!example) return;
@@ -97,7 +103,7 @@
         '<button type="button" class="ghost" data-practice-start="' + esc(id) + '">Try another play</button></section>' : '') +
       (topic ? root.FootballLearning.renderDiagram(topic.id, { level: teachingLevel }) + '<p class="learning-caption">' + esc(topic.diagramCaption) + '</p>' +
         '<button type="button" class="depth-link" data-lesson="' + esc(topic.id) + '" data-lesson-origin="library" data-lesson-example="' + esc(example.id) + '">Learn what to watch <span aria-hidden="true">↗</span></button>' : '') +
-      '<details class="example-sources"><summary>Source and play details</summary><p>' + sourceLinks(example.sources) + '</p>' +
+      adaptationNotice(example) + '<details class="example-sources"><summary>Source and play details</summary><p>' + sourceLinks(example.sources) + '</p>' +
       '<p class="depth-caption">Game ' + esc(example.gameId) + ' · Play ' + esc(example.playId) + '</p></details>';
     resetView();
   }
@@ -154,7 +160,7 @@
         return '<button type="button" data-practice-answer="' + esc(choice.id) + '" aria-pressed="false">' + esc(choice.label) + '</button>';
       }).join('') + '</div><div id="practiceResponse" class="learning-response" role="status" tabindex="-1" hidden></div></section>' +
       '<p class="depth-caption">' + (attempt.priorExampleOpened || attempt.priorTargetQuestions > 0 ? 'You have opened this play or a question about it before. This attempt is saved as a repeat. ' : '') + practiceStatus() + '</p>' +
-      '<details class="example-sources"><summary>Sources</summary><p>' + sourceLinks(target.sources) + '</p></details>';
+      adaptationNotice(target) + '<details class="example-sources"><summary>Sources</summary><p>' + sourceLinks(target.sources) + '</p></details>';
     resetView();
   }
   function answerPractice(choice) {

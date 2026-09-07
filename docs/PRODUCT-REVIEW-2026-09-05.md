@@ -34,7 +34,7 @@ The inspected descriptions supplied no route, blitz, coverage, or play-action id
 
 Keep the static app and deterministic explanations. Adding an AI narrator would not give the app evidence about assignments, routes, or why a defender reacted. Source-backed details and state changes can be explained without runtime generation. Watching suggestions can still introduce those concepts, provided they invite the viewer to look rather than claim the app observed them.
 
-Historical tendencies remain useful background. They are not a live account of personnel or scheme. The published NFL table currently contains 2024 data only. Refresh dry-run `33991873877` succeeded, but fresh data was not published by that run; it does not establish that the live site's tables are current.
+Historical tendencies remain useful background. They are not a live account of personnel or scheme. At this review’s original checkpoint, the NFL table contained 2024 only. **Update, September 6:** the shipped NFL history now covers 2023–2025. The [refresh audit](DATA-REFRESH-2026-09-05.md) records the data checks and the statistical tie against the league baseline. The earlier refresh dry-run alone was not evidence of deployment.
 
 The code and feed audits establish what information is available and expose mismatches in feedback. They do not prove a learning effect. The meaningful test is whether the viewer can explain a play and recognize a concept with less help over time, not simply whether they guess run or pass correctly.
 

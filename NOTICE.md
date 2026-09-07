@@ -1,0 +1,11 @@
+# Data and third-party notices
+
+The public explanation is in [web/data.html](web/data.html). These notices do not grant a licence to unrelated application code, trademarks or broadcast material.
+
+- **nflverse:** NFL play-by-play is obtained from the [nflverse-data releases](https://github.com/nflverse/nflverse-data/releases). Its repository [licence](https://github.com/nflverse/nflverse-data/blob/main/LICENSE.md) is CC BY 4.0. The app filters and aggregates records; tendencies also use recency weights and shrinkage. Exports are transformed summaries, not unmodified source files.
+- **FTN Data via nflverse:** the [public charting subset](https://nflreadr.nflverse.com/reference/load_ftn_charting.html) is CC BY-SA 4.0. In `web/teaching-examples.json`, records whose `sources` name FTN Data via nflverse, their explanations, and the corresponding rendered illustrations are adaptations under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Changes: selection, join to nflverse play-by-play, extraction of charted facts, explanatory text and diagrams. Source labels, URLs, game/play IDs and licence links are preserved. The adaptation notice is also rendered in lessons and practice. This source-specific licence does not cover the rest of the application.
+- **CollegeFootballData.com:** historical aggregates and selected examples are produced from its API under the [API terms](https://collegefootballdata.com/terms), effective August 12, 2026. Raw responses and credentials remain private. These notices do not relicense its API data as an open dataset.
+- **ESPN:** the live browser feed and team image URLs are ESPN-hosted. No availability guarantee, official partnership or blanket permission for those assets is claimed. Names and logos identify teams and are outside the above data licences. The access/licensing question remains an open provider decision; adding attribution does not resolve it.
+- **Fonts:** the bundled DM Sans and Barlow Condensed files retain their SIL OFL notices under `web/fonts/`.
+
+Primary documentation checked September 6, 2026. This notice records the sources and modifications used here; it does not settle upstream rights questions.

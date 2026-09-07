@@ -100,10 +100,12 @@ var league = lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
 var shortHints = lsGet(LS.shortHints) === '1';
 var teachingLevel = lsGet(LS.teachingLevel) === 'basics' ? 'basics' : 'game';
 var predictionQuestions = lsGet(LS.questions) === '1';
-var delaySec = (function () {
+var savedDelay = (function () {
   var n = parseInt(lsGet(LS.delay), 10);
-  return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : 0;
+  return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : null;
 })();
+var delayConfigured = savedDelay !== null;
+var delaySec = delayConfigured ? savedDelay : 45;
 var HISTORY = null; // Descriptive preceding-season profiles.
 var TEND = null;    // tendency table for the current league
 var CARDS = null;   // cards.json
@@ -220,17 +222,41 @@ function loadDiag() {
   } catch (e) { diagRing = []; }
 }
 function diag(kind, data) {
+  // Coalesce consecutive unchanged polls, retaining their cadence and time span.
+  // Arrival timestamps alone are not a change in the feed. Resumptions, errors,
+  // revisions, queue changes and clock changes still get their own records.
+  var previous = diagRing[diagRing.length - 1];
+  if (kind === 'poll' && previous && previous.k === 'poll' && pollSignature(previous.d) === pollSignature(data)) {
+    previous.polls = (previous.polls || 1) + 1;
+    previous.last_t = Date.now();
+    previous.last_response_gap_ms = data.response_gap_ms;
+    previous.max_response_gap_ms = Math.max(previous.max_response_gap_ms || previous.d.response_gap_ms || 0, data.response_gap_ms || 0);
+    diagDirty = true;
+    return;
+  }
   var row = { t: Date.now(), k: kind };
   if (data !== undefined) row.d = data;
   diagRing.push(row);
   if (diagRing.length > DIAG_MAX) diagRing = diagRing.slice(-DIAG_MAX);
   diagDirty = true;
 }
-setInterval(function () {
+function pollSignature(data) {
+  var state = {};
+  Object.keys(data || {}).sort().forEach(function (key) {
+    if (key !== 'received_at' && key !== 'response_gap_ms') state[key] = data[key];
+  });
+  return JSON.stringify(state);
+}
+function flushDiag() {
   if (!diagDirty) return;
   diagDirty = false;
   lsSet(LS.diag, JSON.stringify(diagRing));
-}, 2000);
+}
+setInterval(flushDiag, 30000);
+window.addEventListener('pagehide', flushDiag);
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'hidden') flushDiag();
+});
 function diagPayload(extra) {
   var out = {
     version: VERSION, at: new Date().toISOString(), ua: navigator.userAgent,
@@ -909,11 +935,13 @@ function render() {
   // the snaps the copy is allowed to, and never on the rest.
   var chips = [];
   var ten = st.ten;
+  var sourceName = sh.league() === 'nfl' ? 'nflverse' : 'CollegeFootballData';
+  var sourceLink = '<a class="chip ' + (st.attributed && ten ? 'src' : 'srcl') + '" href="data.html#history" target="_blank" rel="noopener">';
   if (st.attributed && ten) {
-    chips.push('<span class="chip src">' + esc(ten.team) + ' · ' + sh.seasonsLabel() +
-      ' · ' + ten.sample_size + ' plays</span>');
+    chips.push(sourceLink + esc(ten.team) + ' · ' + sh.seasonsLabel() +
+      ' · ' + ten.sample_size + ' plays · ' + sourceName + ' ↗</a>');
   } else {
-    chips.push('<span class="chip srcl">All offenses · ' + sh.seasonsLabel() + '</span>');
+    chips.push(sourceLink + 'All offenses · ' + sh.seasonsLabel() + ' · ' + sourceName + ' ↗</a>');
   }
   var cs = (st.lesson ? st.lesson.concepts : st.card.concepts) || [];
   for (var i = 0; i < cs.length; i++) {
@@ -1856,10 +1884,6 @@ function pollScoreboard(force) {
   fetchGames(requestedLeague).then(function (rows) {
     if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
     st.games = rows;
-    if (!st.gameId) {
-      var live = rows.filter(function (g) { return g.state === 'in'; });
-      if (live.length) selectGame(live[0].id);
-    }
     renderPicker();
   }).catch(function (e) {
     if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
@@ -1947,11 +1971,10 @@ sh.bus.on('leagueChanged', function () {
   fetchGames(requestedLeague).then(function (rows) {
     if (generation !== gameGeneration || requestedLeague !== sh.league()) return;
     st.games = rows;
-    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
-               rows.filter(function (g) { return g.state === 'in'; })[0];
+    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0];
     renderPicker();
     if (pick) selectGame(pick.id);
-    else sh.bus.emit('quiet', 'No live games. Open Games to see the schedule.');
+    else sh.bus.emit('quiet', 'Choose a game in Games to start.');
   }).catch(function (e) {
     if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
   });
@@ -1965,17 +1988,17 @@ setInterval(pump, sh.TICK_MS);
 setInterval(paintConnection, 1000);
 
 sh.bus.on('boot', function () {
+  renderHeader();
   renderPicker();
   var requestedLeague = sh.league(), generation = gameGeneration;
   var saved = sh.lsGet(sh.LS.game + requestedLeague);
   fetchGames(requestedLeague).then(function (rows) {
     if (generation !== gameGeneration || requestedLeague !== sh.league()) return;
     st.games = rows;
-    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0] ||
-               rows.filter(function (g) { return g.state === 'in'; })[0];
+    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0];
     renderPicker();
     if (pick) selectGame(pick.id);
-    else sh.bus.emit('quiet', 'No live games. Open Games to see the schedule.');
+    else sh.bus.emit('quiet', 'Choose a game in Games to start.');
   }).catch(function (e) {
     if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
   }).then(function () {
@@ -1987,6 +2010,19 @@ sh.bus.on('boot', function () {
 })(shell);
 
 // ================================================================= shell wiring
+function openSettings() {
+  $('settingsSheet').classList.add('on');
+  bus.emit('sheet');
+}
+$('settingsBtn').addEventListener('click', openSettings);
+$('gameSettingsBtn').addEventListener('click', function () {
+  $('closeSheet').click();
+  openSettings();
+});
+$('closeSettings').addEventListener('click', function () { $('settingsSheet').classList.remove('on'); });
+$('settingsSheet').addEventListener('click', function (ev) {
+  if (ev.target === this) this.classList.remove('on');
+});
 $('predictionQuestions').checked = predictionQuestions;
 $('predictionQuestions').addEventListener('change', function () {
   predictionQuestions = this.checked;
@@ -2010,15 +2046,18 @@ $('shortHints').addEventListener('change', function () {
 function paintDelay() {
   $('dVal').textContent = delaySec + 's';
   $('dSlide').value = String(delaySec);
-  $('delayBtn').textContent = 'TV +' + delaySec + 's';
+  $('delayBtn').textContent = delayConfigured ? 'TV +' + delaySec + 's' : 'Sync TV';
   $('delayBtn').className = delaySec > 0 ? 'on' : '';
-  $('dNote').textContent = delaySec === 0
+  $('dNote').textContent = !delayConfigured
+    ? 'Starting at 45 seconds. This is a guess, not a measured match to your TV. Adjust it below or check your timing with a fresh play.'
+    : delaySec === 0
     ? 'No delay. Updates appear as they arrive.'
     : 'Updates wait ' + delaySec + ' second' + (delaySec === 1 ? '' : 's') + '.';
 }
 function setDelay(n) {
   n = Math.max(0, Math.min(MAX_DELAY, Math.round(n)));
-  if (n === delaySec) return;
+  if (!isFinite(n) || (n === delaySec && delayConfigured)) return;
+  delayConfigured = true;
   delaySec = n;
   lsSet(LS.delay, String(n));
   paintDelay();

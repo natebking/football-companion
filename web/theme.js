@@ -38,7 +38,8 @@
   });
   document.addEventListener('DOMContentLoaded', function () {
     paint();
-    document.getElementById('themeToggle').addEventListener('click', function () {
+    var toggle = document.getElementById('themeToggle');
+    if (toggle) toggle.addEventListener('click', function () {
       choose(root.dataset.theme === 'dark' ? 'light' : 'dark');
     });
     document.querySelectorAll('[data-theme-choice]').forEach(function (button) {

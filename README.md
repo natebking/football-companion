@@ -45,6 +45,8 @@ The tests cover curated real ESPN plays, scoring and penalty edge cases, predict
 
 To check logo stability, serve the repository root with `python3 -m http.server 8765 --bind 127.0.0.1` and open `/tests/logo-rendering.html`. These browser checks exercise the actual rendering functions through repeated refreshes, score and delay changes, game reordering, and image failures. Logos and focused game buttons must remain in place as their text updates.
 
+- [Review follow-up](docs/REVIEW-FOLLOWUP-2026-09-06.md): resolved findings, current fixes and remaining research.
+- [Data and privacy](web/data.html) and [third-party notices](NOTICE.md): data sources, adaptations and what stays in this browser.
 - [Build contract](docs/CONTRACT.md): interfaces, statistical validation, and truth boundaries.
 - [Context brief](docs/context-brief.md) and [prompt scaffold](docs/prompt-scaffold.md): original design and future ideas, including up to four feeds.
 - [Deployment](docs/DEPLOYMENT.md): shared Codex and Claude deployment setup and troubleshooting.
