@@ -43,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-06-clock-review';
+var VERSION = '2026-09-06-tv-field';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -300,6 +300,10 @@ var shell = {
 // Pre-snap only. Nothing in this scope can see an ESPN object.
 (function initPrime(sh) {
 
+var fieldStorage;
+try { fieldStorage = window.localStorage; } catch (_) {}
+var fieldView = window.FootballField.create({ storage: fieldStorage });
+var fieldContext = '';
 var st = {
   evidence: null, read: null, readHistory: [], past: null, selectionReason: 'snap',
   sit: null, sitKey: '', card: null, ten: null, lesson: null,
@@ -777,25 +781,51 @@ function quietPrime(msg) {
   $('exploreRead').hidden = true;
   $('pFoot').innerHTML = '';
   $('fieldPosition').hidden = true;
+  $('fieldView').open = false;
 }
 
-// A diagram of the same pre-snap whitelist the card reads. Offense always
-// moves left to right; neither the diagram nor its labels can see a result.
+// Geometry uses released pre-snap context; orientation is the viewer's TV match.
 function renderField(sit) {
-  var ball = 30 + (100 - sit.yardsToGoal) * 4.4;
-  var target = 30 + Math.min(100, 100 - sit.yardsToGoal + sit.distance) * 4.4;
-  var goal = sit.distance >= sit.yardsToGoal;
+  var view = fieldView.view(sit, sh.league()), geo = view.geometry;
+  if (!geo) { $('fieldPosition').hidden = true; return; }
+  var context = [sh.league(), sit.gameId, sit.period, sit.offenseTeam && sit.offenseTeam.id].join(':');
+  if (context !== fieldContext) {
+    if ($('fieldView').open && $('fieldView').contains(document.activeElement)) $('fieldViewSummary').focus({ preventScroll: true });
+    $('fieldView').open = false; fieldContext = context;
+  }
+  var offense = sit.offenseTeam.abbreviation || sit.offenseTeam.shortDisplayName || 'Offense';
+  function label(team) { return team ? (team.abbreviation || team.shortDisplayName || team.name || 'Team') + ' defends' : ''; }
   $('fieldPosition').hidden = false;
-  $('ballLine').setAttribute('x1', ball);
-  $('ballLine').setAttribute('x2', ball);
-  $('ballMarker').setAttribute('cx', ball);
-  $('firstDownLine').setAttribute('x1', target);
-  $('firstDownLine').setAttribute('x2', target);
-  $('fieldDirection').textContent = (sit.offenseTeam.abbreviation || '') + ' possession →';
-  $('fieldTargetLabel').textContent = goal ? 'Goal line' : 'First down';
+  $('ballLine').setAttribute('x1', geo.ball);
+  $('ballLine').setAttribute('x2', geo.ball);
+  $('ballMarker').setAttribute('cx', geo.ball);
+  $('firstDownLine').setAttribute('x1', geo.target);
+  $('firstDownLine').setAttribute('x2', geo.target);
+  $('fieldDirection').textContent = view.right ? offense + ' possession →' : '← ' + offense + ' possession';
+  $('fieldLeftEnd').textContent = label(view.leftTeam);
+  $('fieldRightEnd').textContent = label(view.rightTeam);
+  $('fieldTargetLabel').textContent = geo.goal ? 'Goal line' : 'First down';
+  $('fieldView').hidden = !view.canMatch;
+  $('fieldViewSummary').textContent = view.matched ? 'Flip field' : 'Match TV';
+  $('fieldViewPrompt').textContent = 'Which way is ' + offense + ' attacking on your TV?';
+  $('fieldAttackLeft').setAttribute('aria-pressed', String(view.matched && !view.right));
+  $('fieldAttackRight').setAttribute('aria-pressed', String(view.matched && view.right));
   $('fieldGraphic').setAttribute('aria-label', sit.yardsToGoal + ' yards from the end zone, ' +
-    sit.distance + ' yards to ' + (goal ? 'score.' : 'a first down.') + ' Offense moves left to right.');
+    sit.distance + ' yards to ' + (geo.goal ? 'score.' : 'a first down.') + ' ' + offense + ' attacks ' +
+    (view.right ? 'right' : 'left') + '. ' + label(view.leftTeam) + ' the left end zone; ' + label(view.rightTeam) +
+    ' the right end zone.' + (view.matched ? ' TV direction set by you.' : ' TV direction has not been set.'));
 }
+function matchField(right) {
+  if (!st.sit || !fieldView.match(st.sit, sh.league(), right)) return;
+  renderField(st.sit);
+  $('fieldView').open = false;
+  $('fieldViewSummary').focus({ preventScroll: true });
+}
+$('fieldAttackLeft').addEventListener('click', function () { matchField(false); });
+$('fieldAttackRight').addEventListener('click', function () { matchField(true); });
+$('fieldView').addEventListener('keydown', function (event) {
+  if (event.key === 'Escape') { event.preventDefault(); $('fieldView').open = false; $('fieldViewSummary').focus({ preventScroll: true }); }
+});
 // Two signatures, two redraws, deliberately separate. The card above and the
 // ask below are torn down only when their own content changed, so a poll, a
 // countdown tick or a concept bump can never rebuild a tap target under a
@@ -814,6 +844,8 @@ function askSig() {
 }
 function render() {
   renderAsk();
+  // Period/possession can change while the selected text stays the same.
+  if (st.sit) renderField(st.sit);
   var sig = cardSig();
   if (sig === st.sig) return;      // nothing on the card changed, do not redraw
   st.sig = sig;
@@ -832,7 +864,6 @@ function render() {
     sit.yardsToGoal + ' to the end zone';
   $('pHold').textContent = st.hold;
 
-  renderField(sit);
   window.FootballHistoryUI.render($('historyComparison'), st.past);
   $('readLabel').textContent = sh.teachingLevel() === 'game' ? 'Read the game' : 'Where to look';
   $('readDetail').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.detail : '');

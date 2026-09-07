@@ -14,11 +14,15 @@ Open **Understand this play** for the meaning of a gain and, when verified, the 
 
 Choose a game, measure or set a TV delay, and use light, dark, or system appearance. Occasional predictions are optional. Their scores are separate from the history of terms seen; full definitions stay on unless the reader chooses shorter hints. There is no fixed bottom bar.
 
+Use **Match TV** below the field to choose whether the current offense is attacking left or right. The ball, first-down line and defended ends follow that view. The app remembers it for the game, reverses the ends for the second and fourth quarters, and asks for a new match after halftime or at the start of each overtime period. **Flip field** reopens the direction choices.
+
 **Game journal** saves source revisions, released play explanations, exact watching prompts and optional observations in this browser. Journals survive reloads and can be downloaded or removed. Storage is bounded and reports failures; it never silently removes old games. The old Vercel address and the new domain have separate browser storage.
 
 Open **post-game review** only when finished watching. Any saved game can request ESPN's final report; published college reviews also join available CFBD passing and rushing detail by exact game/play/offense IDs. The first enriched review is Boise State at Oregon. Reviews highlight different lessons, compare recorded explanations with later facts, and retain unmatched/missing data. Added detail is separated from corrections. Historical sessions from before journaling cannot be reconstructed.
 
 The completed [context evaluations](docs/CONTEXT-RESULTS-2026-09-06.md) found lower held-out historical probability error with score/time context in separate NFL and college studies. The expanded [three-caller transfer study](docs/COACHING-TRANSFER-RESULTS-2026-09-06.md) did not establish a reliable forecasting benefit from coaching history. [Frozen forecast replay](docs/FORECAST-REPLAY-RESULTS-2026-09-06.md) now compares candidates on original saved pre-snap inputs. The existing journals provide development examples, not prospective evidence. Production probabilities are unchanged.
+
+The [practice-export audit](docs/PRACTICE-AUDIT-2026-09-06.md) checks source versions and separates first recorded attempts from repeats, unknown history and unanswered questions. Its available QA export is not evidence of viewer learning.
 
 ## Data and limits
 

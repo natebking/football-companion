@@ -2,6 +2,12 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Seventh checkpoint: TV field direction and practice auditing**
+
+The user's added field request is implemented with Match TV / Flip field below the main diagram. It mirrors the ball, target line and defended-end labels, preserves the teams' ends on regulation possession changes and reverses them for the second/fourth quarters through the existing TV-delay queue. It remembers choices by game, requests a new match after halftime or at the start of an overtime period, and respects the college overtime shared-end rule. See [implementation, rule sources and browser checks](TV-FIELD-2026-09-06.md). All 229 JavaScript tests pass; desktop light and mobile dark checks have no overflow or JavaScript errors. Production verification follows after deployment.
+
+The separate [practice audit](PRACTICE-AUDIT-2026-09-06.md) is ready for voluntary exports. It verifies question/source versions and separates first recorded attempts, repeats, unknown history, unanswered questions and “Not sure.” The two available QA responses verify the workflow only. No real viewer practice results or learning gains are established.
+
 **Sixth checkpoint: frozen forecast replay**
 
 The [forecast replay workflow](FORECAST-REPLAY-PROTOCOL-2026-09-06.md) now compares a frozen candidate and the shipped historical baseline on the exact pre-snap context saved in a journal. Separate 2026 NFL and college candidates train only through 2025, retaining the previously selected shrinkage and calibration. The freeze records model, baseline, training-source and code hashes. It does not update the live probability files.

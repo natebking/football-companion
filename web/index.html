@@ -78,7 +78,18 @@
           <line id="ballLine" x1="250" y1="5" x2="250" y2="59" stroke="#d4f76b" stroke-width="2"/>
           <circle id="ballMarker" cx="250" cy="32" r="6" fill="#d4f76b" stroke="#203728" stroke-width="2"/>
         </svg>
-        <div class="field-legend"><span>Own end zone</span><span class="field-key">● Ball <i></i> <span id="fieldTargetLabel">First down</span></span><span>End zone →</span></div>
+        <div class="field-legend"><span id="fieldLeftEnd"></span><span class="field-key">● Ball <i></i> <span id="fieldTargetLabel">First down</span></span><span id="fieldRightEnd"></span></div>
+        <details id="fieldView" class="field-view">
+          <summary id="fieldViewSummary">Match TV</summary>
+          <div class="field-view-panel">
+            <p id="fieldViewPrompt">Which way is the offense attacking?</p>
+            <div class="field-view-choices" role="group" aria-labelledby="fieldViewPrompt">
+              <button type="button" id="fieldAttackLeft" aria-pressed="false">← Left</button>
+              <button type="button" id="fieldAttackRight" aria-pressed="false">Right →</button>
+            </div>
+            <p class="field-view-note">Match the main sideline camera. Check again after halftime or when a new overtime period starts.</p>
+          </div>
+        </details>
       </div>
       <div class="pHold" id="pHold"></div>
     </section>
@@ -130,6 +141,7 @@
     <p class="note">Use <b>See the idea</b> for a diagram and a question about what you noticed. Those answers are your observations, not a graded quiz. Diagrams explain the concept; they do not reconstruct the players’ actual paths.</p>
     <p class="note"><b>Explore past plays</b>, at the bottom of the page, uses named examples from past games, including NFL charting from FTN Data via nflverse. Historical examples are separate from the live game. Passing detail is shown only when its numbers agree with the play report.</p>
     <p class="note">If the app gets ahead of your TV, use <b>TV delay</b> to hold cards, plays, and scores by 0–90 seconds. Adjust it as you watch. Prediction questions are optional in Games; they do not measure your understanding of football.</p>
+    <p class="note"><b>Match TV</b> under the field lets you choose which way the offense is attacking. The diagram keeps each team’s end consistent through possession changes in regulation and switches ends for the second and fourth quarters. Match it again after halftime or when a new overtime period starts. Use <b>Flip field</b> to change the view at any time.</p>
     <p class="note"><b>Game journal</b> keeps the guidance you saw and the reports that arrived, including later corrections. Open a finished game for a review. Your journal stays in this browser on this website; use Download to keep a copy. It does not follow you between the old Vercel address and fluentin.football.</p>
     <p class="note"><b>Was this useful?</b> saves feedback with the card in your journal. It stays in this browser and is included when you download the journal.</p>
     <p class="note"><b>Explore plays</b> pairs worked examples with a different past play to try. Questions use recorded facts, not video. Your first answer in each attempt is saved separately in Practice history, where you can download or clear it. These answers do not change the live analysis.</p>
@@ -235,6 +247,7 @@
 <script src="game-insights.js"></script>
 <script src="game-history.js"></script>
 <script src="history-ui.js"></script>
+<script src="field-view.js"></script>
 <script src="game-read.js"></script>
 <script src="learning.js"></script>
 <script src="glossary.js"></script>

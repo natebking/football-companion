@@ -316,8 +316,8 @@ use the URLs supplied by ESPN in scoreboard and summary records; names remain
 visible if a logo is missing or fails to load. Logos stay in LIVE and do not
 expand PRIME's input whitelist.
 
-The field-position diagram in PRIME reads only the existing pre-snap whitelist.
-Offense always moves left to right, with the ball and first-down or goal line shown.
+The field-position diagram in PRIME reads only the existing released pre-snap whitelist.
+`field-view.js` adds a local per-game TV orientation preference. Until the viewer chooses a direction, the diagram uses the conventional offense-to-the-right view and offers Match TV. A chosen direction mirrors the ball, first-down/goal line, possession arrow and labels of the defended ends. Regulation possession changes retain each team's end; the second and fourth quarters reverse the directions within a half. Halftime and each overtime period require a fresh match, because goal choice is not reported. NCAA overtime uses the same selected scoring end for both teams' possession series. The NFL retains opposite directions within its overtime period. These are presentation rules, not inferred camera or player-tracking data. Period and possession reach the diagram only through the existing TV-delay queue. Changing the view never changes yardage, analysis or predictions. Storage failure retains the choice for the current session.
 Underlined football terms open a definition popover from `web/glossary.js`, including keyboard dismissal and focus restoration. The header links to a How it works dialog. The raw play description remains available under each play's disclosure. No card
 copy, attribution rule, grading rule, or broadcast-delay rule changes with the theme.
 
@@ -364,3 +364,5 @@ One owner per file, so parallel work never collides.
 Answers are interpretations of supplied historical evidence, not reports of what the viewer saw on television. No practice event enters the live game, prediction ledger, game journal or main-card selector. There is no mastery score or automatic adjustment to teaching level. The recorded level is the one at question opening; later preference changes do not relabel it.
 
 The optional history holds at most 200 attempts and never drops earlier ones automatically. It can be downloaded or explicitly cleared. Storage failures are visible; in-memory answers remain downloadable and unreadable stored records are not overwritten. Unknown prior history is recorded as unknown. Opening/rendering an example is not evidence that a viewer read it, and these answers alone cannot establish learning gains or video recognition.
+
+The [practice audit](PRACTICE-AUDIT-2026-09-06.md) verifies exports against their exact source bank and separates first recorded, repeated and unknown exposure. It does not pool browser exports as unique viewers, turn “Not sure” into an incorrect answer, or treat QA as viewer evidence.

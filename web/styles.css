@@ -127,6 +127,17 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 .field-legend { margin-top: 9px; color: #b3c9bc; font-size: .625rem; }
 .field-key { display: flex; gap: 5px; align-items: center; color: #d4f76b; }
 .field-key i { height: 9px; border-left: 2px dashed #f0c967; margin-left: 5px; }
+.field-legend > :last-child { text-align: right; }
+.field-view { margin-top: 10px; font-size: .75rem; }
+.field-view summary { width: fit-content; min-height: 32px; display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--field-ink); text-decoration: underline; text-underline-offset: 3px; }
+.field-view summary::after { content: '+'; text-decoration: none; }
+.field-view[open] summary::after { content: '−'; }
+.field-view-panel { padding: 4px 0 2px; }
+.field-view-panel p { margin: 0 0 9px; }
+.field-view-choices { display: flex; gap: 8px; margin-bottom: 10px; }
+.field-view-choices button { min-height: 44px; min-width: 100px; padding: 8px 15px; border: 1px solid #8ca89a; border-radius: 7px; background: transparent; color: var(--field-ink); }
+.field-view-choices button[aria-pressed="true"] { background: #d4f76b; color: #203728; border-color: #d4f76b; }
+.field-view-note { color: #b3c9bc; font-size: .6875rem; line-height: 1.5; max-width: 48ch; }
 #prime:has(.pHold:not(:empty)) .field-position { margin-bottom: 0; border-radius: 0; }
 
 /* The feed keeps the explanation prominent and the source text optional. */
