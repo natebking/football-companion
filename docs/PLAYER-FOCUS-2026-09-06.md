@@ -48,3 +48,11 @@ Passing components must reconcile with the gain and any reported catch spot. Sin
 These checks establish supported output and working presentation. They do not establish improved viewer learning, prediction accuracy or reliable TV synchronization. No paid source, visual analysis, background retraining or delay-queue change is included.
 
 The next useful evaluation is ordinary viewing feedback on the chosen player and latest explanation. An explicit explanation tied to the exact previously displayed player prompt remains separate follow-up work; this release does not claim that the app previously highlighted a play when it did not.
+
+## Published release
+
+- Implementation commits: `dcbe2e2` and `6ae653c`, pushed to the private repository.
+- Production: [fluentin.football](https://fluentin.football/), deployment `dpl_FRTDT5FbsQ2Pg8U7iS4Vb5GhoELE`, READY on September 6, 2026.
+- Build ID: `d9dc79509df2223d47b3aa01c072abdc82cc7287f35076b3ffc1d46ab75608d7`.
+- Authenticated preview manifest matched all 42 local asset fingerprints. The public manifest and nine main HTML/JS/CSS assets were independently fetched and matched the tested build. `/stopwatch` was unchanged.
+- A fresh production browser loaded selector `read-5` with no console errors or horizontal overflow.
