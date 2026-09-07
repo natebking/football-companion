@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-09-06",
+  "scope": "Three reported-primary-callers across multiple teams. Retrospective season-level role evidence, not a per-snap headset audit.",
+  "sources": {
+    "no_2018": {
+      "title": "Sean Payton NFC Championship media availability",
+      "published": "2019-01-18",
+      "url": "https://www.neworleanssaints.com/news/quotes-from-saints-coach-sean-payton-s-nfc-championship-media-availability-x1213",
+      "supports": "Payton describes calling plays from field level during the 2018 postseason, with Carmichael and other assistants contributing."
+    },
+    "no_2019": {
+      "title": "Sean Payton postgame quotes, Cardinals 2019 Week 8",
+      "published": "2019-10-27",
+      "url": "https://www.neworleanssaints.com/news/transcript-new-orleans-saints-head-coach-sean-payton-postgame-quotes-saints-card",
+      "supports": "Payton discusses his play-calling decisions with Brees back in the lineup."
+    },
+    "no_2020": {
+      "title": "Saints season-opening victory over Tampa Bay",
+      "published": "2020-09-13",
+      "url": "https://www.neworleanssaints.com/news/timely-contributions-by-each-unit-fuel-new-orleans-saints-victory-over-tampa-bay",
+      "supports": "Team report explicitly attributes offensive play-calling to Payton."
+    },
+    "no_2021": {
+      "title": "Sean Payton conference call, October 21",
+      "published": "2021-10-21",
+      "url": "https://www.neworleanssaints.com/news/saints-transcripts-sean-payton-conference-call-thursday-october-21-quotes",
+      "supports": "Payton answers questions about his responsibilities as play caller and Winston's effect on play calls."
+    },
+    "no_exception": {
+      "title": "Dennis Allen media availability, December 17",
+      "published": "2021-12-17",
+      "url": "https://www.neworleanssaints.com/news/saints-transcripts-dennis-allen-media-availability-friday-december-17",
+      "supports": "Allen announces Carmichael will call offense against Tampa Bay while Payton is absent with COVID-19."
+    },
+    "no_departure": {
+      "title": "Sean Payton to step away",
+      "published": "2022-01-25",
+      "url": "https://www.neworleanssaints.com/news/sean-payton-new-orleans-saints-head-coach-step-away-nfl-retirement-012522",
+      "supports": "Payton leaves New Orleans after 2021; original hire January 18, 2006."
+    },
+    "den_hire": {
+      "title": "Sean Payton official biography",
+      "published": null,
+      "url": "https://www.denverbroncos.com/team/coaches-roster/sean-payton",
+      "supports": "Denver appointed Payton February 3, 2023; he coached Denver in 2023–25 after New Orleans."
+    },
+    "den_staff": {
+      "title": "Broncos announce coaching hires",
+      "published": "2023-02-25",
+      "url": "https://www.denverbroncos.com/news/broncos-announce-series-of-coaching-hires",
+      "supports": "Joe Lombardi's offensive coordinator title is separate from Payton's head coach role."
+    },
+    "den_caller_change": {
+      "title": "Payton announces Davis Webb will call plays",
+      "published": "2026-02-24",
+      "url": "https://www.denverbroncos.com/news/i-wouldn-t-do-it-if-i-didn-t-think-it-was-going-to-help-our-team-win-hc-sean-payton-announces-oc-davis-webb-to-call-plays-for-broncos-offense",
+      "supports": "Payton transfers play-calling responsibility to Webb for 2026 while remaining head coach."
+    },
+    "den_confirmation": {
+      "title": "Davis Webb entering his first season as Broncos offensive coordinator",
+      "published": "2026-06-11",
+      "url": "https://www.denverbroncos.com/news/davis-webb-blessed-and-thankful-to-have-hc-sean-payton-as-resource-entering-first-season-as-broncos-oc",
+      "supports": "Webb is a first-time regular-season caller in 2026 after three seasons learning from Payton; 2025 preseason play-calling is distinguished."
+    },
+    "moore_dal_2020": {
+      "url": "https://www.dallascowboys.com/news/mccarthy-expects-that-moore-will-call-plays",
+      "retrievedAt": "2026-09-07T00:24:08.971155+00:00",
+      "sha256": "7fb6f29d4108ea1f822d1605d3150db072319c91512a95203f7f607b0efcdfa1",
+      "title": "Kellen Moore to Handle Play-Calling Duties",
+      "published": "2020-01-17",
+      "supports": "McCarthy retained Moore as play caller after his first Dallas season, despite the head-coach change.",
+      "storedFileSha256": "a036201a4602d2d5694e7ddc8368eee1915ed4f57d3be9f297da6f96cb73a57f"
+    },
+    "moore_dal_handoff": {
+      "url": "https://www.dallascowboys.com/news/combine-10-things-we-learned-from-jerry-in-indy",
+      "retrievedAt": "2026-09-07T00:24:08.989548+00:00",
+      "sha256": "fc64efe58198dedcb126670257d21800ea449d55f854d70f1f99c8fac48da106",
+      "title": "Combine: 10 Things We Learned From Jerry in Indy",
+      "published": "2023-03-04",
+      "supports": "Dallas describes McCarthy taking over play calling in 2023 after retaining Moore under the previous arrangement.",
+      "storedFileSha256": "cf31736e41aa170aeeeae7c514111587dfeae0dbb52c0afee152490a468d50dd"
+    },
+    "moore_lac_2023": {
+      "url": "https://www.chargers.com/news/chargers-kellen-moore-oc-dolphins-defense-week-1",
+      "retrievedAt": "2026-09-07T00:24:09.171609+00:00",
+      "sha256": "507382140f82eaecb7e721e036fbae130a22a387fde72ac91d24a8a65f1e3816",
+      "title": "From The Podium | Here's What Kellen Moore Expects From the Bolts New-Look Offense in Week 1",
+      "published": "2023-09-07",
+      "supports": "Moore is explicitly identified as the Chargers play caller entering the 2023 regular season.",
+      "storedFileSha256": "de3cc1815ad9809a51ce51b57b0d398f99b6cfcbebc3055a03d1ca60ccfbefaa"
+    },
+    "moore_lac_late": {
+      "url": "https://www.chargers.com/news/top-quotes-chargers-broncos-week-17-easton-stick",
+      "retrievedAt": "2026-09-07T00:24:09.421954+00:00",
+      "sha256": "47f44271dbec9bbeda4bf00ab4aff1e8f50d5dc5647392509052db02211d603a",
+      "title": "Top Quotes | What the Chargers Said Ahead of Week 17",
+      "published": "2023-12-30",
+      "supports": "Moore remains the offensive coordinator in the Week 17 staff transcript, after the interim head-coach change; this is role continuity, not per-snap proof.",
+      "storedFileSha256": "1fcb4fb1779a3502427002b912427e0723572e4249ee27afdcde3d504ea1717d"
+    },
+    "moore_phi_2024": {
+      "url": "https://www.philadelphiaeagles.com/news/kellen-moore-named-new-orleans-saints-head-coach",
+      "retrievedAt": "2026-09-07T00:24:09.072231+00:00",
+      "sha256": "474e5ca8cdcea4f1c1c29f8876dc155c813836ea6eb99a6f887b1d3281c32452",
+      "title": "Kellen Moore named New Orleans Saints Head Coach",
+      "published": "2025-02-11",
+      "supports": "Sirianni identifies Moore as the Eagles play caller in his sole Philadelphia season, ending with the 2024-season Super Bowl.",
+      "storedFileSha256": "f3146ec24f6fce1f3233c3d37de61de3b28f19e6b4f1df9b9b5bee4e76b91b36"
+    },
+    "moore_no_intro": {
+      "url": "https://www.neworleanssaints.com/news/kellen-moore-prepared-to-call-shots-for-new-orleans-saints-as-19th-coach-in-franchise-history",
+      "retrievedAt": "2026-09-07T00:24:08.854146+00:00",
+      "sha256": "d82ef8cd48d721029ecdb74949c2762c2bd71916ea1286eb99790ff428194e2d",
+      "title": "Kellen Moore prepared to call shots for New Orleans Saints as 19th coach in franchise history",
+      "published": "2025-02-13",
+      "supports": "Moore states he will retain offensive play calling as Saints head coach in 2025.",
+      "storedFileSha256": "2dfd0957fdf9a235d1f0a4b84eb149ef4b8b7aa0634c82b26e1032dd3fdc0be3"
+    },
+    "moore_no_2025": {
+      "url": "https://www.neworleanssaints.com/news/2025-nfl-week-15-carolina-panthers-vs-new-orleans-saints-postgame-quotes-tyler-shough-charlie-smyth",
+      "retrievedAt": "2026-09-07T00:24:09.847998+00:00",
+      "sha256": "0111b06e87f83090bb95498f970cfc0f7f70a26dcaa5ea98f228b16f6a6e448b",
+      "title": "Postgame Quotes: New Orleans Saints 20, Carolina Panthers 17 | 2025 NFL Week 15",
+      "published": "2025-12-15",
+      "supports": "The Saints postgame transcript discusses Moore calling plays and his quarterback credits his calls in a 2025 regular-season game.",
+      "storedFileSha256": "46e7749b719e50d1560ccc6953319791101c683bcfa8ea3e3057c6d9beb51d99"
+    },
+    "smith_ten_atl": {
+      "url": "https://www.steelers.com/news/what-does-arthur-smith-bring-to-the-steelers-offense",
+      "retrievedAt": "2026-09-07T00:24:09.460188+00:00",
+      "sha256": "cfa1c4f325c770a906d0bd5ee715c8549726c7cc2d4d2639322951eba6dac054",
+      "title": "What does Arthur Smith bring to the Steelers' offense?",
+      "published": "2024-02-02",
+      "supports": "The Steelers retrospective identifies five seasons of play calling: Tennessee 2019–20 and Atlanta 2021–23.",
+      "storedFileSha256": "e0666ce48fe0237c1576f759814a22218095c8a311e394f62c1e0ec43a7464f9"
+    },
+    "smith_atl_caller": {
+      "url": "https://www.atlantafalcons.com/news/arthur-smith-matt-ryan-must-find-lockstep-to-run-falcons-offense-well",
+      "retrievedAt": "2026-09-07T00:24:09.637919+00:00",
+      "sha256": "fa1bf5a2f17408206d435a0d728911f7545aa7476146d40e4112eda4ff947429",
+      "title": "Falcons' Matt Ryan and Arthur Smith using NFL offseason program to build chemistry",
+      "published": "2021-06-14",
+      "supports": "Atlanta explicitly identifies Smith as Matt Ryan’s new offensive play caller in 2021.",
+      "storedFileSha256": "abc56efd70d81d31856b232eaba6b51645f54b0d9630bde7f1e9c8226047b9e6"
+    },
+    "smith_pit_2024": {
+      "url": "https://www.steelers.com/news/labriola-on-the-win-over-the-chargers-x2423",
+      "retrievedAt": "2026-09-07T00:24:09.473253+00:00",
+      "sha256": "115f144da16c76bd380d9a24925ece69342f40df94a4e58f58c54444b89d46e2",
+      "title": "Labriola on the win over the Chargers",
+      "published": "2024-09-23",
+      "supports": "A regular-season Steelers game report describes Smith calling the offensive plays in 2024.",
+      "storedFileSha256": "3fc71f2a43cff4cabb2caab6cee338bb02ca64c5401e9fb3b6049f3f0cd868d4"
+    },
+    "smith_pit_2025": {
+      "url": "https://www.steelers.com/news/smith-just-one-word-for-their-short-yardage-play",
+      "retrievedAt": "2026-09-07T00:24:09.664538+00:00",
+      "sha256": "b4fe28940f9d1bf906e299b5563a9f352d819a658480176d001bb205b6f6d02a",
+      "title": "Smith: 'Just one word' for their short yardage play",
+      "published": "2025-12-18",
+      "supports": "Smith describes the short-yardage call and its deployment across the 2025 Steelers season.",
+      "storedFileSha256": "614ad5bfcc294183cd662a2ded6f1906263f04e7b0e2b921a8e78df58f23eb08"
+    },
+    "lac_interim_head": {
+      "title": "Giff Smith first message as interim head coach",
+      "published": "2023-12-19",
+      "url": "https://www.chargers.com/news/giff-smith-interim-head-coach-takeaways-bills-afc",
+      "supports": "Giff Smith assumes head-coach duties for the final three regular-season games after Brandon Staley; the article does not establish a new offensive caller."
+    }
+  },
+  "assignments": [
+    {
+      "team": "NO",
+      "seasons": [
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "headCoach": "Sean Payton",
+      "offensiveCoordinator": "Pete Carmichael",
+      "playCaller": "Sean Payton",
+      "callerId": "sean_payton",
+      "tenureId": "sean_payton_NO",
+      "headCoachAppointed": "2006-01-18",
+      "roleEnded": "2022-01-25",
+      "datePrecision": "season-level caller assignment with game exception below",
+      "sourceIds": [
+        "no_2018",
+        "no_2019",
+        "no_2020",
+        "no_2021",
+        "no_departure"
+      ]
+    },
+    {
+      "team": "DEN",
+      "seasons": [
+        2023,
+        2024,
+        2025
+      ],
+      "headCoach": "Sean Payton",
+      "offensiveCoordinator": "Joe Lombardi",
+      "playCaller": "Sean Payton",
+      "callerId": "sean_payton",
+      "tenureId": "sean_payton_DEN",
+      "headCoachAppointed": "2023-02-03",
+      "callerChangeAnnounced": "2026-02-24",
+      "datePrecision": "regular season and postseason only; caller handoff effective for 2026",
+      "sourceIds": [
+        "den_hire",
+        "den_staff",
+        "den_caller_change",
+        "den_confirmation"
+      ]
+    },
+    {
+      "team": "DEN",
+      "seasons": [
+        2026
+      ],
+      "headCoach": "Sean Payton",
+      "offensiveCoordinator": "Davis Webb",
+      "playCaller": "Davis Webb",
+      "callerId": "davis_webb",
+      "tenureId": "davis_webb_DEN",
+      "callerChangeAnnounced": "2026-02-24",
+      "datePrecision": "regular season starts in 2026; announcement date is not a game date",
+      "sourceIds": [
+        "den_caller_change",
+        "den_confirmation"
+      ],
+      "includedInExperiment": false
+    },
+    {
+      "team": "DAL",
+      "seasons": [
+        2019
+      ],
+      "headCoach": "Jason Garrett",
+      "playCaller": "Kellen Moore",
+      "callerId": "kellen_moore",
+      "tenureId": "kellen_moore_DAL",
+      "sourceIds": [
+        "moore_dal_2020",
+        "moore_lac_2023"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    },
+    {
+      "team": "DAL",
+      "seasons": [
+        2020,
+        2021,
+        2022
+      ],
+      "headCoach": "Mike McCarthy",
+      "playCaller": "Kellen Moore",
+      "callerId": "kellen_moore",
+      "tenureId": "kellen_moore_DAL",
+      "sourceIds": [
+        "moore_dal_2020",
+        "moore_dal_handoff"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    },
+    {
+      "team": "LAC",
+      "seasons": [
+        2023
+      ],
+      "headCoach": "Brandon Staley; Giff Smith interim for the final three games",
+      "playCaller": "Kellen Moore",
+      "callerId": "kellen_moore",
+      "tenureId": "kellen_moore_LAC",
+      "sourceIds": [
+        "moore_lac_2023",
+        "moore_lac_late",
+        "lac_interim_head"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": "Head-coach change is not treated as a play-caller change. Primary role inferred across the regular-season stint; unreported delegation remains possible."
+    },
+    {
+      "team": "PHI",
+      "seasons": [
+        2024
+      ],
+      "headCoach": "Nick Sirianni",
+      "playCaller": "Kellen Moore",
+      "callerId": "kellen_moore",
+      "tenureId": "kellen_moore_PHI",
+      "sourceIds": [
+        "moore_phi_2024"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    },
+    {
+      "team": "NO",
+      "seasons": [
+        2025
+      ],
+      "headCoach": "Kellen Moore",
+      "playCaller": "Kellen Moore",
+      "callerId": "kellen_moore",
+      "tenureId": "kellen_moore_NO",
+      "sourceIds": [
+        "moore_no_intro",
+        "moore_no_2025"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    },
+    {
+      "team": "TEN",
+      "seasons": [
+        2019,
+        2020
+      ],
+      "headCoach": "Mike Vrabel",
+      "playCaller": "Arthur Smith",
+      "callerId": "arthur_smith",
+      "tenureId": "arthur_smith_TEN",
+      "sourceIds": [
+        "smith_ten_atl"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    },
+    {
+      "team": "ATL",
+      "seasons": [
+        2021,
+        2022,
+        2023
+      ],
+      "headCoach": "Arthur Smith",
+      "playCaller": "Arthur Smith",
+      "callerId": "arthur_smith",
+      "tenureId": "arthur_smith_ATL",
+      "sourceIds": [
+        "smith_ten_atl",
+        "smith_atl_caller"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    },
+    {
+      "team": "PIT",
+      "seasons": [
+        2024,
+        2025
+      ],
+      "headCoach": "Mike Tomlin",
+      "playCaller": "Arthur Smith",
+      "callerId": "arthur_smith",
+      "tenureId": "arthur_smith_PIT",
+      "sourceIds": [
+        "smith_pit_2024",
+        "smith_pit_2025"
+      ],
+      "datePrecision": "Season-level regular/postseason assignment; preseason excluded",
+      "notes": null
+    }
+  ],
+  "exceptions": [
+    {
+      "gameId": "2021_15_NO_TB",
+      "team": "NO",
+      "headCoach": "Dennis Allen (acting)",
+      "playCaller": "Pete Carmichael",
+      "gameDate": "2021-12-19",
+      "sourceIds": [
+        "no_exception"
+      ],
+      "excludeFromCallerTraining": true,
+      "reason": "Verified temporary replacement; retained in league/team training but excluded from Payton's history."
+    }
+  ],
+  "limitations": [
+    "Three transferring callers are covered, selected from sourced role histories before this expanded fit. This is not league-wide coverage; unmapped stints remain unknown.",
+    "Official reports establish the primary role, not a snap-by-snap audit. Shared decisions and unreported temporary delegation may remain.",
+    "Published retrospective role confirmation does not reveal play outcomes to the model; nevertheless this is reconstructed historical metadata, not a database archived before each kickoff.",
+    "The 2026 caller change is source-backed context and a boundary test only. No 2026 outcomes enter training or evaluation.",
+    "Moore’s Dallas head-coach change and Chargers interim head-coach change do not by themselves end his caller tenure. Quarterback and roster changes are not causal controls."
+  ]
+}

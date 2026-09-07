@@ -2,13 +2,19 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Expanded coaching study**
+
+The [three-caller transfer study](COACHING-TRANSFER-RESULTS-2026-09-06.md) is complete for Payton, Moore and Arthur Smith using the fixed NFL method. It covers 9,977 held-out plays in 158 games across six transfer stints; first seasons at new teams account for 5,593 plays in 87 games. Career, tenure and the fixed blend do not establish a reliable probability-error improvement over team history. All pooled and per-caller career comparison intervals include zero. Passer identities and counts are joined to exact raw records to make personnel changes visible; they are descriptive, not causal controls. The source catalog distinguishes actual caller roles and does not substitute head coaches. Thirty Python tests pass. Live probabilities remain unchanged.
+
+The warranted decision is to keep coaching forecasts out of production pending stronger evidence. The NFL study does not answer the college transfer question or provide a complete current-staff database. Ben Johnson and Mike Denbrock remain research leads, not assigned callers in this catalog.
+
 **Fourth checkpoint: updates between plays**
 
 Clock, score, season and source-clock-health changes now refresh the existing read through the TV-delay queue even if the next down, distance and spot stay identical. A different source play with the same end position still advances to a new snap. Context-only refreshes do not open new questions or increment teaching exposures; an existing question is voided only when its read changes. A new read can enter the cooldown, but repeated clock updates retain the current read without consuming the six-read window. The journal and audit distinguish context refreshes.
 
 The scoreboard now receives its own ordered, delayed snapshots. It can update between plays instead of remaining tied to the last play’s old clock and score. Missing scores stay unknown, final status waits for the delay, and team-logo elements stay attached across updates.
 
-Validation: 201 JavaScript tests pass, including a clock boundary, score correction, missing season becoming available, same-position new play, catch-up, corrected pending reports, final status, and journal refresh accounting. A browser fixture using saved Oregon/Boise reports with a synthetic Q4 clock/score transition held 5:01 and a 3-point lead for the configured delay, then showed 4:59, a 7-point lead and the corresponding clock read together. Its journal reproduced both reads; desktop and mobile dark mode had no overflow or browser errors. This fixture validates behavior, not actual game timing. Production verification is pending.
+Validation: 201 JavaScript tests pass, including a clock boundary, score correction, missing season becoming available, same-position new play, catch-up, corrected pending reports, final status, and journal refresh accounting. A browser fixture using saved Oregon/Boise reports with a synthetic Q4 clock/score transition held 5:01 and a 3-point lead for the configured delay, then showed 4:59, a 7-point lead and the corresponding clock read together. Its journal reproduced both reads; desktop and mobile dark mode had no overflow or browser errors. This fixture validates behavior, not actual game timing. Production verification: app commit `f629952` is pushed; preview `dpl_Cv22N9dRUt8uNBdHLBsdhEDTHAEM` and production `dpl_BMmQV4bufvwZCHpaSqSVDqYZeqjc` are READY. The production URL `https://football-companion-4gb784a7x-nates-projects-925609f4.vercel.app` has the fluentin.football and rose aliases. Local, preview and public build ID `bae3d6fe66184ed620716324aa8393d526c39ecc8c15f85632042cfe5a7f96e2` matches, and actual public app/index hashes match the manifest. Replay files were removed by the clean build; local server and isolated browser are closed.
 
 **Third checkpoint: previous-season team and opponent comparisons**
 
@@ -72,7 +78,7 @@ At 2026-09-06T23:32:43Z, a single CFBD `/live/plays` access probe using the exis
 
 1. The separate NFL/college fit, calibration review, source-alignment audit and client parity are complete. The candidate remains research-only pending a prospective live-data gate; the old live model remains the comparison.
 2. The first descriptive team/opponent comparison is implemented and verified in the third checkpoint. Extend current-game comparisons only where the same outcome definitions and adequate samples support them; do not imply causal effects or opponent-adjusted weakness.
-3. Expand dated actual-play-caller coverage to several staff transitions and test the coaching idea. Keep staff/quarterback changes explicit. The one-caller pilot remains inconclusive.
+3. The expanded three-caller NFL study is complete and remains inconclusive for forecasting benefit. Dated descriptive coaching context and college-specific transfer research are possible follow-ups; do not imply that the current catalog covers every team or today’s staff.
 4. Expand the verified historical charting/practice bank and test recognition on a different play. The existing six examples remain; this release does not yet add examples or establish learning gains.
 5. Run the new audit across real exported live-viewer journals, review the actual feedback and compare candidate changes on untouched later games. The local QA journal is not a substitute for those observations.
 6. If authorized and accessible, run a bounded CFBD live trial measuring useful fields, missingness, revisions and latency. Add a protected server adapter/shared game cache only if the trial establishes a useful replacement or supplement. Evaluate richer licensed NFL access separately; no assumed college/NFL feature parity.

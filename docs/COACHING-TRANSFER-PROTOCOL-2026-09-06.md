@@ -1,0 +1,13 @@
+# Expanded coaching-history test
+
+Freeze this design before inspecting the expanded results. Use the existing 2018–2025 NFL archive and the dated `coaching-expanded-sources.json` catalog: Sean Payton, Kellen Moore and Arthur Smith. Their stints are sourced primary-caller assignments, not head-coach proxies. Known exceptions remain excluded from caller training; unmapped roles stay unknown. The original Payton experiment and its artifacts remain intact.
+
+Hold out 2023, 2024 and 2025 in turn. Reuse the existing context model, grids and two-season recency half-life. Tune context and identity strength on all NFL teams in the immediately preceding validation season, using still-earlier training data. Then refit on everything before the holdout. No new grid, blend weight or outcome definition is selected from these caller results. The target remains recorded pass/run, with sacks counted as passes and scrambles as runs; this does not recover the intended call.
+
+Compare context plus team history, current caller/team tenure, the caller’s earlier career across teams, and the previously fixed 50/50 team/career blend. Report all four, including Brier error, classification accuracy and calibration. Separately report all covered stints, transfer stints, each caller, each transfer tenure and the first season at each new team. A transfer requires earlier recorded caller seasons at another team. Never infer continuity from a head-coach title.
+
+Use paired, game-clustered intervals for error differences. With three callers, these intervals describe the sampled games, not a broad population of coaches. Show consistency or disagreement across callers; an aggregate interval alone cannot establish general transfer benefit. This expanded study remains exploratory because the years have been used in prior research and several comparisons are reported without correction. Do not promote revised probabilities from this study.
+
+Join named passers from raw nflverse rows to the eligible game/play IDs and list the most frequent passers by covered team/season. This makes personnel changes visible; it neither establishes starting-quarterback assignments nor controls for quarterback ability, health, roster quality or opponents. Staff role evidence is reconstructed retrospectively. Preserve input hashes, exact catalog and per-play predictions. No 2026 game outcome enters fitting or evaluation.
+
+Next decision: use the results to decide whether caller history merits a larger prospective test or only sourced descriptive context. Neither outcome proves live accuracy, tactical recognition or learning gains.
