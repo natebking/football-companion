@@ -6,6 +6,7 @@ CFBD historical request uses the existing private key and is cached there too.
 Keys never enter the output. FTN-derived records retain their attribution and
 CC-BY-SA 4.0 notice; these records may be reused under that license.
 """
+import hashlib
 import json
 from pathlib import Path
 
@@ -20,6 +21,9 @@ FTN_URL = "https://github.com/nflverse/nflverse-data/releases/download/ftn_chart
 CFBD_URL = "https://api.collegefootballdata.com/passing/plays"
 CFBD_PARAMS = {"year": 2025, "team": "Oregon", "week": 1, "seasonType": "postseason"}
 LICENSE_URL = "https://creativecommons.org/licenses/by-sa/4.0/"
+CONTENT = ROOT / "engine/teaching-content.json"
+CHART_FIELDS = {"is_play_action": "playAction", "is_screen_pass": "screen", "is_motion": "motion",
+                "n_pass_rushers": "passRushers", "n_blitzers": "blitzers"}
 
 
 def _one(frame, game, play):
@@ -27,7 +31,7 @@ def _one(frame, game, play):
     if len(rows) != 1:
         raise ValueError("Expected one source play: {} / {}, found {}".format(game, play, len(rows)))
     row = rows.iloc[0]
-    if row.penalty or row.play_type not in ("run", "pass"):
+    if row.penalty != 0 or row.fumble != 0 or row.interception != 0 or row.play_type not in ("run", "pass"):
         raise ValueError("Lessons require an unambiguous stand-alone scrimmage play")
     return row
 
@@ -46,11 +50,26 @@ def _base(row, lesson_id, topic, title, summary, explanation):
 
 
 def _passing_facts(example, row):
-    if pd.isna(row.air_yards) or pd.isna(row.yards_after_catch):
+    if row.complete_pass != 1 or pd.isna(row.air_yards) or pd.isna(row.yards_after_catch):
         raise ValueError("Missing yardage components")
     if row.air_yards + row.yards_after_catch != row.yards_gained:
         raise ValueError("Yardage components do not reconcile")
     example["facts"].update({"airYards": int(row.air_yards), "yardsAfterCatch": int(row.yards_after_catch)})
+
+
+def _chart_facts(example, row, charting, expected):
+    matches = charting[(charting.nflverse_game_id == row.game_id) & (charting.nflverse_play_id == row.play_id)]
+    if len(matches) != 1:
+        raise ValueError("Required FTN observation is missing")
+    chart = matches.iloc[0]
+    if chart.season != row.season or chart.week != row.week:
+        raise ValueError("FTN season/week does not match the play")
+    for field, value in expected.items():
+        if pd.isna(chart[field]) or chart[field] != value:
+            raise ValueError("Required FTN observation is missing or changed: " + field)
+        example["facts"][CHART_FIELDS[field]] = value
+    example["sources"].append({"label": "FTN Data via nflverse", "url": FTN_URL,
+                              "license": "CC-BY-SA 4.0", "licenseUrl": LICENSE_URL})
 
 
 def build(raw, charting, college):
@@ -75,16 +94,10 @@ def build(raw, charting, college):
          "FTN charted a fake handoff and motion before the snap. The throw traveled 39 yards and Harrison added 6 after the catch. Watch the quarterback and running back first; their fake is part of the play's design. The charting does not prove a defender fell for it.", "is_play_action"),
     ]:
         row = _one(raw, game, play)
-        chart = charting[(charting.nflverse_game_id == game) & (charting.nflverse_play_id == play)]
-        if len(chart) != 1 or not bool(chart.iloc[0][flag]):
-            raise ValueError("Required FTN observation is missing")
         e = _base(row, lesson, topic, title, summary, explanation)
         _passing_facts(e, row)
-        e["facts"].update({"playAction": bool(chart.iloc[0].is_play_action),
-                          "screen": bool(chart.iloc[0].is_screen_pass),
-                          "motion": bool(chart.iloc[0].is_motion)})
-        e["sources"].append({"label": "FTN Data via nflverse", "url": FTN_URL,
-                             "license": "CC-BY-SA 4.0", "licenseUrl": LICENSE_URL})
+        _chart_facts(e, row, charting, {"is_play_action": flag == "is_play_action",
+                                       "is_screen_pass": flag == "is_screen_pass", "is_motion": flag == "is_play_action"})
         examples.append(e)
 
     for game, play, lesson, title, explanation, expected in [
@@ -116,11 +129,41 @@ def build(raw, charting, college):
                   "airYards": row["airYards"], "yardsAfterCatch": row["yardsAfterCatch"]},
         "sources": [{"label": "CollegeFootballData enriched passing", "url": "https://api.collegefootballdata.com/api/passing"}],
     })
-    return {"generated": "2026-09-05", "kind": "historical-lessons", "notice": "Real plays from the 2025 season. These are examples to explore, separate from the game you are watching.", "examples": examples}
+    content = json.loads(CONTENT.read_text())
+    for entry in content["examples"]:
+        row = _one(raw, entry["game"], entry["play"])
+        for field, expected in entry["expected"].items():
+            if pd.isna(row[field]) or row[field] != expected:
+                raise ValueError("Selected lesson source changed: " + entry["id"] + " / " + field)
+        e = _base(row, entry["id"], entry["topic"], entry["title"], entry["summary"], entry["explanation"])
+        if row.complete_pass == 1:
+            _passing_facts(e, row)
+        if entry["charted"]:
+            _chart_facts(e, row, charting, entry["charted"])
+        examples.append(e)
+    by_id = {e["id"]: e for e in examples}
+    if len(by_id) != len(examples) or len({(e["league"], e["gameId"], e["playId"]) for e in examples}) != len(examples):
+        raise ValueError("Duplicate example or source play")
+    practice = content["practice"]
+    if len({p["id"] for p in practice}) != len(practice):
+        raise ValueError("Duplicate practice question")
+    for p in practice:
+        worked, other = by_id[p["workedExampleId"]], by_id[p["testExampleId"]]
+        if (worked["league"], worked["gameId"]) == (other["league"], other["gameId"]):
+            raise ValueError("Practice must use a different game")
+        choices = [c["id"] for c in p["choices"]]
+        if len(choices) != len(set(choices)) or p["answerId"] not in choices:
+            raise ValueError("Practice answer does not match a unique choice")
+    payload = {"generated": "2026-09-06", "version": content["version"], "kind": "historical-lessons",
+               "notice": "Real plays from the 2025 season. Read an example, then try a different play. These use recorded facts and illustrations, not game video.",
+               "examples": examples, "practice": practice}
+    payload["contentHash"] = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    return payload
 
 
 def main():
-    raw = pd.read_parquet(ingest_nfl.ensure_raw(2025))
+    raw_path = Path(ingest_nfl.ensure_raw(2025))
+    raw = pd.read_parquet(raw_path)
     ftn_path = ROOT / "data/raw/ftn_charting_2025.parquet"
     if not ftn_path.exists():
         response = requests.get(FTN_URL, timeout=45)
@@ -135,6 +178,18 @@ def main():
     payload = build(raw, pd.read_parquet(ftn_path), json.loads(college_path.read_text()))
     path = ROOT / "web/teaching-examples.json"
     path.write_text(json.dumps(payload, indent=2) + "\n")
+    audit = {"version": payload["version"], "contentHash": payload["contentHash"],
+             "examples": len(payload["examples"]), "practicePairs": len(payload["practice"]),
+             "sources": [{"file": str(p.relative_to(ROOT)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+                         for p in [raw_path, ftn_path, college_path, CONTENT]],
+             "checks": ["Unique game/play joins and example IDs", "Known, matching FTN fields and season/week",
+                        "Exact expected outcomes; no fumbles, interceptions or accepted penalties in NFL examples",
+                        "Completed-pass air yards plus after-catch yards equal total gain",
+                        "Every practice pair uses a different game"],
+             "limitations": ["Selected illustrations, not a representative performance sample",
+                             "Practice interprets written evidence; no video recognition or learning gain has been measured",
+                             "Only one college worked example; college formation charting is not supplied"]}
+    (ROOT / "docs/teaching-examples-audit.json").write_text(json.dumps(audit, indent=2) + "\n")
     print("Wrote {} validated historical lessons to {}".format(len(payload["examples"]), path))
 
 

@@ -1,7 +1,8 @@
 {
-  "generated": "2026-09-05",
+  "generated": "2026-09-06",
+  "version": "recognition-1",
   "kind": "historical-lessons",
-  "notice": "Real plays from the 2025 season. These are examples to explore, separate from the game you are watching.",
+  "notice": "Real plays from the 2025 season. Read an example, then try a different play. These use recorded facts and illustrations, not game video.",
   "examples": [
     {
       "id": "short-throw-big-gain",
@@ -183,6 +184,345 @@
           "url": "https://api.collegefootballdata.com/api/passing"
         }
       ]
+    },
+    {
+      "id": "screen-no-gain",
+      "topic": "screen",
+      "title": "A screen that went nowhere",
+      "league": "nfl",
+      "season": 2025,
+      "week": 2,
+      "gameId": "2025_02_WAS_GB",
+      "playId": "1014",
+      "offense": "WAS",
+      "defense": "GB",
+      "summary": "Jayden Daniels completed a pass to Deebo Samuel for no gain.",
+      "explanation": "Samuel caught the ball 3 yards behind the line and gained 3 after the catch. That only brought Washington back to where it started. FTN charted a screen with motion. Compare this with Cook\u2019s 51-yard screen: the design label does not tell you whether it worked. Watch the receiver\u2019s room after the catch, then check the final spot.",
+      "facts": {
+        "down": 1,
+        "distance": 10,
+        "yardsGained": 0,
+        "airYards": -3,
+        "yardsAfterCatch": 3,
+        "screen": true,
+        "motion": true
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    },
+    {
+      "id": "sixteen-yards-still-short",
+      "topic": "screen",
+      "title": "Sixteen yards, still short",
+      "league": "nfl",
+      "season": 2025,
+      "week": 2,
+      "gameId": "2025_02_WAS_GB",
+      "playId": "337",
+      "offense": "GB",
+      "defense": "WAS",
+      "summary": "Jordan Love found Chris Brooks for 16 yards on third-and-19.",
+      "explanation": "Brooks caught the ball 5 yards behind the line and added 21 after the catch. It was a substantial run with the ball, but Green Bay still faced fourth-and-three. FTN did not chart a screen. A catch behind the line does not establish the design, and a large gain does not necessarily keep the drive alive.",
+      "facts": {
+        "down": 3,
+        "distance": 19,
+        "yardsGained": 16,
+        "airYards": -5,
+        "yardsAfterCatch": 21,
+        "screen": false,
+        "motion": true
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    },
+    {
+      "id": "run-fake-without-a-verdict",
+      "topic": "play-action",
+      "title": "The fake is only part of the explanation",
+      "league": "nfl",
+      "season": 2025,
+      "week": 2,
+      "gameId": "2025_02_WAS_GB",
+      "playId": "2408",
+      "offense": "GB",
+      "defense": "WAS",
+      "summary": "Jordan Love completed a 23-yard pass to Luke Musgrave.",
+      "explanation": "FTN charted motion and play action. The catch supplied all 23 yards; there were none afterward. Those facts identify the run fake and the gain, but not a defender\u2019s reaction. On a replay, follow a defender behind the line through the fake, then look for a receiver entering the space he leaves.",
+      "facts": {
+        "down": 1,
+        "distance": 10,
+        "yardsGained": 23,
+        "airYards": 23,
+        "yardsAfterCatch": 0,
+        "playAction": true,
+        "motion": true
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    },
+    {
+      "id": "catch-short-finish-beyond",
+      "topic": "yards-after-catch",
+      "title": "The catch left work to do",
+      "league": "nfl",
+      "season": 2025,
+      "week": 2,
+      "gameId": "2025_02_CLE_BAL",
+      "playId": "285",
+      "offense": "BAL",
+      "defense": "CLE",
+      "summary": "Lamar Jackson found Tylan Wallace for 10 yards on third-and-seven.",
+      "explanation": "Wallace caught the ball 3 yards beyond the line, still 4 short of the marker. His 7 yards after the catch turned the completion into a first down. When a throw arrives short, shift your attention to the space in front of the receiver and the first defender who can close it.",
+      "facts": {
+        "down": 3,
+        "distance": 7,
+        "yardsGained": 10,
+        "airYards": 3,
+        "yardsAfterCatch": 7
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        }
+      ]
+    },
+    {
+      "id": "sack-with-four-rushers",
+      "topic": "pressure",
+      "title": "A sack without extra rushers",
+      "league": "nfl",
+      "season": 2025,
+      "week": 1,
+      "gameId": "2025_01_TB_ATL",
+      "playId": "2927",
+      "offense": "ATL",
+      "defense": "TB",
+      "summary": "Michael Penix Jr. was sacked for a 9-yard loss on third-and-four.",
+      "explanation": "FTN counted four pass rushers and no blitzers. Tampa Bay got the sack without sending extra rushers. On a replay, compare the rush with the quarterback\u2019s time to throw. These counts do not tell us whether coverage delayed the throw, a blocker lost, or the quarterback held the ball too long.",
+      "facts": {
+        "down": 3,
+        "distance": 4,
+        "yardsGained": -9,
+        "passRushers": 4,
+        "blitzers": 0
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    },
+    {
+      "id": "sack-with-five-rushers",
+      "topic": "pressure",
+      "title": "This time, an extra rusher",
+      "league": "nfl",
+      "season": 2025,
+      "week": 1,
+      "gameId": "2025_01_DAL_PHI",
+      "playId": "2332",
+      "offense": "PHI",
+      "defense": "DAL",
+      "summary": "Jalen Hurts was sacked for an 8-yard loss on second-and-10.",
+      "explanation": "FTN counted five pass rushers, including one blitzer. That supports describing a blitz on this play. The sack itself would not establish it. Follow the extra rusher and the protection on a replay; these counts do not establish which player, if any, missed an assignment.",
+      "facts": {
+        "down": 2,
+        "distance": 10,
+        "yardsGained": -8,
+        "passRushers": 5,
+        "blitzers": 1
+      },
+      "sources": [
+        {
+          "label": "nflverse play-by-play",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.parquet"
+        },
+        {
+          "label": "FTN Data via nflverse",
+          "url": "https://github.com/nflverse/nflverse-data/releases/download/ftn_charting/ftn_charting_2025.parquet",
+          "license": "CC-BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
     }
-  ]
+  ],
+  "practice": [
+    {
+      "id": "catch-to-conversion",
+      "workedExampleId": "short-throw-big-gain",
+      "testExampleId": "catch-short-finish-beyond",
+      "question": "What kept this third-down play alive?",
+      "evidence": "Baltimore needed 7 yards. Wallace caught the ball 3 yards beyond the line and finished with 10.",
+      "choices": [
+        {
+          "id": "throw",
+          "label": "The throw reached the marker"
+        },
+        {
+          "id": "run",
+          "label": "The run after the catch reached the marker"
+        },
+        {
+          "id": "short",
+          "label": "They finished short of the marker"
+        }
+      ],
+      "answerId": "run",
+      "explanation": "The catch left 4 yards to go. Wallace added 7 after the catch, reaching the marker with 3 yards to spare. The completion needed that run to convert."
+    },
+    {
+      "id": "screen-or-short-pass",
+      "workedExampleId": "screen-behind-the-line",
+      "testExampleId": "sixteen-yards-still-short",
+      "question": "Is that enough to call this a screen?",
+      "evidence": "Brooks caught Love\u2019s pass 5 yards behind the line, then gained 21 with the ball. The final gain was 16 yards.",
+      "choices": [
+        {
+          "id": "yes",
+          "label": "Yes, because the catch was behind the line"
+        },
+        {
+          "id": "no",
+          "label": "No, because screens do not gain that much"
+        },
+        {
+          "id": "unknown",
+          "label": "The catch location alone does not establish it"
+        }
+      ],
+      "answerId": "unknown",
+      "explanation": "A short catch and a long run can happen on several designs. FTN did not chart this play as a screen. To recognize a screen on TV, also watch for blockers moving ahead of the receiver."
+    },
+    {
+      "id": "fake-and-reaction",
+      "workedExampleId": "fake-handoff-deep-pass",
+      "testExampleId": "run-fake-without-a-verdict",
+      "question": "What can these facts tell us about the defense?",
+      "evidence": "FTN charted motion and play action on Love\u2019s 23-yard completion to Musgrave. The throw covered all 23 yards.",
+      "choices": [
+        {
+          "id": "fooled",
+          "label": "A defender definitely stepped toward the fake"
+        },
+        {
+          "id": "check",
+          "label": "We need the defender\u2019s reaction to judge the fake\u2019s effect"
+        },
+        {
+          "id": "man",
+          "label": "The motion proves man coverage"
+        }
+      ],
+      "answerId": "check",
+      "explanation": "The charting confirms the offensive action, not its effect on a defender. Follow one defender through the exchange on a replay, then check the space behind him. The completion alone does not prove he was fooled."
+    },
+    {
+      "id": "gain-and-consequence",
+      "workedExampleId": "five-yards-third-down",
+      "testExampleId": "sixteen-yards-still-short",
+      "question": "How would you describe the result?",
+      "evidence": "On third-and-19, Green Bay completed a pass for 16 yards. No penalty or first down was recorded.",
+      "choices": [
+        {
+          "id": "converted",
+          "label": "A big gain that earned another set of downs"
+        },
+        {
+          "id": "decision",
+          "label": "Better field position, with a fourth-down decision still ahead"
+        },
+        {
+          "id": "turnover",
+          "label": "Possession automatically went to the defense"
+        }
+      ],
+      "answerId": "decision",
+      "explanation": "The gain left fourth-and-three. It changed the field position and the distance for a possible conversion, but did not itself keep the drive going. The next decision still depends on the score, clock and spot."
+    },
+    {
+      "id": "rush-count-and-blame",
+      "workedExampleId": "sack-with-four-rushers",
+      "testExampleId": "sack-with-five-rushers",
+      "question": "Which conclusion is supported?",
+      "evidence": "Hurts was sacked for an 8-yard loss. FTN charted five pass rushers, including one blitzer.",
+      "choices": [
+        {
+          "id": "blitz",
+          "label": "An extra rusher came; responsibility for the sack is not established"
+        },
+        {
+          "id": "tackle",
+          "label": "An offensive tackle missed the extra rusher"
+        },
+        {
+          "id": "coverage",
+          "label": "Every receiver was covered"
+        }
+      ],
+      "answerId": "blitz",
+      "explanation": "The rusher count supports calling it a blitz. It does not identify a missed assignment or establish the coverage. Those need a closer look at the protection and receivers."
+    },
+    {
+      "id": "run-after-catch-no-gain",
+      "workedExampleId": "long-throw-college",
+      "testExampleId": "screen-no-gain",
+      "question": "Why did the yards after the catch produce no net gain?",
+      "evidence": "Samuel caught a pass 3 yards behind the line and gained 3 after the catch. The play ended where it started.",
+      "choices": [
+        {
+          "id": "penalty",
+          "label": "A penalty must have erased the gain"
+        },
+        {
+          "id": "recovered",
+          "label": "The run only recovered the ground behind the line"
+        },
+        {
+          "id": "incomplete",
+          "label": "It must have been ruled incomplete"
+        }
+      ],
+      "answerId": "recovered",
+      "explanation": "The 3 yards with the ball brought Samuel back to the starting line. After-catch yardage can look productive while the offense gains no ground. On a screen, compare the catch point and final spot."
+    }
+  ],
+  "contentHash": "ad0df7f64fe4848b237cdbb4e05184689129a84c648f8d6d1dc7b494311df5ce"
 }

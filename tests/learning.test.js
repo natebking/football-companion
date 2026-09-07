@@ -169,7 +169,7 @@ function depthHarness() {
       const classes = new Set();
       nodes.set(id, {
         id, dataset: {}, innerHTML: '', textContent: '', hidden: false, inert: false,
-        addEventListener() {}, focus() {},
+        addEventListener() {}, focus() {}, scrollIntoView() {},
         classList: { add: cls => classes.add(cls), remove: cls => classes.delete(cls), contains: cls => classes.has(cls) },
         querySelector: () => ({ scrollTop: 0 }), querySelectorAll: () => []
       });
@@ -177,15 +177,18 @@ function depthHarness() {
     return nodes.get(id);
   };
   const document = { getElementById: node, querySelectorAll: () => [], addEventListener: (name, fn) => listeners.set(name, fn) };
-  const root = { document, FootballLearning: learning, FootballGlossary: { annotate: String, close() {} },
+  const data = new Map();
+  const localStorage = { getItem: key => data.get(key) || null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) };
+  const root = { document, localStorage, FootballLearning: learning, FootballPractice: require('../web/practice.js'), FootballGlossary: { annotate: String, close() {} },
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
     dispatchEvent: event => events.push(event) };
-  vm.runInNewContext(fs.readFileSync(require.resolve('../web/depth-ui.js'), 'utf8'), { window: root });
+  vm.runInNewContext(fs.readFileSync(require.resolve('../web/depth-ui.js'), 'utf8'), { window: root,
+    fetch: async () => ({ ok: true, json: async () => require('../web/teaching-examples.json') }) });
   function click(selector, dataset) {
     const target = { dataset, setAttribute() {}, closest: value => value === selector ? target : null };
     listeners.get('click')({ target });
   }
-  return { depth: root.FootballDepth, node, events, click };
+  return { depth: root.FootballDepth, node, events, click, localStorage };
 }
 
 test('the open lesson uses its level for answers and preserves frozen journal context through a level change', () => {
@@ -235,4 +238,27 @@ test('switching a tactical-only topic to basics opens a related basic lesson wit
   depth.setTeachingLevel('basics');
   assert.equal(node('learningTitle').textContent, learning.get('first_down_line', { level: 'basics' }).title);
   assert.equal(events.length, 0);
+});
+
+test('historical practice hides the target explanation until the first answer and never emits a live observation', async () => {
+  const { depth, node, events, click, localStorage } = depthHarness();
+  depth.showLibrary();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.doesNotMatch(node('learningContent').innerHTML, /data-example="catch-short-finish-beyond"/);
+  click('[data-example]', { example: 'short-throw-big-gain' });
+  assert.match(node('learningContent').innerHTML, /Try another play/);
+  click('[data-practice-start]', { practiceStart: 'short-throw-big-gain' });
+  assert.match(node('learningContent').innerHTML, /BAL vs CLE/);
+  assert.doesNotMatch(node('learningContent').innerHTML, /Wallace added 7|data-example="catch-short-finish-beyond"/);
+  click('[data-practice-answer]', { practiceAnswer: 'run' });
+  assert.match(node('practiceResponse').innerHTML, /That fits the evidence/);
+  assert.match(node('practiceResponse').innerHTML, /Wallace added 7/);
+  click('[data-practice-answer]', { practiceAnswer: 'throw' });
+  assert.match(node('practiceResponse').innerHTML, /That fits the evidence/);
+  assert.equal(events.length, 0);
+  const saved = JSON.parse(localStorage.getItem('ff_recognition_v1'));
+  assert.equal(saved.attempts.length, 1);
+  assert.equal(saved.attempts[0].choiceId, 'run');
+  click('[data-example]', { example: 'catch-short-finish-beyond' });
+  assert.match(node('learningContent').innerHTML, /Source and play details/);
 });

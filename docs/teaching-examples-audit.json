@@ -1,0 +1,36 @@
+{
+  "version": "recognition-1",
+  "contentHash": "ad0df7f64fe4848b237cdbb4e05184689129a84c648f8d6d1dc7b494311df5ce",
+  "examples": 12,
+  "practicePairs": 6,
+  "sources": [
+    {
+      "file": "data/raw/nfl_pbp_2025.parquet",
+      "sha256": "c6ecedd6d678cc37ed316b23ef84ee1ec6abb69c514bb11868a7ebd5a367df29"
+    },
+    {
+      "file": "data/raw/ftn_charting_2025.parquet",
+      "sha256": "e993d7658e3bd1378606ea8141ba42bdfa0d0a18c0d492eac52089e091a01f79"
+    },
+    {
+      "file": "data/raw/teaching-cfbd-2025-oregon-postseason.json",
+      "sha256": "4e9d00d3ca3a28b8b0442f7d641b3e2ec25b9be16515d9864c81e867e5fdd1cb"
+    },
+    {
+      "file": "engine/teaching-content.json",
+      "sha256": "5c5c8abaa2bf70022bd29511b9cd54a9649466f35374c25aca98e6ce4311e082"
+    }
+  ],
+  "checks": [
+    "Unique game/play joins and example IDs",
+    "Known, matching FTN fields and season/week",
+    "Exact expected outcomes; no fumbles, interceptions or accepted penalties in NFL examples",
+    "Completed-pass air yards plus after-catch yards equal total gain",
+    "Every practice pair uses a different game"
+  ],
+  "limitations": [
+    "Selected illustrations, not a representative performance sample",
+    "Practice interprets written evidence; no video recognition or learning gain has been measured",
+    "Only one college worked example; college formation charting is not supplied"
+  ]
+}

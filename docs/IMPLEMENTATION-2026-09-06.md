@@ -2,6 +2,16 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Fifth checkpoint: historical practice**
+
+Explore past plays now has twelve verified source plays and six paired questions. Each question follows a worked example with a play from a different game. Added contrasts include a screen with no gain, a catch behind the line that FTN did not chart as a screen, a large completion short of the marker, play action without an established defensive reaction, and sacks with four versus five rushers. The library withholds target titles and summaries until after the answer. Practice stays near the footer and never interrupts live watching.
+
+The separate local practice record saves the question and source facts, bank hash/version, first answer, opening/answer times, level, and prior exposure. Prior questions about the same target count even when the question differs. “Not sure” remains separate from an unsupported answer. Download and explicit clearing are available in Practice history; storage failures stay visible and existing records are not silently discarded. No answer changes live predictions or marks a concept as learned.
+
+Validation: 209 JavaScript tests and 32 Python tests pass. The exporter rejects missing or changed FTN values, wrong season/week joins, ambiguous outcomes and inconsistent yardage. [Source hashes and checks](teaching-examples-audit.json) are preserved. Desktop light and 390×844 mobile dark browser checks exercised worked example → different-game question → answer → explanation, with no horizontal overflow or JavaScript errors. A browser download preserved both synthetic QA answers. The isolated browser again could not fetch the external ESPN schedule; this did not prevent the static practice flow and is not a live-feed validation. Final repeat-target accounting has a focused regression test. The local browser and server are closed.
+
+This is evidence interpretation from written facts and illustrations, not video recognition. It enables voluntary testing on another example; it does not establish learning gains. Current coverage is eleven NFL plays and one college play, with no claimed college formation charting. Production verification is pending for this checkpoint.
+
 **Expanded coaching study**
 
 The [three-caller transfer study](COACHING-TRANSFER-RESULTS-2026-09-06.md) is complete for Payton, Moore and Arthur Smith using the fixed NFL method. It covers 9,977 held-out plays in 158 games across six transfer stints; first seasons at new teams account for 5,593 plays in 87 games. Career, tenure and the fixed blend do not establish a reliable probability-error improvement over team history. All pooled and per-caller career comparison intervals include zero. Passer identities and counts are joined to exact raw records to make personnel changes visible; they are descriptive, not causal controls. The source catalog distinguishes actual caller roles and does not substitute head coaches. Thirty Python tests pass. Live probabilities remain unchanged.
@@ -79,7 +89,7 @@ At 2026-09-06T23:32:43Z, a single CFBD `/live/plays` access probe using the exis
 1. The separate NFL/college fit, calibration review, source-alignment audit and client parity are complete. The candidate remains research-only pending a prospective live-data gate; the old live model remains the comparison.
 2. The first descriptive team/opponent comparison is implemented and verified in the third checkpoint. Extend current-game comparisons only where the same outcome definitions and adequate samples support them; do not imply causal effects or opponent-adjusted weakness.
 3. The expanded three-caller NFL study is complete and remains inconclusive for forecasting benefit. Dated descriptive coaching context and college-specific transfer research are possible follow-ups; do not imply that the current catalog covers every team or today’s staff.
-4. Expand the verified historical charting/practice bank and test recognition on a different play. The existing six examples remain; this release does not yet add examples or establish learning gains.
+4. The expanded twelve-play bank and six different-game practice pairs are implemented in the fifth checkpoint. Collect voluntary practice exports to evaluate whether the explanations help; successful QA answers do not establish learning gains.
 5. Run the new audit across real exported live-viewer journals, review the actual feedback and compare candidate changes on untouched later games. The local QA journal is not a substitute for those observations.
 6. If authorized and accessible, run a bounded CFBD live trial measuring useful fields, missingness, revisions and latency. Add a protected server adapter/shared game cache only if the trial establishes a useful replacement or supplement. Evaluate richer licensed NFL access separately; no assumed college/NFL feature parity.
 7. Continue auditing the full original plan before declaring the goal complete. The first production deployment is verified below.

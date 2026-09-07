@@ -6,8 +6,11 @@
   function esc(text) { return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   }); }
-  var examples = null, selectedLesson = null, selectedExample = null;
+  var examples = null, selectedLesson = null, selectedExample = null, selectedPractice = null;
   var teachingLevel = 'game', lessonContext = null;
+  var practiceStorage;
+  try { practiceStorage = root.localStorage; } catch (_) {}
+  var practice = root.FootballPractice.create({ storage: practiceStorage });
   function rich(text) { return root.FootballGlossary.annotate(text); }
   function resetView() {
     $('learningSheet').querySelector('.sheetInner').scrollTop = 0;
@@ -29,7 +32,7 @@
     options = options || {};
     var lesson = root.FootballLearning.get(id, { level: teachingLevel });
     if (!lesson) return;
-    selectedLesson = lesson; selectedExample = null;
+    selectedLesson = lesson; selectedExample = null; selectedPractice = null;
     // Capture the opener's identity. Later game/feed changes must not relabel an
     // observation of the example or play the user actually opened.
     lessonContext = {
@@ -74,19 +77,24 @@
     }).filter(Boolean).join('<br>');
   }
   function topicLesson(topic) {
-    var lessons = { screen: 'screen_blockers', 'play-action': 'handoff_fake', 'down-and-distance': 'first_down_line' };
+    var lessons = { screen: 'screen_blockers', 'play-action': 'handoff_fake', 'down-and-distance': 'first_down_line',
+      pressure: 'pocket_edges', 'yards-after-catch': teachingLevel === 'basics' ? 'first_down_line' : 'catch_and_run' };
     return lessons[topic] ? root.FootballLearning.get(lessons[topic], { level: teachingLevel }) : null;
   }
   function showExample(id) {
     var example = examples && examples.examples.find(function (entry) { return entry.id === id; });
     if (!example) return;
-    selectedExample = example; selectedLesson = null;
+    selectedExample = example; selectedLesson = null; selectedPractice = null;
+    practice.seen(example);
     var topic = topicLesson(example.topic);
     $('learningTitle').textContent = example.title;
     $('learningContent').innerHTML = '<button type="button" class="depth-link" data-example-library>← All examples</button>' +
       '<p class="example-label">Past game · ' + esc(example.season) + ' · ' + esc(example.offense) + ' vs ' + esc(example.defense) + '</p>' +
       '<h2 class="example-summary">' + esc(example.summary) + '</h2><p class="learning-intro">' + rich(example.explanation) + '</p>' +
       yardageGraphic(example.facts) +
+      (root.FootballPractice.pairFor(examples, id) ? '<section class="practice-invitation"><h2>Read another play</h2>' +
+        '<p>Try the same idea on a different game before seeing its explanation.</p>' +
+        '<button type="button" class="ghost" data-practice-start="' + esc(id) + '">Try another play</button></section>' : '') +
       (topic ? root.FootballLearning.renderDiagram(topic.id, { level: teachingLevel }) + '<p class="learning-caption">' + esc(topic.diagramCaption) + '</p>' +
         '<button type="button" class="depth-link" data-lesson="' + esc(topic.id) + '" data-lesson-origin="library" data-lesson-example="' + esc(example.id) + '">Learn what to watch <span aria-hidden="true">↗</span></button>' : '') +
       '<details class="example-sources"><summary>Source and play details</summary><p>' + sourceLinks(example.sources) + '</p>' +
@@ -94,19 +102,24 @@
     resetView();
   }
   function paintLibrary() {
-    selectedLesson = null; selectedExample = null;
+    selectedLesson = null; selectedExample = null; selectedPractice = null;
+    var targets = new Set(examples.practice.map(function (p) { return p.testExampleId; }));
     $('learningTitle').textContent = 'Explore plays';
     $('learningContent').innerHTML = '<p class="learning-intro">' + esc(examples.notice) + '</p><div class="example-list">' +
-      examples.examples.map(function (example) {
+      examples.examples.filter(function (example) { return !targets.has(example.id); }).map(function (example) {
         return '<button type="button" class="example-choice" data-example="' + esc(example.id) + '"><span class="example-label">' +
           esc(example.season) + ' · ' + esc(example.offense) + ' vs ' + esc(example.defense) + '</span><b>' + esc(example.title) +
           '</b><span>' + esc(example.summary) + '</span><span class="example-arrow" aria-hidden="true">↗</span></button>';
-      }).join('') + '</div>';
+      }).join('') + '</div><details class="example-sources"><summary>Practice history</summary>' +
+      '<p>Your answers stay in this browser. Download them to review or share them. They do not change live predictions or mark a skill as learned.</p>' +
+      '<p id="practiceStorageStatus" role="status">' + practiceStatus() + '</p>' +
+      '<div class="review-actions"><button type="button" class="ghost" data-practice-download>Download practice</button>' +
+      '<button type="button" class="ghost" data-practice-clear>Clear practice history</button></div></details>';
     resetView();
   }
   function showLibrary() {
     $('learningTitle').textContent = 'Explore plays';
-    selectedLesson = null; selectedExample = null;
+    selectedLesson = null; selectedExample = null; selectedPractice = null;
     open();
     if (examples) { paintLibrary(); return; }
     $('learningContent').innerHTML = '<p class="learning-intro" role="status">Loading the examples…</p>';
@@ -116,6 +129,48 @@
     }).catch(function () {
       if (!selectedLesson && !selectedExample) $('learningContent').innerHTML = '<p class="learning-intro">The examples could not load. Close this panel and try again.</p>';
     });
+  }
+
+  function practiceStatus() {
+    var status = practice.status();
+    return !status.saved ? 'Browser storage is unavailable. This session’s answers can be downloaded; older records have not been overwritten.' :
+      status.full ? 'Practice history is full. Download it, then clear it to save new attempts.' : 'Saved in this browser. Nothing is uploaded.';
+  }
+  function startPractice(id) {
+    if (!selectedExample || selectedExample.id !== id) return;
+    var attempt = practice.start(examples, id, teachingLevel);
+    if (!attempt) {
+      $('learningContent').insertAdjacentHTML('beforeend', '<p role="status" class="depth-caption">' + practiceStatus() + '</p>');
+      return;
+    }
+    selectedPractice = attempt; selectedExample = null; selectedLesson = null;
+    var target = examples.examples.find(function (e) { return e.id === attempt.target.id; });
+    $('learningTitle').textContent = 'Read another play';
+    $('learningContent').innerHTML = '<button type="button" class="depth-link" data-example-library>← All examples</button>' +
+      '<p class="example-label">Past game · ' + esc(target.season) + ' · ' + esc(target.offense) + ' vs ' + esc(target.defense) + '</p>' +
+      '<p class="learning-intro">' + esc(attempt.pair.evidence) + '</p>' +
+      '<section class="learning-observe practice-question" aria-labelledby="practiceQuestion"><h2 id="practiceQuestion">' + esc(attempt.pair.question) + '</h2>' +
+      '<div class="learning-choices">' + attempt.pair.choices.concat([{ id: 'unsure', label: 'Not sure' }]).map(function (choice) {
+        return '<button type="button" data-practice-answer="' + esc(choice.id) + '" aria-pressed="false">' + esc(choice.label) + '</button>';
+      }).join('') + '</div><div id="practiceResponse" class="learning-response" role="status" tabindex="-1" hidden></div></section>' +
+      '<p class="depth-caption">' + (attempt.priorExampleOpened || attempt.priorTargetQuestions > 0 ? 'You have opened this play or a question about it before. This attempt is saved as a repeat. ' : '') + practiceStatus() + '</p>' +
+      '<details class="example-sources"><summary>Sources</summary><p>' + sourceLinks(target.sources) + '</p></details>';
+    resetView();
+  }
+  function answerPractice(choice) {
+    if (!selectedPractice) return;
+    var result = practice.answer(selectedPractice.id, choice.dataset.practiceAnswer);
+    if (!result) return;
+    selectedPractice = result;
+    $('learningContent').querySelectorAll('[data-practice-answer]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b === choice)); b.disabled = true;
+    });
+    $('practiceResponse').innerHTML = '<b>' + (result.result === 'supported' ? 'That fits the evidence.' : result.result === 'unsure' ? 'Here’s what the record supports.' : 'Take another look at the evidence.') + '</b><p>' +
+      rich(result.pair.explanation) + '</p><button type="button" class="depth-link" data-example="' + esc(result.target.id) + '">See the full play explanation ↗</button>' +
+      '<p class="depth-caption">' + practiceStatus() + '</p>';
+    $('practiceResponse').hidden = false;
+    $('practiceResponse').focus({ preventScroll: true });
+    $('practiceResponse').scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }
 
   function renderInsights(insights) {
@@ -144,6 +199,22 @@
     }).join('');
   }
   doc.addEventListener('click', function (event) {
+    var start = event.target.closest('[data-practice-start]');
+    if (start) { startPractice(start.dataset.practiceStart); return; }
+    var answer = event.target.closest('[data-practice-answer]');
+    if (answer) { answerPractice(answer); return; }
+    if (event.target.closest('[data-practice-download]')) {
+      var url = URL.createObjectURL(new Blob([practice.export()], { type: 'application/json' }));
+      var link = doc.createElement('a'); link.href = url; link.download = 'football-practice.json'; link.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000); return;
+    }
+    if (event.target.closest('[data-practice-clear]')) {
+      if (root.confirm('Clear the practice history saved in this browser? Download a copy first if you want to keep it.')) {
+        if (practice.clear()) paintLibrary();
+        else $('practiceStorageStatus').textContent = 'The browser could not clear practice history.';
+      }
+      return;
+    }
     var lessonButton = event.target.closest('[data-lesson]');
     if (lessonButton) {
       showLesson(lessonButton.dataset.lesson, lessonButton.dataset.lessonContext, {

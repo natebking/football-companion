@@ -20,7 +20,7 @@ New modules keep the existing live truth boundary:
 - `FootballInsights.summarize` uses all released raw play records, deduplicated by play ID. A correction replaces the original. Drive totals require consistent positions and movement, with penalty progress separated. Player and direction counts describe available reports and disclose missing coverage.
 - `FootballLearning` chooses eight observational lessons from the whitelisted pre-snap situation. Static diagrams show examples only. Self-reported observations are separate from prediction grading and are never evidence of mastery.
 - `FootballDepth` renders these views. All game aggregates cross the same TV-delay queue as the play feed, including initial history and corrections. They never read an unreleased source snapshot to obtain scores or totals.
-- `teaching-examples.json` contains six identified historical plays. FTN-derived lessons retain attribution and CC-BY-SA 4.0 source links. Sources are not queried by the runtime library. Historical examples never modify the live game.
+- `teaching-examples.json` contains twelve identified historical plays and six practice pairs, each using a different game for the second example. FTN-derived lessons retain attribution and CC-BY-SA 4.0 source links. Sources are not queried by the runtime library. Historical examples never modify the live game.
 
 ## Architecture
 
@@ -354,3 +354,11 @@ One owner per file, so parallel work never collides.
 | `web/cards.json` | cards |
 | `web/app.js`, `web/index.html` | site |
 | `index.html` (v0 stopwatch) | frozen, do not edit |
+
+## Historical practice — September 6, 2026
+
+`web/practice.js` owns the separate local `ff_recognition_v1` record. Opening a worked example records its source identity; starting practice freezes the bank version/hash, question, source play, supporting facts, level and prior exposure information. Only the first answer in that attempt is accepted. “Not sure” is stored separately from unsupported answers. A repeat is never substituted for an earlier result. Practice targets are omitted from the library listing so their answer-bearing titles and summaries are not shown before the question.
+
+Answers are interpretations of supplied historical evidence, not reports of what the viewer saw on television. No practice event enters the live game, prediction ledger, game journal or main-card selector. There is no mastery score or automatic adjustment to teaching level. The recorded level is the one at question opening; later preference changes do not relabel it.
+
+The optional history holds at most 200 attempts and never drops earlier ones automatically. It can be downloaded or explicitly cleared. Storage failures are visible; in-memory answers remain downloadable and unreadable stored records are not overwritten. Unknown prior history is recorded as unknown. Opening/rendering an example is not evidence that a viewer read it, and these answers alone cannot establish learning gains or video recognition.

@@ -34,7 +34,7 @@
 .learning-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .learning-footer .depth-link { min-height: 44px; }
 .learning-footer p { color: var(--dim); font-size: .8125rem; }
-.learning-panel { max-width: 700px; }
+.learning-panel { max-width: 700px; scroll-padding-top: 80px; }
 .depth-context { padding: 10px 12px; background: var(--surface); border-radius: 8px; color: var(--dim); margin-bottom: 14px; font-size: .8125rem; }
 .learning-intro { color: var(--dim); text-wrap: pretty; margin: 5px 0 20px; font-size: 1rem; line-height: 1.65; }
 .learning-caption { font-size: .75rem; color: var(--dim); margin: 10px 0 20px; }
@@ -56,6 +56,15 @@
 .example-sources summary { cursor: pointer; padding: 5px 0; }
 .example-sources p { margin-top: 9px; overflow-wrap: anywhere; }
 .example-sources a { color: var(--accent); }
+.practice-invitation { padding: 18px; margin: 20px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.practice-invitation h2 { font-size: 1.1rem; }
+.practice-invitation p { color: var(--dim); font-size: .875rem; margin: 8px 0 14px; }
+.practice-question { margin-top: 0; }
+.practice-question .learning-choices { flex-direction: column; }
+.practice-question .learning-choices button { text-align: left; }
+.practice-question button:disabled { opacity: 1; cursor: default; }
+#practiceResponse p { margin-top: 8px; }
+.practice-question button:disabled:not([aria-pressed="true"]) { color: var(--dim); }
 .yardage-breakdown { padding: 15px; border: 1px solid var(--line); border-radius: 12px; margin: 18px 0; }
 .yardage-breakdown svg { width: 100%; }
 .yardage-track { stroke: var(--line); stroke-width: 5; }
