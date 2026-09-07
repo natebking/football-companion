@@ -327,6 +327,16 @@ Prompts suggest what to look for; they must not claim to have seen a formation
 or infer a coach's intent from the play feed. Practice history records exposure
 and answers, not demonstrated mastery of football concepts.
 
+## Descriptive previous-season profiles
+
+`engine/history_profiles.py` exports separate league files. `game-history.js` matches only approved pre-snap fields to static aggregates. No raw report is passed to PRIME. The selected game must explicitly report the year immediately following the profile season and a regular/postseason type. Missing context yields no historical comparison; there is no broader-cell fallback.
+
+The grouping uses down, distance (1–3/4–6/7+), field area (goal-to-go/inside-20/outside-20), offensive score margin (ahead9+/behind9+/within8), and clock phase (last5minutesQ4/last2minutesQ2/other). Counts require 20 plays in 5 games. A conversion statistic requires 20 clear outcomes; an action’s yardage statistic requires 15. At least 90% of relevant outcomes must be known. These thresholds govern display, not a statistical-confidence label. Unknown outcomes are excluded from the denominator and disclosed. Contexts with impossible distance/field relationships or unknown score/clock are excluded.
+
+A conversion means the offense gained a first down or scored a touchdown without losing possession. NFL outcomes join raw nflverse identifiers and offense; flagged plays are unknown. College plays with ambiguous penalties/fumbles remain unknown; ordinary gains and offensive touchdown/interception types establish the result. Interception return yards never count as offensive gains. Source clocks and college labels use the same shared alignment as the research evaluation.
+
+Historical reads are subordinate to urgent decisions and stronger current-game evidence, with the same repetition cooldown. Journal entries preserve exact dataset IDs, team, side and context. An audit without the referenced dataset must report that historical read as unverifiable. These counts do not replace live probability estimates, adjust for opponents, establish causation, or identify the current coaching staff.
+
 ## File ownership
 
 One owner per file, so parallel work never collides.

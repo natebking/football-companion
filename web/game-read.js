@@ -3,7 +3,8 @@
  * selections. An observation never establishes the next formation or call. */
 (function (root) {
   'use strict';
-  var VERSION = 'read-2';
+  var VERSION = 'read-3';
+  var history = typeof module !== 'undefined' && module.exports ? require('./game-history.js') : root.FootballHistory;
   function valid(s) {
     return s && Number.isInteger(s.down) && s.down >= 1 && s.down <= 4 &&
       Number.isInteger(s.distance) && s.distance >= 1 && Number.isInteger(s.yardsToGoal) &&
@@ -15,7 +16,7 @@
       detail: detail, watch: watch || '', lessonId: null, question: null,
       source: 'Score, clock and field position', playIds: [], key: id }, options);
   }
-  function candidates(s, evidence) {
+  function candidates(s, evidence, past) {
     if (!valid(s)) return [];
     var list = [], goal = s.distance === s.yardsToGoal;
     var clockKnown = Number.isFinite(s.clockSeconds), scoreKnown = Number.isFinite(s.scoreDiff);
@@ -25,6 +26,8 @@
     var team = e && e.teams.find(function (t) { return t.teamId === off; });
     var d = e && e.drive && e.drive.teamId === off && !e.drive.complete ? e.drive : null;
     function add(c) { list.push(c); }
+    var historical = history.read(s, past);
+    if (historical) add(candidate(historical.id, historical.priority, historical.headline, historical.detail, historical.watch, historical));
     if (s.down === 4) {
       var headline, detail, watch = 'Watch whether the offense stays on the field.', variant;
       if (late && scoreKnown && s.scoreDiff <= -4 && s.scoreDiff >= -8) {
@@ -110,8 +113,8 @@
     }
     return list.sort(function (a, b) { return b.priority - a.priority || a.id.localeCompare(b.id); });
   }
-  function select(s, evidence, recent) {
-    var list = candidates(s, evidence), seen = (recent || []).slice(-6);
+  function select(s, evidence, recent, past) {
+    var list = candidates(s, evidence, past), seen = (recent || []).slice(-6);
     // Clock and fourth-down decisions keep their place while they still apply.
     return list.find(function (c) { return c.priority >= 96 || seen.indexOf(c.key) < 0; }) || null;
   }

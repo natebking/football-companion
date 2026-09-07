@@ -19,7 +19,8 @@ for (const file of files) {
   let review = null;
   try { review = JSON.parse(await readFile(resolve(import.meta.dirname, '../web/reviews', game.key.replace(':', '-') + '.json'), 'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
-  results.push(audit.auditGame(game, review));
+  const history = JSON.parse(await readFile(resolve(import.meta.dirname, '../web/history-' + game.meta.league + '.json'), 'utf8'));
+  results.push(audit.auditGame(game, review, history));
 }
 const report = JSON.stringify({ schemaVersion: 1, games: results.length, results }, null, 2) + '\n';
 if (output) { await writeFile(output, report); console.log('Audited ' + results.length + ' journal(s): ' + output); }

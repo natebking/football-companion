@@ -4,8 +4,9 @@
 const insights = require('../web/game-insights.js');
 const read = require('../web/game-read.js');
 const journal = require('../web/journal.js');
+const history = require('../web/game-history.js');
 
-function auditGame(game, review) {
+function auditGame(game, review, historyData) {
   if (!game || game.schemaVersion !== 1 || !Array.isArray(game.shown) || !Array.isArray(game.sources) || !Array.isArray(game.releases)) {
     throw new Error('Expected a downloaded game journal, not a final review or a diagnostic log.');
   }
@@ -54,18 +55,22 @@ function auditGame(game, review) {
     }
     const summary = insights.summarize([...retained.values()], { teamAbbreviations: abbr });
     const evidence = insights.forRead(summary, game.meta.gameId);
-    const proposed = read.select(shown.situation, evidence, proposedHistory);
-    const eligible = read.candidates(shown.situation, evidence);
+    const past = history.lookup(historyData, shown.situation, game.meta.league);
+    const proposed = read.select(shown.situation, evidence, proposedHistory, past);
+    const eligible = read.candidates(shown.situation, evidence, past);
     const recorded = shown.read;
+    const refs = recorded && recorded.historyRefs || [];
+    const historyAvailable = refs.every(ref => past && ref.datasetId === past.datasetId && ref.season === past.season && ref.key === past.key &&
+      past.rows.some(row => row.side === ref.side && row.team === ref.team));
     const missingSupport = recorded ? (recorded.playIds || []).filter(id => !retained.has(String(id))) : [];
     const sameVersion = recorded && recorded.version === read.version;
-    const reproducible = sameVersion ? eligible.some(c => c.key === recorded.key &&
+    const reproducible = sameVersion && historyAvailable ? eligible.some(c => c.key === recorded.key &&
       c.headline === shown.lines.watch && c.detail === shown.lines.detail && c.watch === shown.lines.observation) : null;
     const repeated = !!recorded && recordedHistory.slice(-6).includes(recorded.key) &&
       !['fourth_down', 'protect_clock', 'chasing_score'].includes(recorded.id);
     if (moment.visible) rows.push({ shownId: shown.id, at, basisPlayId: shown.basisPlayId, recordedRead: recorded ? recorded.id : null,
       proposedRead: proposed ? proposed.id : null, sameVersion: !!sameVersion,
-      reproducible, missingSupport, repeated, feedback: moment.feedback,
+      reproducible, missingSupport, historyAvailable, repeated, feedback: moment.feedback,
       releasedReports: retained.size, predictionScored: false });
     recordedHistory.push(recorded ? recorded.key : 'quiet');
     proposedHistory.push(proposed ? proposed.key : 'quiet');
@@ -78,6 +83,7 @@ function auditGame(game, review) {
       reproduced: rows.filter(r => r.reproducible === true).length,
       notReproduced: rows.filter(r => r.reproducible === false).length,
       unverifiableVersion: rows.filter(r => !r.sameVersion && r.recordedRead).length,
+      unverifiableHistory: rows.filter(r => !r.historyAvailable).length,
       unsupportedByReleasedReports: rows.filter(r => r.missingSupport.length).length,
       repeatedWithinSixMoments: rows.filter(r => r.repeated).length,
       feedback: Object.fromEntries(['useful', 'obvious', 'unsupported'].map(rating => [rating, rows.filter(r => r.feedback === rating).length])) },

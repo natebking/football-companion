@@ -2,6 +2,18 @@
 
 The full scope remains [the advanced-mode plan](/Users/nking/Documents/football-companion/docs/ADVANCED-MODE-PLAN-2026-09-06.md). This is a progress record, not a claim that the whole plan is finished.
 
+**Third checkpoint: previous-season team and opponent comparisons**
+
+The `read-3` selector can now use descriptive 2025 outcomes in 2026 games. A collapsed **Past games** disclosure shows the offense and opposing defense in matching down, distance, field, score and clock bands. Relevant third-down comparisons and early-down short-run counts can supply the main read; current-game patterns and urgent decisions retain priority. The default remains Read the game, with an explicit Beginner choice.
+
+Profiles require 20 plays across 5 games. Individual conversion and yardage measures also have known-outcome thresholds; unclear results do not become failures. NFL conversions join the original nflverse game/play IDs and possession team. College penalties and fumbles with unclear possession remain unknown, and interception return yards do not enter offensive gain counts. These are counts, not fitted probabilities, opponent-adjusted rankings or causal run/pass recommendations. The separate live probability tables remain unchanged.
+
+The game’s reported season and season type travel through the existing delay queue. Profiles are eligible only for the following season’s regular/postseason games; missing, preseason, older or stale season context suppresses them. The module receives approved context and static aggregates, not raw live reports. Exact dataset/team/context references and disclosure text are saved in the journal. Offline replay explicitly reports missing historical datasets as unverifiable.
+
+Validation: 194 JavaScript tests and 27 Python tests pass. Python/browser context keys agree on all 34,032 distinct NFL and 119,354 distinct college archived contexts. See `history-profiles-audit.json` for source hashes, coverage and export sizes. A source-derived Oregon–Boise replay displayed Boise State’s 17/49 third-down conversions alongside 7/32 allowed by Oregon. Its browser journal reproduced the read using the matching dataset, with no missing support. Desktop and 390×844 mobile light/dark checks showed no overflow or JavaScript errors. The transport was mocked from saved reports; this is not evidence of live usefulness or improved predictions.
+
+Deployment verification is pending below. Wider play-caller research, more recognition examples, prospective evaluation and the optional paid-source trial remain outstanding. A follow-up timing check should cover updates to score, clock, season or feed health when the down/distance/spot remains identical; the existing queue currently identifies new snap contexts by that situation key.
+
 **Second checkpoint: clock priority and real-source evaluation**
 
 See [the complete results](CONTEXT-RESULTS-2026-09-06.md) and [the fixed evaluation protocol](CONTEXT-EVALUATION-PROTOCOL-2026-09-06.md). Read selector `read-2` keeps late-game score/clock ahead of routine patterns and applies pattern cooldowns across count changes. The live parser no longer confuses the surname Kneeland or a fake kneel with taking a knee. Finished Washington–Washington State and Texas A&M–Missouri State reviews were exported from final sources, and Oregon's review was regenerated with the checked parser.
@@ -50,8 +62,8 @@ At 2026-09-06T23:32:43Z, a single CFBD `/live/plays` access probe using the exis
 
 **Outstanding work under the same goal**
 
-1. Fit and calibrate score/time-aware historical tables separately for NFL and college; align the forecast labels with recorded live actions and prove exported/client parity. Use chronological evaluation and keep the old model as the comparison. A retrospective NFL improvement alone does not satisfy the live-data gate.
-2. Add useful team/opponent and action-consequence comparisons with sample-size and missing-data checks. Connect these to the read selector without overreacting to a few plays or implying causal effects.
+1. The separate NFL/college fit, calibration review, source-alignment audit and client parity are complete. The candidate remains research-only pending a prospective live-data gate; the old live model remains the comparison.
+2. The first descriptive team/opponent comparison is implemented and verified in the third checkpoint. Extend current-game comparisons only where the same outcome definitions and adequate samples support them; do not imply causal effects or opponent-adjusted weakness.
 3. Expand dated actual-play-caller coverage to several staff transitions and test the coaching idea. Keep staff/quarterback changes explicit. The one-caller pilot remains inconclusive.
 4. Expand the verified historical charting/practice bank and test recognition on a different play. The existing six examples remain; this release does not yet add examples or establish learning gains.
 5. Run the new audit across real exported live-viewer journals, review the actual feedback and compare candidate changes on untouched later games. The local QA journal is not a substitute for those observations.

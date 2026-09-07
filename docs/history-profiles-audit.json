@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "results": [
+    {
+      "league": "nfl",
+      "season": 2025,
+      "qualifyingPlays": 34273,
+      "games": 285,
+      "conversionKnown": 33747,
+      "conversionUnknown": 526,
+      "coverage": {
+        "offense": {
+          "teams": 32,
+          "cells": 355,
+          "coveredPlays": 21426
+        },
+        "defense": {
+          "teams": 32,
+          "cells": 353,
+          "coveredPlays": 21442
+        }
+      },
+      "gzipBytes": 17930,
+      "alignment": {
+        "sourceLabelCorrections": 0,
+        "clockAudit": {
+          "eligibleWithExplicitSnapClock": 31587,
+          "eligibleClocksDiffer": 0,
+          "eligiblePhaseChanges": 0,
+          "fallback": "Structured source clock when the report has no explicit leading snap time; exact snap semantics are not independently verified."
+        }
+      },
+      "datasetId": "46f96aa4232c384a551cf4a1c6370a171aa72cba6084dd73f7ed8d1ce06dfb6b",
+      "unifiedInputSha256": "5fc4b219b40e3c165fbcb76aa5fc4baebdd62de7bc6d6e0806be4585920d12ee",
+      "outcomeInputSha256": "c6ecedd6d678cc37ed316b23ef84ee1ec6abb69c514bb11868a7ebd5a367df29"
+    },
+    {
+      "league": "cfb",
+      "season": 2025,
+      "qualifyingPlays": 121891,
+      "games": 933,
+      "conversionKnown": 118198,
+      "conversionUnknown": 3693,
+      "coverage": {
+        "offense": {
+          "teams": 136,
+          "cells": 1048,
+          "coveredPlays": 62600
+        },
+        "defense": {
+          "teams": 136,
+          "cells": 1072,
+          "coveredPlays": 63330
+        }
+      },
+      "gzipBytes": 52600,
+      "alignment": {
+        "sourceLabelCorrections": 117,
+        "clockAudit": {
+          "eligibleWithExplicitSnapClock": 45491,
+          "eligibleClocksDiffer": 41580,
+          "eligiblePhaseChanges": 219,
+          "fallback": "Structured source clock when the report has no explicit leading snap time; exact snap semantics are not independently verified."
+        }
+      },
+      "datasetId": "70a54864ea394bf7b23f4b92d4a36e8b56d5f1d7f8f2c618fdb958f3e145f325",
+      "unifiedInputSha256": "edf40a4b879ad7e525024da150b5c7e713e05222fea7aa959a26f5d9708377f8"
+    }
+  ]
+}

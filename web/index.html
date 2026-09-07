@@ -65,7 +65,7 @@
       <div class="watch-block"><div class="watch-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><span id="readLabel">Read the game</span></div><p id="pWatch"></p><p id="readDetail" class="read-detail"></p><p id="readWatch" class="read-observe"></p><small id="readSource" class="read-source"></small></div>
       <button id="exploreRead" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="learningSheet" hidden>See the idea <span aria-hidden="true">↗</span></button>
       <details id="readFeedback" class="read-feedback" hidden><summary>Was this useful?</summary><div><button type="button" class="ghost" data-read-rating="useful">Useful</button><button type="button" class="ghost" data-read-rating="obvious">Too obvious</button><button type="button" class="ghost" data-read-rating="unsupported">Doesn’t fit</button></div><small id="readFeedbackStatus" role="status"></small></details>
-      <details class="tendency-block"><summary class="tendency-label">Historical choices</summary><p id="pSit"></p><p id="pTen"></p><div class="pFoot" id="pFoot"></div></details>
+      <details class="tendency-block"><summary class="tendency-label">Past games</summary><div id="historyComparison" class="history-comparison"></div><div class="historical-choices"><p id="pSit"></p><p id="pTen"></p><div class="pFoot" id="pFoot"></div></div></details>
       <div id="fieldPosition" class="field-position" hidden>
         <div class="field-caption"><span>Field position</span><span id="fieldDirection"></span></div>
         <svg id="fieldGraphic" viewBox="0 0 500 64" role="img" aria-label="Field position">
@@ -125,7 +125,7 @@
       <button id="closeHow" class="closex" type="button">Close</button>
     </div>
     <p class="note">Pick a game, then keep watching on TV. <b>Read the game</b> connects the situation with patterns in the plays reported so far. It is the default; <b>Beginner</b> explains the rules. Tap an underlined term for a definition in either mode.</p>
-    <p class="note">The percentages come from past run and pass choices in similar situations. They do not tell us the next play or how anyone is lined up. The app does not watch your TV picture.</p>
+    <p class="note"><b>Past games</b> compares the offense and defense using the preceding season, where enough similar plays are available. The counts match down, distance, field position, score and clock bands. Different opponents, players and coaches mean they are context, not a forecast. The separate run/pass percentage uses down, distance and field position only. The app does not watch your TV picture or know how players are lined up.</p>
     <p class="note">Recent plays explains what happened and what changed. The drive story connects those plays, including progress from penalties. Open <b>So far in this game</b> to see which players and parts of the field have been involved. Updates can arrive late or be corrected.</p>
     <p class="note">Use <b>See the idea</b> for a diagram and a question about what you noticed. Those answers are your observations, not a graded quiz. Diagrams explain the concept; they do not reconstruct the players’ actual paths.</p>
     <p class="note"><b>Explore past plays</b>, at the bottom of the page, uses named examples from past games, including NFL charting from FTN Data via nflverse. Historical examples are separate from the live game. Passing detail is shown only when its numbers agree with the play report.</p>
@@ -232,6 +232,8 @@
 <script src="play-facts.js"></script>
 <script src="feed-health.js"></script>
 <script src="game-insights.js"></script>
+<script src="game-history.js"></script>
+<script src="history-ui.js"></script>
 <script src="game-read.js"></script>
 <script src="learning.js"></script>
 <script src="glossary.js"></script>

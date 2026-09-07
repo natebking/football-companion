@@ -207,6 +207,21 @@ test('reported play facts and the next hint both wait behind the TV delay', () =
   assert.equal(h.events.find(e => e.name === 'result').value.kind, 'run');
 });
 
+test('historical season context travels with the delayed snap and is never inferred', () => {
+  const h = liveQueue(), play = runPlay();
+  const summary = summaryOf([play]);
+  assert.equal(h.context.preSnap(summary, [play]).season, null);
+  assert.equal(h.context.preSnap(summary, [play]).seasonType, null);
+  summary.header.season = { year: 2026, type: 2 };
+  h.context.applySummary(summary);
+  assert.equal(h.events.filter(e => e.name === 'snap').length, 0);
+  h.tick(110000);
+  const snap = h.events.find(e => e.name === 'snap').value;
+  assert.equal(snap.season, 2026); assert.equal(snap.seasonType, 2);
+  summary.header.season.year = 2027;
+  assert.equal(snap.season, 2026);
+});
+
 test('a delayed game never reveals the current score before a historical score is available', () => {
   const elements = {};
   const context = vm.createContext({

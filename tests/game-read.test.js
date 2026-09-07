@@ -123,9 +123,9 @@ test('switching modes at fourth down replaces the entire guidance, preserving ex
   let mode = 'game';
   const basic = require('../web/cards.json').cards.find(c => c.id === 'd4_field_goal');
   const c = vm.createContext({
-    window: { FootballRead: read, FootballLearning: require('../web/learning.js') },
+    window: { FootballHistory: require('../web/game-history.js'), FootballRead: read, FootballLearning: require('../web/learning.js') },
     st: { sit, rate: null, ten: null, read: null, readHistory: [], evidence },
-    sh: { teachingLevel: () => mode },
+    sh: { teachingLevel: () => mode, history: () => null, league: () => 'cfb' },
     pickCard: () => basic, fill: t => t, useShortWatch: () => false
   });
   vm.runInContext(app.slice(app.indexOf('function refreshRead('), app.indexOf('// ---------------------------------------------------------------- the ask')), c);

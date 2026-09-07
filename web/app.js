@@ -104,6 +104,7 @@ var delaySec = (function () {
   var n = parseInt(lsGet(LS.delay), 10);
   return (isFinite(n) && n >= 0 && n <= MAX_DELAY) ? n : 0;
 })();
+var HISTORY = null; // Descriptive preceding-season profiles.
 var TEND = null;    // tendency table for the current league
 var CARDS = null;   // cards.json
 var artifacts = { version: VERSION, build: null };
@@ -275,6 +276,7 @@ var shell = {
   sameSnap: sameSnap, delayMs: delayMs,
   league: function () { return league; },
   tend: function () { return TEND; },
+  history: function () { return HISTORY; },
   cards: function () { return CARDS; },
   shortHints: function () { return shortHints; },
   teachingLevel: function () { return teachingLevel; },
@@ -299,7 +301,7 @@ var shell = {
 (function initPrime(sh) {
 
 var st = {
-  evidence: null, read: null, readHistory: [],
+  evidence: null, read: null, readHistory: [], past: null,
   sit: null, sitKey: '', card: null, ten: null, lesson: null,
   sitLine: '', tendLine: '', watchLine: '', attributed: false, rate: null,
   ask: null,          // {id, kind, q, opts, priority}
@@ -462,7 +464,7 @@ function refreshRead(remember) {
   var history = st.readHistory.slice();
   // Re-rendering a preference or a correction may retain a still-valid read.
   if (!remember && st.read) history = history.filter(function (key) { return key !== st.read.key; });
-  st.read = window.FootballRead.select(st.sit, st.evidence, history);
+  st.read = window.FootballRead.select(st.sit, st.evidence, history, st.past);
   st.lesson = st.read && st.read.lessonId ? window.FootballLearning.get(st.read.lessonId, { level: 'game' }) : null;
   st.card = { id: st.read ? st.read.id : 'quiet_read', prints_number: !!st.tendLine, concepts: st.lesson ? st.lesson.concepts : [] };
   st.watchLine = st.read ? st.read.headline : '';
@@ -473,6 +475,7 @@ function refreshRead(remember) {
 }
 function setGuidance(remember) {
   var sit = st.sit, ten = st.ten, rate = st.rate;
+  st.past = window.FootballHistory.lookup(sh.history(), sit, sh.league());
   if (sh.teachingLevel() === 'game') {
     st.attributed = !!(ten && ten.can_attribute);
     var late = sit.period === 4 && Number.isFinite(sit.clockSeconds) && sit.clockSeconds <= 300;
@@ -746,6 +749,7 @@ function flash() {
 }
 function quietPrime(msg) {
   $('readFeedback').hidden = true;
+  $('historyComparison').replaceChildren();
   $('readDetail').textContent = ''; $('readWatch').textContent = ''; $('readSource').textContent = '';
   $('prime').className = '';
   $('pQuiet').hidden = false;
@@ -785,7 +789,7 @@ function renderField(sit) {
 function cardSig() {
   return [
     st.sitKey, st.card ? st.card.id : '', st.attributed ? 1 : 0, st.rate,
-    st.sitLine, st.tendLine, st.watchLine, st.quiet, JSON.stringify(st.read)
+    st.sitLine, st.tendLine, st.watchLine, st.quiet, JSON.stringify(st.read), JSON.stringify(st.past)
   ].join('|');
 }
 function askSig() {
@@ -815,6 +819,7 @@ function render() {
   $('pHold').textContent = st.hold;
 
   renderField(sit);
+  window.FootballHistoryUI.render($('historyComparison'), st.past);
   $('readLabel').textContent = sh.teachingLevel() === 'game' ? 'Read the game' : 'Where to look';
   $('readDetail').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.detail : '');
   $('readWatch').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.watch : '');
@@ -877,19 +882,21 @@ function captureGuidance() {
   if (!st.sit || !st.card || !sh.journalShown) return;
   var lines = { situation: $('pDD').textContent, spot: $('pSpot').textContent,
     context: $('pSit').textContent, tendency: $('pTen').textContent, watch: $('pWatch').textContent,
-    detail: $('readDetail').textContent, observation: $('readWatch').textContent };
+    detail: $('readDetail').textContent, observation: $('readWatch').textContent,
+    historical: $('historyComparison').textContent };
   var visible = document.visibilityState === 'visible' && !document.querySelector('.sheet.on');
-  var signature = JSON.stringify([st.sitKey, lines, visible]);
+  var historyVisible = document.querySelector('.tendency-block').open;
+  var signature = JSON.stringify([st.sitKey, lines, visible, historyVisible]);
   if (signature === st.journalSignature) return;
   st.journalSignature = signature;
   var printed = st.card.prints_number !== false && st.tendLine.match(/(\d+)%/);
-  var historyVisible = document.querySelector('.tendency-block').open;
   var shown = printed && historyVisible ? Number(printed[1]) / 100 : null;
   if (shown !== null && /\brun\b/i.test(st.tendLine)) shown = 1 - shown;
   var result = sh.journalShown({ kind: 'guidance', lines: lines, situation: st.sit,
     cardId: st.card.id, lessonId: st.lesson && st.lesson.id, teachingLevel: sh.teachingLevel(),
     historicalVisible: historyVisible,
-    read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source, playIds: st.read.playIds },
+    historyRefs: st.past ? st.past.rows.map(function (r) { return window.FootballHistory.reference(st.past, r); }) : [],
+    read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source, playIds: st.read.playIds, historyRefs: st.read.historyRefs || [] },
     probabilityShown: shown, modelProbability: st.ten && st.ten.pass_rate,
     baselineProbability: st.ten && st.ten.league_pass_rate, attributed: st.attributed });
   if (result && result.ok && result.id) st.journalIds.push(result.id);
@@ -1239,6 +1246,8 @@ function preSnap(sum, plays, health) {
     distance: fx.distance,
     yardsToGoal: fx.yardsToGoal,
     period: period,
+    season: Number.isInteger(sum.header.season && sum.header.season.year) ? sum.header.season.year : null,
+    seasonType: Number.isInteger(sum.header.season && sum.header.season.type) ? sum.header.season.type : null,
     clockSeconds: clock,
     offenseScore: os,
     defenseScore: ds,
@@ -1983,7 +1992,7 @@ document.querySelector('.seg').addEventListener('click', function (ev) {
   var requestedLeague = league;
   lsSet(LS.league, league);
   bus.emit('leagueChanging');
-  TEND = null;
+  TEND = null; HISTORY = null;
   bus.emit('tables');
   loadTables().then(function () {
     if (requestedLeague !== league) return;
@@ -2005,7 +2014,11 @@ document.addEventListener('visibilitychange', function () {
 
 function loadTables() {
   var requestedLeague = league;
-  return jget(LEAGUES[requestedLeague].table).then(function (t) { if (requestedLeague === league) TEND = t; });
+  return Promise.all([
+    jget(LEAGUES[requestedLeague].table).then(function (t) { if (requestedLeague === league) TEND = t; }),
+    jget('history-' + requestedLeague + '.json').then(function (h) { if (requestedLeague === league) HISTORY = h; })
+      .catch(function () { if (requestedLeague === league) HISTORY = null; })
+  ]);
 }
 
 loadLedger();
