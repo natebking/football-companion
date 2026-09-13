@@ -45,18 +45,21 @@ test('confirming the starting delay saves it, including when the value stays 45'
 function selection(saved, rows, replay = false) {
   const handlers = {}, picked = [], messages = [], counts = { fetches: 0, replays: 0 };
   const c = vm.createContext({
-    gameGeneration: 1, st: {},
+    gameGeneration: 1, scoreboardGeneration: 0, sbTimer: null, st: { games: [], gameId: null },
+    setTimeout: () => 1, clearTimeout: () => {},
     sh: { LS: { game: 'game_' }, lsGet: () => saved, league: () => 'cfb', replay: () => replay,
       bus: { on: (key, fn) => { handlers[key] = fn; }, emit: (...args) => messages.push(args) }, showErr: () => {} },
     fetchGames: () => { counts.fetches++; return Promise.resolve(rows); }, selectGame: id => picked.push(id),
     startReplay: () => { counts.replays++; },
-    renderPicker: () => {}, renderHeader: () => {}, pollGame: () => {}, pollScoreboard: () => {}
+    renderPicker: () => {}, renderHeader: () => {}, pollGame: () => {}
   });
-  let start = source.indexOf("sh.bus.on('leagueChanged',");
+  let start = source.indexOf('function pollScoreboard(');
+  vm.runInContext(source.slice(start, source.indexOf('function resetGame(', start)), c);
+  start = source.indexOf("sh.bus.on('leagueChanged',");
   vm.runInContext(source.slice(start, source.indexOf("sh.bus.on('delay',", start)), c);
   start = source.indexOf("sh.bus.on('boot',");
   vm.runInContext(source.slice(start, source.indexOf('})(shell);', start)), c);
-  return { handlers, picked, messages, counts };
+  return { c, handlers, picked, messages, counts };
 }
 
 test('replay boot does not fetch a scoreboard or restore the saved live game', async () => {
@@ -74,7 +77,8 @@ test('boot and league changes restore only the saved unfinished game', async () 
       const h = selection(saved, rows);
       h.handlers[event](); await flush();
       assert.equal(h.picked.length, 0, event + ': do not substitute another live game');
-      assert.match(h.messages[0][1], /Choose a game/);
+      assert.equal(h.c.st.gameId, null);
+      assert.equal(h.c.st.gamesLoading, false);
     }
     const h = selection('saved', rows);
     h.handlers[event](); await flush();
@@ -85,7 +89,7 @@ test('boot and league changes restore only the saved unfinished game', async () 
 test('scoreboard refresh never starts a game on behalf of the viewer', async () => {
   const selected = [];
   const c = vm.createContext({
-    sbTimer: null, scoreboardGeneration: 0, st: { gameId: null },
+    sbTimer: null, scoreboardGeneration: 0, gameGeneration: 0, st: { gameId: null },
     clearTimeout: () => {}, setTimeout: () => 1,
     sh: { tend: () => ({}), league: () => 'cfb', SB_MS: 12000 },
     fetchGames: () => Promise.resolve([{ id: 'live', state: 'in' }]),
@@ -148,4 +152,81 @@ test('diagnostics persist on the 30-second timer and on leaving, without redunda
   assert.equal(h.writes.length, 2);
   h.c.diag('delay', 45); h.listeners.pagehide();
   assert.equal(h.writes.length, 3);
+});
+
+function schedule() {
+  const requests = [], timers = [], picked = [];
+  let league = 'cfb';
+  const c = vm.createContext({
+    sbTimer: null, scoreboardGeneration: 0, gameGeneration: 0,
+    st: { gameId: null, games: [], gamesError: '' }, clearTimeout: () => {}, setTimeout: fn => { timers.push(fn); return timers.length; },
+    sh: { replay: () => false, league: () => league, LS: { game: 'game_' }, lsGet: () => 'saved',
+      diag: () => {}, SB_MS: 12000 },
+    fetchGames: () => new Promise((resolve, reject) => requests.push({ resolve, reject })),
+    renderPicker: () => {}, selectGame: id => picked.push(id)
+  });
+  const start = source.indexOf('function pollScoreboard(');
+  vm.runInContext(source.slice(start, source.indexOf('function resetGame(', start)), c);
+  return { c, requests, timers, picked, league: next => { league = next; } };
+}
+
+test('schedule loading, a valid empty day, network failure and successful retry stay distinct', async () => {
+  const h = schedule(); h.c.pollScoreboard(true);
+  assert.equal(h.c.st.gamesLoading, true);
+  assert.equal(h.c.st.gamesError, '');
+  h.requests[0].resolve([]); await flush();
+  assert.equal(h.c.st.gamesLoading, false);
+  assert.equal(h.c.st.gamesError, '');
+  h.c.pollScoreboard(true); h.requests[1].reject(new Error('offline')); await flush();
+  assert.equal(h.c.st.gamesLoading, false);
+  assert.match(h.c.st.gamesError, /could not be loaded/);
+  h.c.pollScoreboard(true); h.requests[2].resolve([{ id: 'a', state: 'pre' }]); await flush();
+  assert.equal(h.c.st.gamesError, '');
+  assert.equal(h.c.st.games[0].id, 'a');
+});
+
+test('failed refresh retains existing listings and labels them as potentially stale', async () => {
+  const h = schedule(); h.c.st.games = [{ id: 'a', state: 'in' }]; h.c.pollScoreboard(true);
+  h.requests[0].reject(new Error('offline')); await flush();
+  assert.equal(h.c.st.games[0].id, 'a');
+  assert.match(h.c.st.gamesError, /out of date/);
+});
+
+test('a late schedule or failure cannot replace another league or finish its loading state', async () => {
+  for (const fail of [false, true]) {
+    const h = schedule(); h.c.pollScoreboard(true);
+    h.league('nfl'); h.c.pollScoreboard(true);
+    if (fail) h.requests[0].reject(new Error('old error'));
+    else h.requests[0].resolve([{ id: 'old', state: 'in' }]);
+    await flush();
+    assert.equal(h.c.st.gamesLoading, true);
+    assert.equal(h.c.st.games.length, 0);
+    assert.equal(h.c.st.gamesError, '');
+    h.requests[1].resolve([{ id: 'new', state: 'in' }]); await flush();
+    assert.equal(h.c.st.games[0].id, 'new');
+    assert.equal(h.c.st.gamesLoading, false);
+  }
+});
+
+test('restoration cannot override a game chosen while the schedule is loading', async () => {
+  const h = schedule(); h.c.pollScoreboard(true, true);
+  h.c.st.gameId = 'chosen'; h.c.gameGeneration++;
+  h.requests[0].resolve([{ id: 'saved', state: 'in' }]); await flush();
+  assert.equal(h.picked.length, 0);
+});
+
+test('schedule transport validates the response and clears its bounded timeout', async () => {
+  for (const response of [null, {}, { events: [] }]) {
+    const timers = new Map();
+    const c = vm.createContext({ AbortController,
+      sh: { jget: () => Promise.resolve(response) }, scoreboardUrl: () => '', etDate: () => '', eventRow: e => e,
+      setTimeout: (fn, delay) => { timers.set(1, { fn, delay }); return 1; }, clearTimeout: id => timers.delete(id) });
+    const start = source.indexOf('function fetchGames(');
+    vm.runInContext(source.slice(start, source.indexOf('// Finished-game browsing', start)), c);
+    const result = c.fetchGames('cfb');
+    assert.equal(timers.get(1).delay, 15000);
+    if (response && response.events) assert.deepEqual(Array.from(await result), []);
+    else await assert.rejects(result, /Missing schedule/);
+    assert.equal(timers.size, 0);
+  }
 });

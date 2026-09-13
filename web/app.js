@@ -43,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-13-advanced-cues';
+var VERSION = '2026-09-13-home';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -1102,6 +1102,7 @@ sh.bus.on('reset', function () { st.sig = ''; st.asig = ''; render(); renderLedg
 var FEED_PREVIEW = 3;
 var st = {
   gameId: null, games: [], gameLabel: '', gameState: '',
+  gamesLoading: true, gamesLoaded: false, gamesError: '',
   pickerMode: 'current', archiveGames: [], archiveDate: '', archiveLoading: false, archiveError: '',
   sum: null,                 // latest raw summary, this scope only
   seen: {}, order: {}, queue: [], rows: [], released: {}, shownPlay: null, feedExpanded: false,
@@ -1174,15 +1175,18 @@ function eventRow(e) {
 // empty on a Saturday, so a "only look back when today is empty" rule never
 // fires. Look back whenever nothing is live today.
 function fetchGames(lg) {
-  return sh.jget(scoreboardUrl(lg, etDate(0))).then(function (sb) {
-    var rows = (sb.events || []).map(eventRow);
+  var controller = new AbortController();
+  var timeout = setTimeout(function () { controller.abort(); }, 15000);
+  return sh.jget(scoreboardUrl(lg, etDate(0)), controller.signal).then(function (sb) {
+    if (!sb || !Array.isArray(sb.events)) throw new Error('Missing schedule');
+    var rows = sb.events.map(eventRow);
     if (rows.some(function (r) { return r.state === 'in'; })) return rows;
-    return sh.jget(scoreboardUrl(lg, etDate(-1))).then(function (sb2) {
+    return sh.jget(scoreboardUrl(lg, etDate(-1)), controller.signal).then(function (sb2) {
       var y = (sb2.events || []).map(eventRow);
       var live = y.filter(function (r) { return r.state === 'in'; });
       return live.length ? live.concat(rows) : (rows.length ? rows : y);
     }).catch(function () { return rows; });
-  });
+  }).finally(function () { clearTimeout(timeout); });
 }
 
 // Finished-game browsing is independent of the selected live game's polling.
@@ -1870,7 +1874,21 @@ $('syncApply').addEventListener('click', function () {
   $('syncApply').hidden = true;
 });
 
+function renderPageView() {
+  var home = !st.gameId && !sh.replay();
+  document.body.dataset.view = home ? 'home' : 'game';
+  $('home').hidden = !home;
+  var host = home && !st.sheet ? $('homeGamePicker') : $('sheet');
+  if ($('gameBrowser').parentElement !== host) host.appendChild($('gameBrowser'));
+  var skip = document.querySelector('.skip-link');
+  skip.href = home ? '#gameSearch' : '#prime';
+  skip.textContent = home ? 'Skip to games' : 'Skip to what to watch';
+  if (home || sh.replay()) $('pickBtn').removeAttribute('aria-haspopup');
+  else $('pickBtn').setAttribute('aria-haspopup', 'dialog');
+}
+
 function renderPicker() {
+  renderPageView();
   if (sh.replay()) {
     $('pickBtn').textContent = 'Exit replay';
     $('pickBtn').setAttribute('aria-label', 'Exit replay and return to games');
@@ -1887,6 +1905,15 @@ function renderPicker() {
   }
   var archived = st.pickerMode === 'finished';
   var games = archived ? st.archiveGames : st.games;
+  var loading = archived ? st.archiveLoading : st.gamesLoading && !st.gamesLoaded;
+  var available = games.filter(function (g) { return archived || g.state === 'in' || g.state === 'pre'; });
+  var noSchedule = !archived && !loading && !st.gamesError && !available.length;
+  $('scheduleNotice').hidden = archived || (!st.gamesError && !noSchedule);
+  $('scheduleMessage').textContent = st.gamesError || (noSchedule
+    ? 'No ' + (sh.league() === 'cfb' ? 'college' : 'NFL') + ' games live or scheduled for today. Pick a finished game to try the analysis play by play.' : '');
+  $('scheduleRetry').hidden = archived || !st.gamesError;
+  $('scheduleRetry').disabled = st.gamesLoading;
+  $('browseFinished').hidden = !noSchedule;
   $('currentGamesBtn').setAttribute('aria-pressed', String(!archived));
   $('finishedGamesBtn').setAttribute('aria-pressed', String(archived));
   $('archiveDateField').hidden = !archived;
@@ -1942,13 +1969,13 @@ function renderPicker() {
     heading.hidden = !groupMatches;
     matchCount += groupMatches;
   }
-  if (!matchCount) {
+  if (!matchCount && !(noSchedule || (!archived && st.gamesError))) {
     var empty = el.querySelector('.empty') || document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = archived && st.archiveLoading ? 'Loading finished games…' :
-      archived && st.archiveError ? st.archiveError : query && games.length
+    empty.textContent = loading ? (archived ? 'Loading finished games…' : 'Loading today’s games…') :
+      archived && st.archiveError ? st.archiveError : query && available.length
       ? 'No teams match “' + $('gameSearch').value.trim() + '”. Try another name or abbreviation.'
-      : archived ? 'No finished games on this date. Try another day.' : 'No live or upcoming games. Open Finished games to replay a game.';
+      : 'No finished games on this date. Try another day.';
     children.push(empty);
   }
   // Leave unchanged rows attached; move a row only if the schedule reordered it.
@@ -1959,7 +1986,10 @@ function renderPicker() {
   var status = query ? matchCount + (matchCount === 1 ? ' game' : ' games') + ' found in ' + (sh.league() === 'cfb' ? 'College' : 'NFL') : '';
   if (archived && !query) status = st.archiveLoading ? 'Loading finished games…' : st.archiveError ||
     matchCount + (matchCount === 1 ? ' finished game' : ' finished games');
-  el.setAttribute('aria-busy', String(archived && st.archiveLoading));
+  if (!archived && !query && !st.gamesError) status = loading ? 'Updating schedule…' :
+    'Today’s games · Eastern time';
+  if (loading && query) status = archived ? 'Loading finished games…' : 'Updating schedule…';
+  el.setAttribute('aria-busy', String(loading));
   if ($('gameSearchStatus').textContent !== status) $('gameSearchStatus').textContent = status;
 }
 
@@ -1995,24 +2025,33 @@ function pollGame() {
     pollTimer = setTimeout(pollGame, st.gameState === 'post' ? 30000 : sh.POLL_MS);
   });
 }
-function pollScoreboard(force) {
+function pollScoreboard(force, restoreSaved) {
   clearTimeout(sbTimer);
   if (sh.replay && sh.replay()) return;
-  if (st.pickerMode === 'finished' || !sh.tend() || !(force || st.sheet || !st.gameId)) {
+  if (st.pickerMode === 'finished' || !(force || st.sheet || !st.gameId)) {
     sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
     return;
   }
   var generation = ++scoreboardGeneration, requestedLeague = sh.league();
-  fetchGames(requestedLeague).then(function (rows) {
+  var selectedGeneration = gameGeneration;
+  var saved = restoreSaved ? sh.lsGet(sh.LS.game + requestedLeague) : null;
+  st.gamesLoading = true;
+  renderPicker();
+  return fetchGames(requestedLeague).then(function (rows) {
     if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
-    st.games = rows;
-    renderPicker();
+    st.games = rows; st.gamesLoaded = true; st.gamesError = '';
+    var pick = rows.find(function (g) { return g.id === saved && g.state !== 'post'; });
+    // A choice made while the schedule loads takes precedence over restoration.
+    if (pick && selectedGeneration === gameGeneration && !st.gameId) selectGame(pick.id);
   }).catch(function (e) {
     if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
     sh.diag('err', { where: 'scoreboard', msg: e.message });
-    sh.showErr('Games could not be updated. Retrying…');
-  }).then(function () {
-    if (generation !== scoreboardGeneration) return;
+    st.gamesError = st.games.length ? 'The schedule could not be refreshed. These listings may be out of date.' :
+      'The schedule could not be loaded. Try again, or browse Finished games.';
+  }).finally(function () {
+    if (generation !== scoreboardGeneration || requestedLeague !== sh.league()) return;
+    st.gamesLoading = false;
+    renderPicker();
     sbTimer = setTimeout(function () { pollScoreboard(false); }, sh.SB_MS);
   });
 }
@@ -2038,6 +2077,7 @@ function clearLeague() {
   st.archiveGames = []; st.archiveError = '';
   scoreboardGeneration += 1;
   st.gameId = null; st.games = []; st.gameLabel = '';
+  st.gamesLoading = true; st.gamesLoaded = false; st.gamesError = '';
   resetGame();
   renderPicker(); renderFeed(); renderHeader();
   sh.bus.emit('quiet', 'Loading games…');
@@ -2123,6 +2163,11 @@ $('finishedGamesBtn').addEventListener('click', function () {
 });
 $('archiveDate').addEventListener('change', loadArchive);
 $('archiveRetry').addEventListener('click', loadArchive);
+$('scheduleRetry').addEventListener('click', function () { pollScoreboard(true); });
+$('browseFinished').addEventListener('click', function () {
+  $('finishedGamesBtn').click();
+  $('archiveDate').focus();
+});
 $('replayPrevious').addEventListener('click', function () {
   if (replaySession) seekReplay(replaySession.steps[replaySession.steps.indexOf(replayCount) - 1]);
 });
@@ -2155,15 +2200,20 @@ $('feedToggle').addEventListener('click', function () {
 });
 $('pickBtn').addEventListener('click', function () {
   if (sh.replay()) { window.location.assign(window.location.pathname); return; }
+  if (!st.gameId) {
+    $('gameSearch').scrollIntoView({ block: 'center' });
+    $('gameSearch').focus({ preventScroll: true });
+    return;
+  }
   st.sheet = true;
   $('sheet').className = 'sheet on';
-  $('sheet').querySelector('.sheetInner').scrollTop = 0;
   renderPicker();
+  $('gameBrowser').scrollTop = 0;
   sh.bus.emit('sheet');
   if (st.pickerMode === 'finished') loadArchive();
   else pollScoreboard(true);
 });
-function closeSheet() { st.sheet = false; $('sheet').className = 'sheet'; }
+function closeSheet() { st.sheet = false; $('sheet').className = 'sheet'; renderPageView(); }
 $('closeSheet').addEventListener('click', closeSheet);
 $('sheet').addEventListener('click', function (ev) { if (ev.target === $('sheet')) closeSheet(); });
 $('gameSearch').addEventListener('input', renderPicker);
@@ -2181,24 +2231,18 @@ $('games').addEventListener('click', function (ev) {
     window.location.assign('?replay=' + sh.league() + ':' + game.id);
     return;
   }
+  var fromHome = !st.sheet;
   selectGame(b.dataset.g);
   closeSheet();
+  if (fromHome) {
+    $('prime').focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  }
 });
 sh.bus.on('leagueChanging', clearLeague);
 sh.bus.on('leagueChanged', function () {
   if (st.pickerMode === 'finished') { loadArchive(); return; }
-  var requestedLeague = sh.league(), generation = gameGeneration;
-  var saved = sh.lsGet(sh.LS.game + requestedLeague);
-  fetchGames(requestedLeague).then(function (rows) {
-    if (generation !== gameGeneration || requestedLeague !== sh.league()) return;
-    st.games = rows;
-    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0];
-    renderPicker();
-    if (pick) selectGame(pick.id);
-    else sh.bus.emit('quiet', 'Choose a game in Games to start.');
-  }).catch(function (e) {
-    if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
-  });
+  pollScoreboard(true, true);
 });
 sh.bus.on('delay', function () { pump('delay_change'); renderHeader(); renderPicker(); });
 
@@ -2208,25 +2252,13 @@ document.addEventListener('visibilitychange', function () {
 setInterval(pump, sh.TICK_MS);
 setInterval(paintConnection, 1000);
 
+renderPageView();
 sh.bus.on('boot', function () {
   renderHeader();
   renderPicker();
   if (sh.replay()) { startReplay(); return; }
-  var requestedLeague = sh.league(), generation = gameGeneration;
-  var saved = sh.lsGet(sh.LS.game + requestedLeague);
-  fetchGames(requestedLeague).then(function (rows) {
-    if (generation !== gameGeneration || requestedLeague !== sh.league()) return;
-    st.games = rows;
-    var pick = rows.filter(function (g) { return g.id === saved && g.state !== 'post'; })[0];
-    renderPicker();
-    if (pick) selectGame(pick.id);
-    else sh.bus.emit('quiet', 'Choose a game in Games to start.');
-  }).catch(function (e) {
-    if (generation === gameGeneration && requestedLeague === sh.league()) sh.showErr('Games could not be loaded. Open Games to try again.');
-  }).then(function () {
-    pollGame();
-    pollScoreboard(false);
-  });
+  pollScoreboard(true, true);
+  pollGame();
 });
 
 })(shell);

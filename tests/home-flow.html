@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Home page browser checks</title>
+<style>body{font:16px/1.5 system-ui;margin:24px}.pass{color:#176328}.fail{color:#b32020}iframe{width:1100px;max-width:100%;height:850px;border:1px solid #aaa}</style>
+<h1 id="result">Running home page checks…</h1>
+<p>Runs the actual app with synthetic schedules and isolated browser storage. Serve the repository root and open /tests/home-flow.html.</p>
+<ul id="checks"></ul><iframe title="App under test"></iframe>
+<script>
+(async function () {
+  const frame = document.querySelector('iframe');
+  const html = await (await fetch('../web/index.html')).text();
+  function fixtures() {
+    const storage = new Map();
+    Object.defineProperty(window, 'localStorage', { value: { getItem: k => storage.get(k) ?? null,
+      setItem: (k, v) => storage.set(k, String(v)), removeItem: k => storage.delete(k), clear: () => storage.clear() } });
+    const nativeFetch = window.fetch.bind(window);
+    window.qa = { mode: 'pending', events: [], pending: [], errors: [] };
+    addEventListener('error', e => { if (e.message) qa.errors.push(e.message); });
+    addEventListener('unhandledrejection', e => qa.errors.push(String(e.reason)));
+    const json = value => Promise.resolve(new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } }));
+    qa.respond = (mode, events = []) => {
+      qa.mode = mode; qa.events = events;
+      qa.pending.splice(0).forEach(p => mode === 'error' ? p.reject(new Error('Test network failure')) : p.resolve(json({ events })));
+    };
+    window.fetch = (url, options) => {
+      const target = new URL(url, document.baseURI);
+      if (!target.hostname.endsWith('espn.com')) return nativeFetch(url, options);
+      if (target.pathname.endsWith('/scoreboard')) {
+        if (qa.mode === 'pending') return new Promise((resolve, reject) => qa.pending.push({ resolve, reject }));
+        if (qa.mode === 'error') return Promise.reject(new Error('Test network failure'));
+        return json({ events: qa.events });
+      }
+      if (target.pathname.endsWith('/summary')) {
+        const event = qa.events.find(e => e.id === target.searchParams.get('event'));
+        return json({ header: { id: event.id, season: { year: 2026 }, competitions: [Object.assign({}, event.competitions[0], { status: event.status })] }, drives: { previous: [] } });
+      }
+      return json({ athletes: [] });
+    };
+  }
+  frame.srcdoc = html.replace('<head>', '<head><base href="' + new URL('../web/', location.href) + '"><script>(' + fixtures.toString() + ')();<\/script>');
+  const wait = async predicate => {
+    const until = Date.now() + 5000;
+    while (!predicate()) { if (Date.now() > until) throw new Error('Timed out waiting for app state'); await new Promise(r => setTimeout(r, 25)); }
+  };
+  await wait(() => frame.contentWindow.qa && frame.contentWindow.qa.pending.length);
+  const w = frame.contentWindow, d = frame.contentDocument, el = id => d.getElementById(id);
+  const visible = node => !!node.getClientRects().length;
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  let passed = 0, failed = 0;
+  async function check(name, fn) {
+    const li = document.createElement('li');
+    try { await fn(); passed++; li.className = 'pass'; li.textContent = 'PASS: ' + name; }
+    catch (e) { failed++; li.className = 'fail'; li.textContent = 'FAIL: ' + name + ' — ' + e.message; }
+    document.getElementById('checks').append(li);
+  }
+  const event = (id, away, home, state = 'pre') => ({ id, name: away + ' at ' + home,
+    shortName: away + ' @ ' + home, status: { type: { state, name: state === 'pre' ? 'STATUS_SCHEDULED' : 'STATUS_FINAL', detail: 'Today at 1 PM ET' } },
+    competitions: [{ competitors: [
+      { homeAway: 'away', score: '0', team: { id: '1', shortDisplayName: away, abbreviation: away, displayName: away } },
+      { homeAway: 'home', score: '0', team: { id: '2', shortDisplayName: home, abbreviation: home, displayName: home } }
+    ] }] });
+  const games = [event('100001', 'LSU', 'Clemson'), event('100002', 'Oregon', 'Boise State')];
+  await check('First visit explains the product, exposes the picker, and hides inactive analysis', () => {
+    assert(visible(el('homeTitle')) && visible(el('gameSearch')), 'Home or search missing');
+    assert(!visible(el('prime')) && !visible(el('feed')) && !visible(el('delayBtn')), 'Inactive panels remain visible');
+    assert(el('games').getAttribute('aria-busy') === 'true', 'Missing loading announcement');
+    assert(!visible(el('scheduleNotice')), 'An unfinished request looked like no games');
+    assert(el('gameBrowser').parentElement === el('homeGamePicker'), 'Picker is not inline');
+  });
+  await check('Schedule failure has a working retry, separate from an empty day', async () => {
+    w.qa.respond('error'); await wait(() => visible(el('scheduleRetry')));
+    assert(el('scheduleMessage').textContent.includes('could not be loaded'), 'Missing error explanation');
+    w.qa.mode = 'pending'; el('scheduleRetry').click();
+    await wait(() => w.qa.pending.length); w.qa.respond('ready', []);
+    await wait(() => visible(el('browseFinished')));
+    assert(!visible(el('scheduleRetry')), 'Stale retry still visible');
+    assert(!el('games').textContent.includes('No finished games'), 'Wrong empty-day message');
+  });
+  await check('A background refresh keeps the empty-day action in place', async () => {
+    w.qa.mode = 'pending'; el('currentGamesBtn').click();
+    await wait(() => w.qa.pending.length);
+    assert(visible(el('browseFinished')), 'Background polling replaced the empty-day action');
+    assert(!el('games').textContent.includes('Loading'), 'Background polling flashed a loading state');
+    w.qa.respond('ready', []);
+  });
+  await check('The empty-day action opens dated replay browsing without a modal', async () => {
+    el('browseFinished').click(); await wait(() => !el('archiveDateField').hidden);
+    assert(d.activeElement === el('archiveDate'), 'Focus did not follow the action');
+    assert(!el('sheet').classList.contains('on'), 'Unexpected modal');
+    await wait(() => el('games').getAttribute('aria-busy') === 'false');
+  });
+  await check('Search narrows games immediately; clearing restores the same buttons', async () => {
+    w.qa.respond('ready', games); el('currentGamesBtn').click();
+    await wait(() => el('games').querySelectorAll('[data-g]').length === 2);
+    const original = el('games').querySelector('[data-g="100001"]');
+    el('gameSearch').value = 'LSU'; el('gameSearch').dispatchEvent(new w.Event('input'));
+    assert(el('games').querySelectorAll('[data-g]:not([hidden])').length === 1, 'Search did not narrow');
+    assert(el('gameSearchStatus').textContent.includes('1 game found'), 'Missing search count');
+    el('gameSearch').value = 'nonexistent'; el('gameSearch').dispatchEvent(new w.Event('input'));
+    assert(el('games').textContent.includes('No teams match'), 'No-results explanation missing');
+    el('clearGameSearch').click();
+    assert(el('games').querySelector('[data-g="100001"]') === original, 'Polling/search replaced a game button');
+    assert(d.activeElement === el('gameSearch'), 'Clear lost keyboard focus');
+  });
+  await check('Choosing a game replaces the landing page with analysis and moves focus', async () => {
+    el('games').querySelector('[data-g="100001"]').click();
+    await wait(() => d.body.dataset.view === 'game');
+    assert(!visible(el('home')) && visible(el('prime')) && visible(el('feed')), 'Wrong selected-game layout');
+    assert(d.activeElement === el('prime'), 'Focus stayed in the hidden picker');
+    assert(el('gameBrowser').parentElement === el('sheet'), 'Game selector was not retained for switching');
+  });
+  await check('Games opens the same selector as a dialog; Escape closes and restores focus', async () => {
+    el('pickBtn').focus(); el('pickBtn').click();
+    await wait(() => !el('sheet').inert);
+    assert(visible(el('gameSearch')), 'Dialog selector unavailable');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(() => el('sheet').inert);
+    assert(d.activeElement === el('pickBtn'), 'Dialog did not restore focus');
+  });
+  await check('Switching leagues and closing without a selection restores the inline selector', async () => {
+    el('pickBtn').click(); await wait(() => !el('sheet').inert);
+    d.querySelector('[data-lg="nfl"]').click();
+    await wait(() => d.body.dataset.view === 'home');
+    el('closeSheet').click(); await wait(() => el('sheet').inert);
+    assert(el('gameBrowser').parentElement === el('homeGamePicker') && visible(el('gameSearch')), 'Inline browser not restored');
+    el('pickBtn').click();
+    assert(d.activeElement === el('gameSearch') && !el('sheet').classList.contains('on'), 'Home Games button should focus inline search');
+  });
+  await check('Mobile and dark mode keep the selector usable without horizontal overflow', async () => {
+    frame.style.width = '390px'; el('themeToggle').click();
+    await new Promise(r => setTimeout(r, 100));
+    assert(d.documentElement.dataset.theme === 'dark', 'Theme toggle failed');
+    assert(d.documentElement.scrollWidth <= d.documentElement.clientWidth, 'Mobile overflow');
+    assert(visible(el('gameSearch')) && !visible(el('prime')), 'Wrong mobile state');
+  });
+  await check('App has no uncaught errors or rejected promises', () => assert(w.qa.errors.length === 0, w.qa.errors.join('\n')));
+  document.getElementById('result').textContent = passed + ' passed, ' + failed + ' failed';
+  document.body.dataset.failures = String(failed);
+})().catch(e => { document.getElementById('result').textContent = e.stack; document.body.dataset.failures = '1'; });
+</script>

@@ -31,7 +31,7 @@
   const createRenderer = new Function('document', 'sh', 'st', '$', 'paintConnection',
     between('function teamLogo(', '// A CFB game that starts') + '\n' +
     between('function renderHeader(', 'function paintConnection(') + '\n' +
-    between('function renderPicker(', '// ---------------------------------------------------------------- loop') + '\n' +
+    between('function renderPageView(', '// ---------------------------------------------------------------- loop') + '\n' +
     between("$('gameSearch').addEventListener('input'", "$('games').addEventListener('click'") + '\n' +
     'return { header: renderHeader, picker: renderPicker, eventRow };');
   const logos = ['https://a.espncdn.com/i/teamlogos/ncaa/500/2655.png',
@@ -40,7 +40,7 @@
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g,
     char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   function setup() {
-    byId('fixture').innerHTML = '<div id="score"></div><div id="hmeta"></div>' +
+    byId('fixture').innerHTML = '<a class="skip-link"></a><div id="home"></div><div id="homeGamePicker"></div><div id="sheet"><div id="gameBrowser"></div></div><div id="scheduleNotice"><p id="scheduleMessage"></p><button id="scheduleRetry"></button><button id="browseFinished"></button></div><div id="score"></div><div id="hmeta"></div>' +
       '<button id="currentGamesBtn"></button><button id="finishedGamesBtn"></button><div id="archiveDateField"></div><button id="archiveRetry"></button>' +
       '<button id="pickBtn">Games</button><div class="seg"><button data-lg="cfb">College</button><button data-lg="nfl">NFL</button></div>' +
       '<label for="gameSearch">Search teams</label><input id="gameSearch" type="search" aria-controls="games">' +
@@ -214,7 +214,8 @@
   });
   check('Empty schedules and league changes clear old logos', () => {
     const h = setup(); h.picker(); h.state.games = []; h.state.league = 'nfl'; h.picker();
-    assert(images('#games').length === 0 && document.querySelector('#games .empty'), 'Old games remained.');
+    assert(images('#games').length === 0 && !document.querySelector('#games [data-g]'), 'Old games remained.');
+    assert(!byId('scheduleNotice').hidden && !byId('browseFinished').hidden, 'Empty schedule action missing.');
     assert(document.querySelector('.seg .on').dataset.lg === 'nfl', 'League did not update.');
     h.state.games = [game('new-league-game', 'pre')]; h.picker();
     assert(images('#games').length === 2 && !document.querySelector('#games .empty'), 'New schedule did not replace empty state.');

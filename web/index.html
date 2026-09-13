@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f1f4f5">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Become fluent in football. Learn where to look, understand each play, and make your own calls as you watch.">
+<meta name="description" content="Know what to watch next. Follow player usage, the shape of a drive, and what each play changed alongside the game on your TV.">
 <meta property="og:site_name" content="Fluent in Football">
 <meta property="og:title" content="Fluent in Football">
 <meta property="og:url" content="https://fluentin.football/">
 <link rel="canonical" href="https://fluentin.football/">
-<meta property="og:description" content="Learn the game while you watch.">
+<meta property="og:description" content="Know what to watch next. Live football context and play-by-play replays for college and NFL games.">
 <meta name="application-name" content="Fluent in Football">
 <meta name="apple-mobile-web-app-title" content="Fluent in Football">
 <title>Fluent in Football</title>
@@ -22,9 +22,9 @@
 <link rel="stylesheet" href="review.css">
 <link rel="stylesheet" href="replay.css">
 </head>
-<body>
+<body data-view="home">
 
-<a class="skip-link" href="#prime">Skip to what to watch</a>
+<a class="skip-link" href="#gameSearch">Skip to games</a>
 <header class="app-header">
   <div class="header-inner">
     <div class="masthead">
@@ -54,6 +54,53 @@
 <div id="err" role="status"></div>
 
 <main class="workspace">
+
+  <section id="home" class="home" aria-labelledby="homeTitle">
+    <div class="home-intro">
+      <p class="eyebrow">Your football companion</p>
+      <h1 id="homeTitle">Know what to watch next.</h1>
+      <p class="home-lede">Follow the game on TV with a read on who’s getting the ball, what’s changing this drive, and what the last play set up.</p>
+      <dl class="home-rhythm">
+        <div><dt>Before the snap</dt><dd>A player or decision worth following.</dd></div>
+        <div><dt>After the play</dt><dd>What changed, and why it matters for the next down.</dd></div>
+      </dl>
+      <p class="home-source">Built from play reports and historical data. Bring your own broadcast.</p>
+    </div>
+    <div id="homeGamePicker" class="home-game-picker">
+  <div id="gameBrowser" class="sheetInner game-browser">
+    <h2 id="gamePickerTitle">Choose a game</h2>
+    <p class="game-picker-intro">Follow live, or replay a finished game.</p>
+    <div class="sheetTop">
+      <div class="seg" role="group" aria-label="League">
+        <button data-lg="cfb">College</button>
+        <button data-lg="nfl">NFL</button>
+      </div>
+      <button id="closeSheet" class="closex">Close</button>
+    </div>
+    <div class="game-browser-modes" role="group" aria-label="Game schedule">
+      <button id="currentGamesBtn" type="button" aria-pressed="true" aria-controls="games">Live & upcoming</button>
+      <button id="finishedGamesBtn" type="button" aria-pressed="false" aria-controls="games">Finished games</button>
+    </div>
+    <div id="archiveDateField" class="archive-date-field" hidden>
+      <label for="archiveDate">Game date <input id="archiveDate" type="date" required></label>
+      <p>Choose a game to replay. Scores stay hidden until you reach them.</p>
+      <button id="archiveRetry" type="button" class="ghost" hidden>Try again</button>
+    </div>
+    <div class="game-search">
+      <label for="gameSearch">Search teams</label>
+      <div class="game-search-field">
+        <input id="gameSearch" type="search" placeholder="Team name or abbreviation" autocomplete="off" autocapitalize="none" spellcheck="false" aria-controls="games" aria-describedby="gameSearchStatus">
+        <button id="clearGameSearch" type="button" aria-label="Clear team search" hidden>Clear</button>
+      </div>
+      <p id="gameSearchStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+    </div>
+    <div id="scheduleNotice" class="schedule-notice" hidden><p id="scheduleMessage" role="status"></p><button id="scheduleRetry" class="ghost" type="button" hidden>Try again</button><button id="browseFinished" class="ghost" type="button" hidden>Browse finished games →</button></div>
+    <div id="games"><div class="empty">Loading games…</div></div>
+    <button id="gameSettingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings: hints and appearance ↗</button>
+  </div>
+    </div>
+  </section>
+
 
   <section id="replayControls" class="replay-controls" aria-label="Game replay" hidden>
     <div class="replay-heading"><div><span class="eyebrow">Game replay</span><h1 id="replayGameTitle">Loading game…</h1></div><span id="replayDate"></span></div>
@@ -162,7 +209,7 @@
       <button id="closeHow" class="closex" type="button">Close</button>
     </div>
     <ol class="how-steps">
-      <li><b>Choose the game you’re watching.</b> Open Games and search for either team.</li>
+      <li><b>Choose the game you’re watching.</b> Search for either team in the game list. Use Games to switch at any time.</li>
       <li><b>Match the timing.</b> Open Sync TV. We start with a 45-second delay; your broadcast may need more or less.</li>
       <li><b>Know what to watch.</b> Watch next highlights a player, pattern or decision that matters now. Last play explains what changed. Tap an underlined term whenever you need it.</li>
     </ol>
@@ -183,36 +230,7 @@
   </div>
 </div>
 
-<div id="sheet" class="sheet" role="dialog" aria-modal="true" aria-label="Choose a game" inert>
-  <div class="sheetInner">
-    <div class="sheetTop">
-      <div class="seg" aria-label="League">
-        <button data-lg="cfb">College</button>
-        <button data-lg="nfl">NFL</button>
-      </div>
-      <button id="closeSheet" class="closex">Close</button>
-    </div>
-    <div class="game-browser-modes" role="group" aria-label="Game schedule">
-      <button id="currentGamesBtn" type="button" aria-pressed="true" aria-controls="games">Live & upcoming</button>
-      <button id="finishedGamesBtn" type="button" aria-pressed="false" aria-controls="games">Finished games</button>
-    </div>
-    <div id="archiveDateField" class="archive-date-field" hidden>
-      <label for="archiveDate">Game date <input id="archiveDate" type="date" required></label>
-      <p>Choose a game to replay. Scores stay hidden until you reach them.</p>
-      <button id="archiveRetry" type="button" class="ghost" hidden>Try again</button>
-    </div>
-    <div class="game-search">
-      <label for="gameSearch">Search teams</label>
-      <div class="game-search-field">
-        <input id="gameSearch" type="search" placeholder="Team name or abbreviation" autocomplete="off" autocapitalize="none" spellcheck="false" aria-controls="games" aria-describedby="gameSearchStatus">
-        <button id="clearGameSearch" type="button" aria-label="Clear team search" hidden>Clear</button>
-      </div>
-      <p id="gameSearchStatus" role="status" aria-live="polite" aria-atomic="true"></p>
-    </div>
-    <div id="games"><div class="empty">Loading games…</div></div>
-    <button id="gameSettingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings: hints and appearance ↗</button>
-  </div>
-</div>
+<div id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="gamePickerTitle" inert></div>
 
 <div id="settingsSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" inert>
   <div class="sheetInner">

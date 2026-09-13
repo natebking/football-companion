@@ -68,6 +68,45 @@ svg { display: block; }
 
 /* Follow one player or decision, with the last play alongside. */
 .workspace { max-width: 1184px; margin: 0 auto; padding: 32px 32px calc(40px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+/* Before selection, give the game browser the space occupied by analysis. */
+body[data-view="home"] .workspace > :not(.home):not(.learning-footer),
+body[data-view="home"] .scorebar, body[data-view="home"] .connection,
+body[data-view="home"] .journal-toolbar { display: none; }
+body[data-view="home"] .masthead { border-bottom: 0; }
+.home { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); padding: 16px 0 12px; align-items: start; }
+.home-intro { padding-top: 30px; }
+.home-intro > .eyebrow { color: var(--accent); }
+.home h1 { font-size: clamp(2.25rem, 4.1vw, 3.25rem); line-height: 1.08; letter-spacing: -.055em; font-weight: 600; margin: 18px 0 22px; max-width: 10ch; text-wrap: balance; }
+.home-lede { color: var(--dim); font-size: 1.0625rem; line-height: 1.65; max-width: 39ch; text-wrap: pretty; }
+.home-rhythm { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+.home-rhythm > div + div { margin-top: 17px; }
+.home-rhythm dt { font-size: .875rem; font-weight: 600; margin-bottom: 3px; }
+.home-rhythm dd { color: var(--dim); font-size: .9375rem; max-width: 35ch; }
+.home-source { color: var(--faint); font-size: .75rem; line-height: 1.6; margin-top: 26px; max-width: 40ch; }
+.home-game-picker { min-width: 0; }
+.home-game-picker .game-browser { max-width: none; max-height: none; overflow: visible; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); }
+.game-browser h2 { font-size: 1.375rem; font-weight: 600; letter-spacing: -.025em; }
+.game-picker-intro { color: var(--dim); font-size: .875rem; margin: 4px 0 20px; }
+.home-game-picker .sheetTop { position: static; background: transparent; }
+.home-game-picker #closeSheet, .home-game-picker #gameSettingsBtn { display: none; }
+.home-game-picker .seg { width: 100%; }
+.home-game-picker .seg button { flex: 1; }
+.home-game-picker .game-search input { background: var(--bg); }
+.home-game-picker #games { max-height: 460px; overflow-y: auto; overscroll-behavior: auto; scrollbar-gutter: stable; }
+.home-game-picker .grouphead { padding-top: 14px; }
+.schedule-notice { padding: 16px; margin-top: 12px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; font-size: .875rem; color: var(--dim); }
+.schedule-notice button { margin-top: 12px; background: var(--card); color: var(--accent); }
+.game-browser .empty { font-size: .875rem; padding: 28px 12px; }
+@media (max-width: 759px) {
+  .home { display: block; padding: 0; }
+  .home-intro { padding: 10px 4px 26px; }
+  .home h1 { max-width: 15ch; font-size: 2.375rem; margin: 12px 0 16px; }
+  .home-lede { font-size: 1rem; line-height: 1.55; }
+  .home-rhythm { display: none; }
+  .home-source { margin-top: 14px; max-width: none; }
+  .home-game-picker .game-browser { padding: 20px 16px; border-radius: 15px; }
+  .home-game-picker #games { max-height: none; overflow: visible; scrollbar-gutter: auto; }
+}
 .read-column { top: calc(var(--hdr) + 28px); min-width: 0; }
 html[data-read-fits="true"] .read-column { position: sticky; }
 #prime { border-radius: 18px; background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--accent); padding: 25px 28px 24px; box-shadow: var(--shadow); transition: border-top-color 700ms ease-out; }
