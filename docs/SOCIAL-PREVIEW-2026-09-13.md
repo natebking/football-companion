@@ -13,6 +13,8 @@ The homepage now supplies `og:type`, an absolute `og:image` URL with dimensions 
 
 Validation checked unique metadata, the built image's format and dimensions, and all preview/production asset hashes against the local build. Public requests using `Twitterbot/1.0` received the new HTML and exact PNG bytes with the correct content types. An HTTP bare-domain request followed the 308 redirect to the HTTPS page with the same tags. These checks establish that the site supplies a usable card; they do not establish when X will fetch it or replace any cached result.
 
-The original X post has not been deleted or replaced. Rendering inside X is checked separately from the site deployment.
+X's authenticated [Card Validator](https://cards-dev.twitter.com/validator) then fetched the production homepage and reported 26 meta tags, `twitter:card = summary_large_image`, and **Card loaded successfully**. The validator says its visual preview has moved to Tweet Composer. A composer check did not show a visual card for either the root URL or a fresh `?share=launch` query at the time of testing. The validator result confirms X's fetch succeeded; it does not prove a particular timeline or composer will display it immediately.
+
+The original X post has not been deleted or replaced. A replacement text was prepared in an unpublished composer for review. Keep the existing post until a replacement's presentation is satisfactory; an attached product screenshot can also provide the visual directly.
 
 The Open Graph fields follow the [Open Graph protocol](https://ogp.me/). The former X card documentation URLs redirected to its general developer overview during this investigation, so no specific cache expiration time is assumed.
