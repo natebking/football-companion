@@ -1,6 +1,7 @@
 # What the build container is allowed to see. This file replaces .gitignore for
 # uploads, so every secret and every large local artefact is named again here.
 .env
+.env.*
 .venv/
 data/
 __pycache__/

@@ -1,7 +1,6 @@
 # Deployment
 
-Run deployment commands from this repository, `/Users/nking/Documents/football-companion`.
-The similarly named `/Users/nking/Documents/ChatGPT/Football Companion` folder is an empty repository.
+Run deployment commands from the root of the cloned repository. Confirm the Git remote and linked Vercel project before deploying. Contributors should deploy to their own Vercel project.
 
 - Project: `football-companion`
 - Team: `nates-projects-925609f4`
@@ -18,17 +17,11 @@ After DNS changes, check `vercel domains inspect fluentin.football --scope nates
 
 ## Git identity
 
-On 2026-09-05, Vercel blocked CLI deployments whose commit author was the Mac's
-automatic `nking@Nates-MacBook-Air.local` identity. The authenticated CLI user was
-already the team owner. GitHub associates `nathan.king@me.com` with `natebking`,
-and deployments using that author succeeded.
-
-This checkout now saves the following repository-local settings, shared by Codex,
-Claude, and ordinary Git commands. Apply them again when making a fresh clone:
+Vercel checks that the commit author has access to the deployment project. Use a Git identity associated with your own GitHub account and Vercel team. A machine-generated local identity can cause attribution failures even when the CLI is signed in correctly.
 
 ```sh
-git config --local user.name 'Nathan King'
-git config --local user.email 'nathan.king@me.com'
+git config --local user.name 'Your Name'
+git config --local user.email 'your-github-associated-email'
 git var GIT_AUTHOR_IDENT
 ```
 
@@ -60,8 +53,7 @@ CLI 54.14.5 labels blocked deployments `UNKNOWN`; the REST deployment object's
 
 The Codex Vercel connector returned no teams and a 403 for this project during
 the incident. Its connection needs to be reconnected to the existing team-owner
-account. The browser and shared local Vercel CLI already access the team as
-`support-2173`; their successful authentication does not repair a separate
+account. The browser and shared local Vercel CLI already access the team using the project owner account; their successful authentication does not repair a separate
 connector's authorization.
 
 As checked on 2026-09-05, the Vercel project has no Git integration (`link: null`).

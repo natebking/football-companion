@@ -2,6 +2,14 @@
 
 A second screen for following a football game and learning what to watch. [Open Fluent in Football](https://fluentin.football/).
 
+I love football and wanted to understand it more deeply. This app uses live play reports and historical stats to help you see where to look, who is involved, and what each play changed. It supports college football and the NFL.
+
+**[Try the app](https://fluentin.football/) · [Report an issue](https://github.com/natebking/football-companion/issues) · [MIT license for the app code](LICENSE)**
+
+No account or API key is needed to run the web app. Start with the searchable game list, or choose a finished game and step through its play reports. The app reads reported data; it does not watch the broadcast or identify formations from video.
+
+## What it does
+
 Use **Games → Finished games** to choose a date and search for a team in College or NFL. Completed games with ESPN play reports can be replayed with Previous/Next and quarter jump points. Game-specific analysis uses only reports through the chosen point; final reports can differ from live versions. Historical comparisons use the current tables, not a table frozen on the replay date. Replay leaves live journals, predictions and saved TV delay untouched. There is no featured one-game replay on the homepage. See the [September 13 game audit and replay update](docs/RECENT-GAME-AUDIT-2026-09-13.md).
 
 Player workload cues now give way to a relevant down/drive observation after two released offensive actions without new involvement. The workload remains in a smaller note; a new carry or target can restore the main cue. No additional quiet states appeared across 12 checked games. See the [cue-selection and jersey audit](docs/CUE-SELECTION-2026-09-13.md).
@@ -36,11 +44,19 @@ The static app polls ESPN directly in the browser. Historical tendencies ship as
 
 The NFL tendency table covers 2023–2025. The scheduled September 8 college refresh covers 2023–2026, with a partial 2026 season and 373,073 eligible plays. The NFL refresh adds 104,878 eligible plays, but its chronological test found no reliable forecasting advantage over a situation-only baseline. Treat the percentages as descriptive history. See the [data refresh and source audit](docs/DATA-REFRESH-2026-09-05.md) for results, reproduction commands, and access limits. CFBD live requires a higher subscription tier; Sportradar is not connected. Public FTN charting supplies historical lessons, not live tactical observations.
 
+## License and contributions
+
+Original application code and original documentation are available under the [MIT License](LICENSE). Provider data and source reports, FTN-derived lessons, fonts, and team assets have separate terms described in [NOTICE.md](NOTICE.md). They are not covered by a blanket MIT data license. ESPN access and redistribution rights remain an unresolved provider limitation; source attribution does not grant permission.
+
+Issues and pull requests are welcome. Useful reports include the game or replay URL, the play or clock, what the app showed, and what you expected. Please do not put credentials or private browser exports in a public issue. Changes to analysis should include the supporting data and preserve the separation between reported facts and things to watch for.
+
 ## Develop and verify
 
 The live app is in `web/`. The root `index.html` is the frozen broadcast-timing instrument, published at `/stopwatch`.
 
 ```sh
+git clone https://github.com/natebking/football-companion.git
+cd football-companion
 node scripts/build-web.mjs
 python3 -m http.server 8765 --bind 127.0.0.1 --directory .vercel-build
 node --test tests/*.test.js
@@ -62,7 +78,7 @@ To check logo stability, serve the repository root with `python3 -m http.server 
 - [Deployment](docs/DEPLOYMENT.md): shared Codex and Claude deployment setup and troubleshooting.
 
 ```sh
-vercel deploy --prod --yes --scope nates-projects-925609f4
+vercel deploy --prod
 ```
 
 Vercel project: `football-companion`. Git pushes alone do not deploy this project.
