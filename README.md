@@ -2,7 +2,7 @@
 
 A second screen for following a football game and learning what to watch. [Open Fluent in Football](https://fluentin.football/).
 
-Use **Games → Finished games** to choose a date and search for a team in College or NFL. Completed games with ESPN play reports can be replayed with Previous/Next and quarter jump points. The current analysis uses only reports through the chosen point; final reports can differ from live versions. Replay leaves live journals, predictions and saved TV delay untouched. There is no featured one-game replay on the homepage. See the [September 13 game audit and replay update](docs/RECENT-GAME-AUDIT-2026-09-13.md).
+Use **Games → Finished games** to choose a date and search for a team in College or NFL. Completed games with ESPN play reports can be replayed with Previous/Next and quarter jump points. Game-specific analysis uses only reports through the chosen point; final reports can differ from live versions. Historical comparisons use the current tables, not a table frozen on the replay date. Replay leaves live journals, predictions and saved TV delay untouched. There is no featured one-game replay on the homepage. See the [September 13 game audit and replay update](docs/RECENT-GAME-AUDIT-2026-09-13.md).
 
 The two-F logo follows connected player routes: a rounded first F flows into a taller second F, with one starting dot and one forward arrow. Light and dark assets are `web/brand-mark.svg` and `web/brand-mark-dark.svg`. The header colors and matching favicon follow the selected appearance.
 
@@ -32,7 +32,7 @@ The [practice-export audit](docs/PRACTICE-AUDIT-2026-09-06.md) checks source ver
 
 The static app polls ESPN directly in the browser. Historical tendencies ship as JSON; they describe past situations, not the next play's formation or strategy. Richer live details vary by game. Missing routes, coverage, or assignments are not inferred. All explanations are deterministic, with no runtime AI calls or backend.
 
-Both shipped tendency tables now cover 2023–2025. The NFL refresh adds 104,878 eligible plays, but its chronological test found no reliable forecasting advantage over a situation-only baseline. Treat the percentages as descriptive history. See the [data refresh and source audit](docs/DATA-REFRESH-2026-09-05.md) for results, reproduction commands, and access limits. CFBD live requires a higher subscription tier; Sportradar is not connected. Public FTN charting supplies historical lessons, not live tactical observations.
+The NFL tendency table covers 2023–2025. The scheduled September 8 college refresh covers 2023–2026, with a partial 2026 season and 373,073 eligible plays. The NFL refresh adds 104,878 eligible plays, but its chronological test found no reliable forecasting advantage over a situation-only baseline. Treat the percentages as descriptive history. See the [data refresh and source audit](docs/DATA-REFRESH-2026-09-05.md) for results, reproduction commands, and access limits. CFBD live requires a higher subscription tier; Sportradar is not connected. Public FTN charting supplies historical lessons, not live tactical observations.
 
 ## Develop and verify
 
