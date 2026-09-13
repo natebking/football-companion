@@ -3,7 +3,7 @@
  * selections. An observation never establishes the next formation or call. */
 (function (root) {
   'use strict';
-  var VERSION = 'read-5';
+  var VERSION = 'read-6';
   var history = typeof module !== 'undefined' && module.exports ? require('./game-history.js') : root.FootballHistory;
   function valid(s) {
     return s && Number.isInteger(s.down) && s.down >= 1 && s.down <= 4 &&
@@ -51,6 +51,20 @@
   function fieldPosition(yardsToGoal) {
     if (yardsToGoal === 50) return 'midfield';
     return yardsToGoal > 50 ? 'their own ' + (100 - yardsToGoal) : 'the opponent’s ' + yardsToGoal;
+  }
+  // Age evidence in released offensive actions, not clock ticks, card views,
+  // penalties or the other team's possession. This also works after a seek.
+  function actionsSinceInvolvement(team, focus) {
+    var ids = team && team.playIds;
+    var player = team && ((focus.role === 'runner' ? team.runners : team.receivers) || [])
+      .find(function (p) { return p.name === focus.name; });
+    if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length ||
+        !player || !Array.isArray(player.playIds) || !player.playIds.length ||
+        player.playIds.some(function (id) { return ids.indexOf(id) < 0; })) return null;
+    for (var i = ids.length - 1; i >= 0; i--) {
+      if (player.playIds.indexOf(ids[i]) >= 0) return ids.length - i - 1;
+    }
+    return null;
   }
   function candidates(s, evidence, past) {
     if (!valid(s)) return [];
@@ -128,7 +142,7 @@
           t.throwPlayIds, 94, 'third_down_target:' + off + ':' + receiver.name));
       }
       if (t && t.attempts >= 4 && t.knownDistances === t.attempts && t.long >= 3 && t.long / t.attempts >= 0.6) {
-        add(candidate('long_thirds', 75, 'Long third downs are making these possessions harder.',
+        add(candidate('long_thirds', s.down >= 2 && s.distance >= 7 ? 75 : 49, 'Long third downs are making these possessions harder.',
           t.long + ' of ' + t.attempts + ' reported third-down plays needed at least seven yards.',
           s.down < 3 ? 'Watch how much the next play leaves them to gain.' : 'Watch where the catch happens relative to the first-down line.',
           { source: 'ESPN · third downs this game', playIds: t.playIds, lessonId: 'first_down_line',
@@ -181,8 +195,8 @@
     } else if (s.down === 3) {
       add(candidate('third_down_distance', 60,
         s.distance >= 7 ? 'A completion can still leave them short.' : 'This is a chance to extend the possession.',
-        'They need ' + s.distance + ' yards. Where the ball is caught matters as much as whether it is caught.',
-        'Watch the receiver’s position relative to the first-down line.',
+        'They need ' + s.distance + ' yards. A catch or first contact short of the line leaves the ball carrier with more work to do.',
+        'Watch where the catch or first contact happens relative to the first-down line.',
         { lessonId: 'first_down_line', question: { kind: 'conversion', q: 'Will this play gain enough for a first down?' } }));
     } else if (s.down === 2 && s.distance >= 10) {
       add(candidate('second_long', 55, 'This play can make third down manageable—or leave a lot to do.',
@@ -191,6 +205,31 @@
     }
     var historical = history.read(s, past);
     if (historical) add(candidate(historical.id, historical.priority, historical.headline, historical.detail, historical.watch, historical));
+    var situational = list.filter(function (c) {
+      return c.priority > 50 && ['long_thirds', 'goal_to_go', 'third_down_distance', 'second_long'].includes(c.id);
+    });
+    if (situational.length) {
+      var aging = list.filter(function (c) {
+        if (!['game_player', 'drive_player'].includes(c.id)) return false;
+        var age = actionsSinceInvolvement(team, c.focus);
+        return age !== null && age >= 2;
+      }).sort(function (a, b) { return b.priority - a.priority || a.id.localeCompare(b.id); });
+      if (aging.length) {
+        var supporting = aging[0];
+        // Keep the evidence visible in a smaller note. Do not pick a different
+        // name simply for variety, or replace a player with an empty state.
+        // A matched historical comparison can outrank the ordinary down cue.
+        // It must retain the same workload note when that happens.
+        var replacements = situational.concat(list.filter(function (c) { return c.historyRefs; }));
+        replacements.forEach(function (c) {
+          c.supportingPlayer = { name: supporting.focus.name, role: supporting.focus.role,
+            detail: supporting.detail, source: supporting.source, playIds: supporting.playIds.slice(),
+            sinceInvolvementPlayIds: team.playIds.slice(-2) };
+          c.playIds = Array.from(new Set(c.playIds.concat(supporting.playIds, c.supportingPlayer.sinceInvolvementPlayIds)));
+        });
+        aging.forEach(function (c) { c.priority = 50; });
+      }
+    }
     return list.sort(function (a, b) { return b.priority - a.priority || a.id.localeCompare(b.id); });
   }
   function select(s, evidence, recent, past) {

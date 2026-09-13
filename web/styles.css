@@ -104,7 +104,8 @@ html[data-read-fits="true"] .read-column { position: sticky; }
 .read-detail { margin-top: 12px; font-size: 1.0625rem; line-height: 1.55; color: var(--text); }
 .read-observe { margin-top: 14px; padding-left: 13px; border-left: 3px solid var(--accent); font-size: 1rem; line-height: 1.5; color: var(--dim); }
 .read-source { display: block; margin-top: 12px; color: var(--dim); font-size: .75rem; }
-.read-detail:empty, .read-observe:empty, .read-source:empty { display: none; }
+.read-player-context { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--dim); font-size: .875rem; line-height: 1.5; }
+.read-detail:empty, .read-observe:empty, .read-source:empty, .read-player-context:empty { display: none; }
 .tendency-block summary { cursor: pointer; padding: 8px 0; }
 .read-feedback { margin-top: 16px; color: var(--dim); font-size: .8125rem; }
 .read-feedback summary { cursor: pointer; }

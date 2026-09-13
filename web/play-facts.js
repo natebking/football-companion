@@ -70,6 +70,9 @@
   // are useful without a roster request; unmatched prose remains in `raw`.
   function reportedPlayers(text, type) {
     text = text.replace(/^\s*(?:\(\d{1,2}:\d{2}\)\s*)?(?:(?:No Huddle(?:-Shotgun)?|Shotgun)\s+|\((?:No Huddle(?:,\s*Shotgun)?|Shotgun)\)\s*)?/i, '');
+    // An eligibility announcement names a different participant before the
+    // actual play sentence. Keep its name out of the passer/carrier capture.
+    text = text.replace(/^(?:#\d{1,2}\s+)?[A-Z][A-Za-z.\u2019\u0027 -]{1,60}?\s+reported in as eligible\.\s*/, '');
     var name = '((?:#\\d{1,2}\\s+)?[A-Z][A-Za-z.\u2019\u0027 -]{1,60}?)';
     var actor = new RegExp('^' + name + '\\s+(?:pass\\s+(?:complete|incomplete|intercepted|short|deep)|rush|run|scrambl(?:e|es|ed|ing)|sacked)\\b').exec(text);
     // NFL rush reports can name the carrier directly before the reported run

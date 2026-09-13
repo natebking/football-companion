@@ -69,12 +69,92 @@ test('partial target coverage is disclosed, while low coverage and corrections s
   assert.ok(!read.candidates({ ...sit, down: 3 }, e).some(c => c.id === 'third_down_target'));
 });
 
-test('named game involvement outranks the generic long-third observation', () => {
+test('recent named involvement outranks a relevant long-third pattern', () => {
   const e = observe([target(1), target(2), target(3), target(4, '#8 Receiver', 2)]);
-  const c = read.select({ ...sit, down: 1, period: 1 }, e);
+  const c = read.select({ ...sit, down: 2, distance: 8, period: 1 }, e);
   assert.equal(c.id, 'game_player'); assert.match(c.headline, /R.Jones/);
-  assert.ok(read.candidates({ ...sit, down: 1, period: 1 }, e).some(item =>
+  assert.ok(read.candidates({ ...sit, down: 2, distance: 8, period: 1 }, e).some(item =>
     item.id === 'long_thirds' && /3 of 4 reported third-down plays/.test(item.detail)));
+});
+
+test('unchanged workload yields to the current down after two other offensive actions', () => {
+  const s = { ...sit, down: 2, distance: 10, period: 1 };
+  const carries = [1, 2, 3, 4].map(id => rush(id));
+  const other1 = target(5, '#8 A.Other', 10, 'd5', 1);
+  const other2 = target(6, '#9 B.Other', 10, 'd6', 1);
+  const fresh = read.select(s, observe(carries));
+  assert.equal(fresh.id, 'game_player');
+  assert.equal(read.select(s, observe([...carries, other1]), [fresh.key]).id, 'game_player');
+  const plays = [...carries, other1, other2], e = observe(plays);
+  const changed = read.select(s, e, [fresh.key, fresh.key]);
+  assert.equal(changed.id, 'second_long'); assert.equal(changed.focus, null);
+  assert.equal(changed.supportingPlayer.name, '#26 S.Gaines');
+  assert.match(changed.supportingPlayer.detail, /4 of 4 reported runs/);
+  assert.deepEqual(changed.supportingPlayer.sinceInvolvementPlayIds, ['5', '6']);
+  assert.deepEqual(new Set(changed.playIds), new Set(['1', '2', '3', '4', '5', '6']));
+  assert.deepEqual(read.select(s, e, []), changed, 'Direct replay seeks give the same result.');
+  assert.deepEqual(read.select(s, e, [changed.key]), changed, 'A refresh does not age or rotate it.');
+  for (const situation of [{ down: 3, distance: 2 }, { down: 1, distance: 5, yardsToGoal: 5 }]) {
+    const selected = read.select({ ...s, ...situation }, e);
+    assert.equal(selected.id, situation.down === 3 ? 'third_down_distance' : 'goal_to_go');
+    assert.equal(selected.supportingPlayer.name, '#26 S.Gaines');
+  }
+  const restored = read.select(s, observe([...plays, rush(7)]));
+  assert.equal(restored.id, 'game_player'); assert.match(restored.detail, /5 of 5/);
+  assert.equal(restored.supportingPlayer, undefined);
+  assert.equal(read.select({ ...s, down: 1 }, e).id, 'game_player', 'Do not replace useful evidence with quiet.');
+});
+
+test('only eligible offensive actions age a workload; corrections and possession are recomputed', () => {
+  const s = { ...sit, down: 2, distance: 10, period: 1 };
+  const carries = [1, 2, 3, 4].map(id => rush(id));
+  const other = target(5, '#8 A.Other', 10, 'd5', 1);
+  const noPlay = { ...target(6), type: { text: 'Penalty' }, text: 'PENALTY. NO PLAY' };
+  const timeout = { ...target(7), type: { text: 'Timeout' }, text: 'Timeout' };
+  const opponent = rush(8, '#0 D.Riley', 'opponent', '2483');
+  assert.equal(read.select(s, observe([...carries, other, noPlay, timeout, opponent])).id, 'game_player');
+  const second = target(9, '#9 B.Other', 10, 'd9', 1);
+  const changed = read.select(s, observe([...carries, other, second]));
+  assert.equal(changed.id, 'second_long');
+  const corrected = { ...second, type: { text: 'Penalty' }, text: 'PENALTY. NO PLAY' };
+  assert.equal(read.select(s, observe([...carries, other, second, corrected])).id, 'game_player');
+  const missingOrder = observe([...carries, other, second]); missingOrder.teams[0].playIds = [];
+  assert.equal(read.select(s, missingOrder).id, 'game_player', 'Unknown evidence age cannot establish staleness.');
+  const switched = read.select({ ...s, offenseTeam: { id: '2483' } }, observe([...carries, other, second]));
+  assert.equal(switched.supportingPlayer, undefined);
+  const fourth = read.select({ ...s, down: 4 }, observe([...carries, other, second]));
+  assert.equal(fourth.id, 'fourth_down'); assert.equal(fourth.supportingPlayer, undefined);
+});
+
+test('drive workloads age across both runs and passes; a third-down target is situation-specific', () => {
+  const s = { ...sit, down: 2, distance: 10, period: 1 };
+  const plays = [rush(1, '#26 S.Gaines', 'current'), rush(2, '#26 S.Gaines', 'current'),
+    target(3, '#8 A.Other', 10, 'current', 1), target(4, '#9 B.Other', 10, 'current', 2)];
+  const c = read.select(s, observe(plays));
+  assert.equal(c.id, 'second_long'); assert.match(c.supportingPlayer.detail, /2 of 2 reported runs on this drive/);
+  const third = [target(1), target(2), target(3), rush(4), rush(5)];
+  assert.equal(read.select({ ...s, down: 3 }, observe(third)).id, 'third_down_target');
+  assert.equal(read.select({ ...s, down: 3 }, observe(third)).supportingPlayer, undefined);
+  const long = [target(1), target(2), target(3), target(4, '#88 M.Wagner'), rush(5)];
+  assert.equal(read.select(s, observe(long)).id, 'long_thirds');
+  assert.equal(read.select({ ...s, down: 1 }, observe(long)).id, 'game_player');
+  const noLeader = [target(1, '#1 A.One'), target(2, '#2 B.Two'), target(3, '#3 C.Three'), target(4, '#4 D.Four')];
+  assert.equal(read.select({ ...s, down: 1 }, observe(noLeader)).id, 'long_thirds', 'Keep a supported pattern when there is no stronger observation.');
+});
+
+test('a historical third-down comparison retains the displaced player workload', () => {
+  const history = require('../web/game-history.js');
+  const s = { ...sit, down: 3, distance: 8, yardsToGoal: 70, period: 1, clockSeconds: 600, scoreDiff: 0,
+    season: 2026, seasonType: 2, offenseTeam: { id: '2483', location: 'Oregon' }, defenseTeam: { id: '68', location: 'Boise State' } };
+  const plays = [1, 2, 3].map(id => target(id, '#19 R.Jones', 10, 'd' + id, 1, '2483'));
+  plays.push(rush(4, '#1 A.Other', 'd4', '2483'), rush(5, '#2 B.Other', 'd5', '2483'));
+  const e = observe(plays), past = history.lookup(require('../web/history-cfb.json'), s, 'cfb');
+  const selected = read.select(s, e, [], past);
+  assert.equal(selected.id, 'history_third_down');
+  assert.equal(selected.supportingPlayer.name, '#19 R.Jones');
+  assert.match(selected.supportingPlayer.detail, /3 of 3 reported throws/);
+  assert.equal(selected.historyRefs.length, 2);
+  assert.deepEqual(new Set(selected.playIds), new Set(['1', '2', '3', '4', '5']));
 });
 
 test('late-game clock decisions outrank old patterns and stay relevant on the next down', () => {

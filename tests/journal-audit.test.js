@@ -45,6 +45,31 @@ test('different selector versions are not reported as verified', () => {
   assert.equal(report.summary.notReproduced, 0);
   assert.equal(report.summary.unverifiableVersion, 1);
 });
+test('supporting workload text and evidence must reproduce along with the main cue', () => {
+  const game = fixture(), example = game.sources[0].report;
+  game.sources = [1, 2, 3, 4, 5, 6].map(id => ({ revisionId: id + ':1', playId: String(id), observedAt: 1000,
+    report: { ...structuredClone(example), id: String(id), driveId: 'drive-' + id,
+      type: { text: id < 5 ? 'Rush' : 'Pass Incompletion' },
+      start: { ...example.start, down: 1 },
+      text: id < 5 ? '#26 S.Gaines rush middle for 2 yards gain' : '#4 M.Madsen pass incomplete to #' + id + ' Other',
+      statYardage: id < 5 ? 2 : 0 } }));
+  game.releases = game.sources.map(s => ({ revisionId: s.revisionId, playId: s.playId, at: 1100 }));
+  const shown = game.shown[0]; shown.situation.down = 2; shown.situation.distance = 10;
+  const e = insights.forRead(insights.summarize(game.sources.map(s => s.report), { teamAbbreviations: { 68: 'BOIS' } }), '123');
+  const selected = read.select(shown.situation, e);
+  assert.equal(selected.id, 'second_long'); assert.ok(selected.supportingPlayer);
+  shown.read = selected; shown.cardId = selected.id; shown.basisPlayId = '6';
+  shown.lines = { watch: selected.headline, detail: selected.detail, observation: selected.watch,
+    playerContext: 'Player workload · ' + selected.supportingPlayer.detail };
+  assert.equal(auditGame(game).summary.reproduced, 1);
+  const badText = structuredClone(game); badText.shown[0].lines.playerContext = 'Invented workload';
+  assert.equal(auditGame(badText).summary.notReproduced, 1);
+  const badIdentity = structuredClone(game); badIdentity.shown[0].read.supportingPlayer.name = '#0 Someone Else';
+  assert.equal(auditGame(badIdentity).summary.notReproduced, 1);
+  game.releases[5].at = 2000;
+  assert.deepEqual(auditGame(game).rows[0].missingSupport, ['6']);
+  assert.equal(auditGame(game).summary.notReproduced, 1);
+});
 test('covered or background prompts are not counted as visible learning moments', () => {
   const game = fixture(); game.shown[0].visibility = 'background';
   assert.equal(auditGame(game).summary.visibleGuidanceMoments, 0);

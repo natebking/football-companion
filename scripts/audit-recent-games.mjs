@@ -1,12 +1,14 @@
 // Final-report prefix audit; this is not a journal or reconstructed live timing.
 // node scripts/audit-recent-games.mjs [--refresh] [--out path] [--journal journal.json]...
+// Optional comparisons: --selector path/to/game-read.js [--game cfb:EVENT]...
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import replay from '../web/replay.js';
 import insights from '../web/game-insights.js';
-import reads from '../web/game-read.js';
+import currentReads from '../web/game-read.js';
 import facts from '../web/play-facts.js';
 import history from '../web/game-history.js';
 import journalAudit from '../engine/journal_audit.js';
@@ -16,7 +18,14 @@ const args = process.argv.slice(2);
 const refresh = args.includes('--refresh');
 const out = args.includes('--out') ? resolve(args[args.indexOf('--out') + 1]) : resolve(dir, 'audit.json');
 const journalFiles = args.flatMap((arg, i) => arg === '--journal' ? [args[i + 1]] : []);
-const sample = [
+const requestedGames = args.flatMap((arg, i) => arg === '--game' ? [args[i + 1]] : []);
+for (const game of requestedGames) if (!/^(cfb|nfl):[0-9]+$/.test(game || '')) throw Error('Use --game cfb:EVENT or --game nfl:EVENT');
+const selectorFile = args.includes('--selector') ? resolve(args[args.indexOf('--selector') + 1]) : resolve(root, 'web/game-read.js');
+const selectorSource = await readFile(selectorFile, 'utf8');
+const selectorContext = vm.createContext({ module: { exports: {} }, require: createRequire(resolve(root, 'web/game-read.js')) });
+vm.runInContext(selectorSource, selectorContext);
+const reads = args.includes('--selector') ? selectorContext.module.exports : currentReads;
+const sample = requestedGames.length ? requestedGames.map(game => [...game.split(':'), 'Explicit evaluation game, selected before candidate output']) : [
  ['cfb','401858212','Sept 7 close conference game'],
  ['cfb','401856678','Friday regional matchup'],
  ['cfb','401856682','close top-ranked Saturday matchup'],
@@ -40,6 +49,7 @@ vm.runInContext(extracted, context);
 const sha = value => createHash('sha256').update(value).digest('hex');
 const hashes = {};
 for (const file of ['web/app.js','web/replay.js','web/game-insights.js','web/game-read.js','web/play-facts.js','web/game-history.js','web/history-cfb.json','web/history-nfl.json']) hashes[file] = sha(await readFile(resolve(root, file)));
+hashes['web/game-read.js'] = sha(selectorSource);
 const histories = Object.fromEntries(await Promise.all(['cfb','nfl'].map(async league => [league, JSON.parse(await readFile(resolve(root, `web/history-${league}.json`), 'utf8'))])));
 const results = [];
 const journalResults = [];
@@ -57,12 +67,11 @@ for (const [league, gameId, selectionReason] of sample) {
  try { if (refresh) throw Object.assign(Error(), {code:'ENOENT'}); record = JSON.parse(await readFile(cache, 'utf8')); }
  catch (e) { if (e.code !== 'ENOENT') throw e; const response = await fetch(url); if (!response.ok) throw Error(`${gameId}: HTTP ${response.status}`); record = {url, retrievedAt:new Date().toISOString(), data:await response.json()}; await writeFile(cache, JSON.stringify(record,null,2)+'\n'); }
  const source = record.data, header = source.header, competition = header.competitions[0];
- if (String(header.id) !== gameId || competition.status.type.state !== 'post' || !competition.status.type.completed || source.drives.current) throw Error(`${gameId}: not complete final drives`);
+ if (String(header.id) !== gameId || competition.status.type.state !== 'post' || !competition.status.type.completed) throw Error(`${gameId}: not complete final drives`);
  const label = competition.competitors.slice().sort((a,b)=>a.homeAway==='away'?-1:1).map(c=>c.team.displayName).join(' at ');
- const raw = source.drives.previous.flatMap(d => (d.plays||[]).map(p => ({...p, id:String(p.id), driveId:String(d.id)})));
- const positions = new Map(), plays = [];
- for (const p of raw) { if (!p.id || !p.driveId) throw Error('Missing source key'); if (positions.has(p.id)) plays[positions.get(p.id)] = p; else {positions.set(p.id,plays.length);plays.push(p);} }
- const model = replay.prepare({schemaVersion:1,kind:'football-replay',gameId,league,label,playedAt:competition.date,sourceUrl:url,retrievedAt:record.retrievedAt,sourceStatus:'final',sourceNote:'Reconstructed from final ESPN reports; live revisions and release times unknown.',season:header.season,teams:competition.competitors.map(c=>({id:String(c.id),homeAway:c.homeAway,team:c.team})),plays,initialAfterPlayId:plays.find(p=>!context.isMarker(p)).id,momentSpecs:[{label:'Start',count:0},{label:'Final',count:plays.length}]});
+ const raw = [...(source.drives.previous || []), ...(source.drives.current ? [source.drives.current] : [])].flatMap(d => d.plays || []);
+ const model = replay.fromSummary(source, { league, gameId, retrievedAt: record.retrievedAt });
+ const plays = model.plays;
  const abbr = Object.fromEntries(model.teams.map(t=>[String(t.id),t.team.abbreviation]));
  const all = insights.summarize(plays,{teamAbbreviations:abbr});
  const actionIds = new Set(all.teams.flatMap(t=>t.playIds));
@@ -85,7 +94,7 @@ for (const [league, gameId, selectionReason] of sample) {
   const wording = chosen ? JSON.stringify([chosen.headline,chosen.detail,chosen.watch]) : null;
   const team = evidence.teams.find(t=>t.teamId===situation?.offenseTeam?.id);
   const involvement = focus ? (focus.role==='runner' ? team?.runners.find(r=>r.name===focus.name)?.playIds : team?.receivers.find(r=>r.name===focus.name)?.playIds)||[] : [];
-  const row = {count,playId:p.id,type:p.type.text,period:p.period?.number,clock:p.clock?.displayValue,isOffensiveAction:actionIds.has(p.id),situation:situation?JSON.parse(JSON.stringify(situation)):null,readId:chosen?.id||null,key:chosen?.key||null,priority:chosen?.priority||null,focus:focus||null,headline:chosen?.headline||'',detail:chosen?.detail||'',watch:chosen?.watch||'',playIds:chosen?.playIds||[],candidateIds:candidates.map(c=>c.id),samePlayerAsPreviousStep:sameName,sameWordingAsPreviousStep:!!wording&&wording===previous?.wording,samePlayerWithoutNewInvolvement:sameName&&JSON.stringify(involvement)===JSON.stringify(previous.involvement),coldSelectionDiffers:chosen?.key!==cold?.key,takeaway:detail.takeaway||'',gameSummary:detail.gameSummary||'',gameConsequence:detail.gameConsequence||'',raw:detail.raw,kind:detail.kind};
+  const row = {count,playId:p.id,type:p.type.text,period:p.period?.number,clock:p.clock?.displayValue,isOffensiveAction:actionIds.has(p.id),situation:situation?JSON.parse(JSON.stringify(situation)):null,readId:chosen?.id||null,key:chosen?.key||null,priority:chosen?.priority||null,focus:focus||null,supportingPlayer:chosen?.supportingPlayer||null,headline:chosen?.headline||'',detail:chosen?.detail||'',watch:chosen?.watch||'',playIds:chosen?.playIds||[],candidateIds:candidates.map(c=>c.id),samePlayerAsPreviousStep:sameName,sameWordingAsPreviousStep:!!wording&&wording===previous?.wording,samePlayerWithoutNewInvolvement:sameName&&JSON.stringify(involvement)===JSON.stringify(previous.involvement),coldSelectionDiffers:chosen?.key!==cold?.key,takeaway:detail.takeaway||'',gameSummary:detail.gameSummary||'',gameConsequence:detail.gameConsequence||'',raw:detail.raw,kind:detail.kind};
   if (row.playIds.some(id=>!prefix.some(p=>p.id===id))) throw Error('Future support ID');
   if (chosen && chosen.priority !== candidates[0].priority) throw Error('Stale lower priority selection');
   rows.push(row);recent.push(chosen?.key||'quiet');
@@ -100,5 +109,5 @@ for (const [league, gameId, selectionReason] of sample) {
  console.log(`${league} ${gameId}: ${rows.length} steps, ${player.length} player reads, ${player.filter(r=>r.samePlayerWithoutNewInvolvement).length} consecutive unchanged involvement`);
 }
 await mkdir(resolve(out,'..'),{recursive:true});
-await writeFile(out,JSON.stringify({schemaVersion:1,generatedAt:new Date().toISOString(),kind:'reconstructed-final-report-prefix-audit',selectorVersion:reads.version,hashes,samplePolicy:'Purposive sample: six recent college finals spanning Sept7/Thursday/Friday/Saturday, score margins and offense styles; both NFL finals returned in Sept7-12 window. Selected before inspecting selector outputs, not random or representative.',method:'All replay action steps plus final step; original drive boundaries, current replay snapshot, extracted current app preSnap whitelist, current Insights/forRead/History/Read. Sequential recent keys; cold reset compared because the replay UI resets at every seek. No browser timing, queues, actual viewing, future start blocks or final boxscore input.',journalResults,results},null,2)+'\n');
+await writeFile(out,JSON.stringify({schemaVersion:1,generatedAt:new Date().toISOString(),kind:'reconstructed-final-report-prefix-audit',selectorVersion:reads.version,hashes,selectorFile,samplePolicy:requestedGames.length ? 'Explicit evaluation games; selected before candidate output. This is not a random or representative sample.' : 'Purposive sample: six recent college finals spanning Sept7/Thursday/Friday/Saturday, score margins and offense styles; both NFL finals returned in Sept7-12 window. Selected before inspecting selector outputs, not random or representative.',method:'All replay action steps plus final step; original drive boundaries, current replay snapshot, extracted current app preSnap whitelist, current Insights/forRead/History/Read. Sequential recent keys; cold reset compared because the replay UI resets at every seek. No browser timing, queues, actual viewing, future start blocks or final boxscore input.',journalResults,results},null,2)+'\n');
 console.log(out);

@@ -546,3 +546,18 @@ test('NFL report names survive verb-less runs and parenthesized formations witho
   // The same location syntax in a non-run report does not establish a runner.
   assert.equal(describe({type:{text:'Punt'},text:'J.Price right tackle to SEA 37 for 13 yards (K.Byard).'}).players, '');
 });
+
+test('NFL eligibility announcements do not become the passer or runner', () => {
+  const cases = [
+    ['4018726561152', 'Passing Touchdown', 'G.Van Roten reported in as eligible.  D.Maye pass short left to E.Raridon for 2 yards, TOUCHDOWN. A.Borregales extra point is GOOD, Center-J.Ashby, Holder-M.Wishnowsky.', 'pass', { passer: 'D.Maye', receiver: 'E.Raridon', runner: '' }],
+    ['4018726563046', 'Rush', 'J.Jones reported in as eligible.  E.Wilson right guard to NE 45 for no gain (M.Williams).', 'run', { passer: '', receiver: '', runner: 'E.Wilson' }],
+    ['4018726563908', 'Rush', 'G.Van Roten reported in as eligible.  D.Maye scrambles left end ran ob at SEA 21 for 6 yards (J.Jobe).', 'run', { passer: '', receiver: '', runner: 'D.Maye' }]
+  ];
+  for (const [id, type, text, outcome, people] of cases) {
+    const result = describe({ id, type: { text: type }, text });
+    assert.deepEqual(result.people, people, id);
+    assert.equal(result.outcome, outcome, id);
+    assert.equal(result.raw, text, 'The full eligibility report remains available.');
+  }
+  assert.equal(describe({ type: { text: 'Rush' }, text: 'J.Jones reported in as eligible.' }).players, '');
+});

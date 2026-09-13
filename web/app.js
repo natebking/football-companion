@@ -43,7 +43,7 @@
 (function () {
 
 // ==================================================================== shell
-var VERSION = '2026-09-13-game-archive';
+var VERSION = '2026-09-13-context-cues';
 var POLL_MS = 3000;          // selected game, summary endpoint
 var SB_MS = 12000;           // scoreboard, only while picking a game
 var STALE_MS = 9000;         // live dot goes red after this
@@ -805,7 +805,7 @@ function quietPrime(msg) {
   $('readLabel').textContent = 'Watch next';
   $('readFeedback').hidden = true;
   $('historyComparison').replaceChildren();
-  $('readDetail').textContent = ''; $('readWatch').textContent = ''; $('readSource').textContent = '';
+  $('readDetail').textContent = ''; $('readWatch').textContent = ''; $('readSource').textContent = ''; $('readPlayerContext').textContent = '';
   $('prime').className = '';
   $('pQuiet').hidden = false;
   $('pQuiet').textContent = msg;
@@ -906,7 +906,9 @@ function render() {
     (st.read && st.read.focus ? 'Player to watch' : 'What to watch') : 'Where to look';
   $('readDetail').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.detail : '');
   $('readWatch').innerHTML = window.FootballGlossary.annotate(st.read ? st.read.watch : '');
-  $('readSource').textContent = st.read ? st.read.source : '';
+  var supporting = st.read && st.read.supportingPlayer;
+  $('readPlayerContext').textContent = supporting ? 'Player workload · ' + supporting.detail : '';
+  $('readSource').textContent = st.read ? st.read.source + (supporting ? ' · ESPN player reports' : '') : '';
   $('readFeedback').hidden = !st.read || sh.replay();
   var feedbackKey = st.sitKey + ':' + (st.read ? st.read.key : '');
   if ($('readFeedback').dataset.key !== feedbackKey) {
@@ -968,6 +970,7 @@ function captureGuidance() {
   var lines = { situation: $('pDD').textContent, spot: $('pSpot').textContent,
     context: $('pSit').textContent, tendency: $('pTen').textContent, watch: $('pWatch').textContent,
     detail: $('readDetail').textContent, observation: $('readWatch').textContent,
+    playerContext: $('readPlayerContext').textContent,
     historical: $('historyComparison').textContent };
   var visible = document.visibilityState === 'visible' && !document.querySelector('.sheet.on');
   var historyVisible = document.querySelector('.tendency-block').open;
@@ -982,7 +985,8 @@ function captureGuidance() {
     historicalVisible: historyVisible,
     historyRefs: st.past ? st.past.rows.map(function (r) { return window.FootballHistory.reference(st.past, r); }) : [],
     read: st.read && { id: st.read.id, version: st.read.version, key: st.read.key, source: st.read.source,
-      focus: st.read.focus, playIds: st.read.playIds, historyRefs: st.read.historyRefs || [] },
+      focus: st.read.focus, supportingPlayer: st.read.supportingPlayer || null,
+      playIds: st.read.playIds, historyRefs: st.read.historyRefs || [] },
     probabilityShown: shown, modelProbability: st.ten && st.ten.pass_rate,
     baselineProbability: st.ten && st.ten.league_pass_rate, attributed: st.attributed });
   if (result && result.ok && result.id) st.journalIds.push(result.id);
