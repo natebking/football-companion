@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const replay = require('../web/replay.js');
 
-const fixturePath = path.join(__dirname, '../web/replays/louisville-ole-miss-2026.json');
+const fixturePath = path.join(__dirname, './fixtures/louisville-ole-miss-2026.json');
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 
 function flat(snapshot) {
@@ -215,4 +215,97 @@ test('browser build exposes the same pure API without DOM access', () => {
   assert.equal(typeof context.window.FootballReplay.snapshot, 'function');
   const model = context.window.FootballReplay.prepare(JSON.parse(JSON.stringify(synthetic())));
   assert.equal(context.window.FootballReplay.snapshot(model, 0).header.competitions[0].status.type.state, 'pre');
+});
+
+function finalSummary() {
+  const source = synthetic();
+  return {
+    header: { id: '123', season: source.season, competitions: [{ id: '123', date: source.playedAt,
+      competitors: source.teams.map(team => ({ ...team, score: '99', winner: true, leaders: ['future'],
+        team: { ...team.team, statistics: ['future'] } })),
+      status: { type: { name: 'STATUS_FINAL', completed: true, state: 'post' } } }] },
+    boxscore: { future: true }, leaders: ['future'],
+    drives: { previous: [{ id: 'd1', result: 'future', plays: [
+      { id: 'a', type: { text: 'Rush' }, text: 'Original', period: { number: 1 },
+        clock: { displayValue: '15:00' }, homeScore: 0, awayScore: 0,
+        start: { down: 1, distance: 10, team: { id: 'home', statistics: ['future'] }, nextplayblock: 'future' },
+        nextplayblock: 'future' },
+      { id: 'b', type: { text: 'Rush' }, period: { number: 2 }, homeScore: 3, awayScore: 0 },
+      { id: 'a', type: { text: 'Rush' }, text: 'Corrected', period: { number: 1 }, homeScore: 0, awayScore: 0 }
+    ] }], current: { id: 'd2', plays: [
+      { id: 'c', type: { text: 'Pass Reception' }, period: { number: 5 },
+        clock: { displayValue: '1:00' }, homeScore: 3, awayScore: 6 }
+    ] }, nextplayblock: 'future' }
+  };
+}
+
+const summaryOptions = { gameId: '123', league: 'cfb', retrievedAt: '2026-09-13T00:00:00Z' };
+
+test('final summary adapter whitelists reports, preserves corrected order/current possession and starts empty', () => {
+  const source = finalSummary();
+  const model = replay.fromSummary(source, summaryOptions);
+  assert.equal(model.initialCount, 0);
+  assert.deepEqual(model.plays.map(play => play.id), ['a', 'b', 'c', '123:replay-final']);
+  assert.equal(model.plays[0].text, 'Corrected');
+  assert.equal(model.plays[2].driveId, 'd2');
+  assert.ok(!JSON.stringify(model).includes('future'));
+  assert.deepEqual(model.moments.map(moment => moment.label), ['Start', 'Quarter 2', 'Overtime 1', 'Final']);
+  assert.ok(model.moments.every(moment => model.steps.includes(moment.count)));
+  const start = replay.snapshot(model, 0);
+  assert.ok(start.header.competitions[0].competitors.every(team => team.score === null));
+  assert.equal(start.header.competitions[0].status.type.state, 'pre');
+  const beforeFinal = replay.snapshot(model, 3).header.competitions[0];
+  assert.equal(beforeFinal.status.type.state, 'in');
+  assert.deepEqual(beforeFinal.competitors.map(team => team.score), [3, 6]);
+  const final = replay.snapshot(model, 4).header.competitions[0];
+  assert.equal(final.status.type.state, 'post');
+  assert.deepEqual(final.competitors.map(team => team.score), [3, 6]);
+  assert.equal(final.status.displayClock, '1:00', 'final header cannot invent a terminal clock');
+  assert.deepEqual(source, finalSummary(), 'adapter does not mutate source');
+});
+
+test('CFB and NFL use the same final-report contract and existing terminal reports stay intact', () => {
+  const source = finalSummary();
+  source.drives.current.plays.push({ id: 'end', type: { text: 'End of Game' }, period: { number: 5 }, homeScore: 3, awayScore: 6 });
+  for (const league of ['nfl', 'cfb']) {
+    const model = replay.fromSummary(source, { ...summaryOptions, league });
+    assert.equal(model.plays.at(-1).id, 'end');
+    assert.match(model.sourceUrl, league === 'nfl' ? /football\/nfl\/summary/ : /college-football\/summary/);
+    assert.equal(model.plays.length, 4);
+  }
+});
+
+test('adapter rejects mismatched, nonfinal, unsupported and unavailable summaries clearly', () => {
+  assert.throws(() => replay.fromSummary(finalSummary(), { ...summaryOptions, league: 'x' }), /league/);
+  assert.throws(() => replay.fromSummary(finalSummary(), { ...summaryOptions, gameId: '124' }), /does not match/);
+  assert.throws(() => replay.fromSummary(finalSummary(), { ...summaryOptions, gameId: 'cfb:123' }), /event id/);
+  const wrongCompetition = finalSummary(); wrongCompetition.header.competitions[0].id = '124';
+  assert.throws(() => replay.fromSummary(wrongCompetition, summaryOptions), /does not match/);
+  for (const status of [
+    { name: 'STATUS_IN_PROGRESS', completed: false, state: 'in' },
+    { name: 'STATUS_POSTPONED', completed: true, state: 'post' },
+    { name: 'STATUS_FINAL', completed: true, state: 'in' }
+  ]) {
+    const source = finalSummary(); source.header.competitions[0].status.type = status;
+    assert.throws(() => replay.fromSummary(source, summaryOptions), /not a final summary/);
+  }
+  for (const drives of [undefined, {}, { previous: [] }, { current: { id: 'd', plays: [] } }]) {
+    const source = finalSummary(); source.drives = drives;
+    assert.throws(() => replay.fromSummary(source, summaryOptions), /play-by-play reports are unavailable/);
+  }
+});
+
+test('synthetic final marker never uses header totals to repair missing scoring reports', () => {
+  const source = finalSummary();
+  delete source.drives.current.plays[0].homeScore;
+  delete source.drives.current.plays[0].awayScore;
+  delete source.drives.current.plays[0].clock;
+  source.drives.current.plays[0].scoringPlay = true;
+  const model = replay.fromSummary(source, summaryOptions);
+  const final = replay.snapshot(model, model.plays.length).header.competitions[0];
+  assert.ok(final.competitors.every(team => team.score === null));
+  assert.ok(!('displayClock' in final.status));
+  assert.equal(final.status.type.state, 'post');
+  const before = replay.snapshot(model, model.plays.length - 1).header.competitions[0];
+  assert.match(before.status.type.detail, /^OT1/);
 });

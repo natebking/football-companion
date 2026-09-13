@@ -40,7 +40,8 @@
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g,
     char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   function setup() {
-    byId('fixture').innerHTML = '<div id="replayInvite"></div><div id="score"></div><div id="hmeta"></div>' +
+    byId('fixture').innerHTML = '<div id="score"></div><div id="hmeta"></div>' +
+      '<button id="currentGamesBtn"></button><button id="finishedGamesBtn"></button><div id="archiveDateField"></div><button id="archiveRetry"></button>' +
       '<button id="pickBtn">Games</button><div class="seg"><button data-lg="cfb">College</button><button data-lg="nfl">NFL</button></div>' +
       '<label for="gameSearch">Search teams</label><input id="gameSearch" type="search" aria-controls="games">' +
       '<button id="clearGameSearch" type="button" hidden>Clear</button><p id="gameSearchStatus" role="status"></p><div id="games"></div>';
@@ -185,12 +186,23 @@
   check('Moving games between groups retains their existing buttons and logos', () => {
     const h = setup(); h.picker();
     const button = document.querySelector('button[data-g="test-a"]'), before = Array.from(button.querySelectorAll('img'));
-    h.state.games[0].state = 'post'; h.state.games[1].state = 'in'; h.state.games.push(game('test-c', 'pre')); h.picker();
+    h.state.games[0].state = 'pre'; h.state.games[1].state = 'in'; h.state.games.push(game('test-c', 'pre')); h.picker();
     assert(document.querySelector('button[data-g="test-a"]') === button, 'Moving a game replaced its button.');
     assert(before.every((img, i) => img === button.querySelectorAll('img')[i]), 'Moving a game replaced its logos.');
-    assert(Array.from(document.querySelectorAll('.gbtn'), el => el.dataset.g).join(',') === 'test-b,test-c,test-a', 'Groups are out of order.');
+    assert(Array.from(document.querySelectorAll('.gbtn'), el => el.dataset.g).join(',') === 'test-b,test-a,test-c', 'Groups are out of order.');
     h.state.games = h.state.games.filter(g => g.id !== 'test-b'); h.picker();
     assert(!document.querySelector('button[data-g="test-b"]'), 'A removed game remained.');
+  });
+  check('Finished games are separate, searchable and hide final scores', () => {
+    const h = setup(); h.state.games = [game('final', 'post')]; h.picker();
+    assert(!document.querySelector('button[data-g]'), 'A finished game remained in live and upcoming.');
+    h.state.pickerMode = 'finished'; h.state.archiveGames = [game('final', 'post')]; h.picker();
+    const button = document.querySelector('button[data-g="final"]');
+    assert(button && button.querySelector('small').textContent === 'Replay game →', 'Replay exposes the result or has no action.');
+    const search = byId('gameSearch'); search.value = 'duke'; search.dispatchEvent(new Event('input'));
+    assert(!button.hidden, 'Replay team search failed.');
+    search.value = 'unknown'; search.dispatchEvent(new Event('input'));
+    assert(button.hidden, 'Replay team search did not narrow the list.');
   });
   check('Only the changed matchup gets new team labels and logo URLs', () => {
     const h = setup(); h.picker(); const unchanged = images('button[data-g="test-b"]');

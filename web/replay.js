@@ -1,8 +1,8 @@
-/* Pure prefix snapshots for bundled, finished-game replays. No network or DOM. */
+/* Pure final-summary adapters and prefix snapshots. No network or DOM. */
 (function (root) {
   'use strict';
 
-  var VERSION = 'replay-1';
+  var VERSION = 'replay-2';
   var MARKER = /^(?:end\s|end of|two-minute|two minute)|timeout|official|coin toss/i;
   var TERMINAL = /^End (?:of )?Game$/i;
 
@@ -105,7 +105,7 @@
     for (var i = 1; i < moments.length; i++) {
       if (moments[i].count < moments[i - 1].count) fail('moments are out of order');
     }
-    var initialCount = countAfter(plays, data.initialAfterPlayId, 'initial point');
+    var initialCount = data.initialCount === 0 ? 0 : countAfter(plays, data.initialAfterPlayId, 'initial point');
     var steps = counts(plays);
     if (steps.indexOf(initialCount) < 0) fail('initial point is not an action step');
     moments.forEach(function (moment) {
@@ -130,6 +130,105 @@
     };
   }
 
+  // Copy only fields consumed by the play reader. Nested source metadata, final
+  // totals, leaders, drive outcomes and future-next-play blocks never enter a model.
+  function pick(value, fields) {
+    var result = {};
+    if (!object(value)) return result;
+    fields.forEach(function (field) {
+      var item = value[field];
+      if (typeof item === 'string' || typeof item === 'boolean' ||
+          (typeof item === 'number' && Number.isFinite(item))) result[field] = item;
+    });
+    return result;
+  }
+
+  function playReport(raw, driveId) {
+    if (!object(raw)) fail('a play report is invalid');
+    var play = pick(raw, ['id', 'sequenceNumber', 'text', 'awayScore', 'homeScore',
+      'scoringPlay', 'isPenalty', 'isTurnover', 'statYardage', 'scoreValue',
+      'modified', 'wallclock', 'airYards', 'yardsAfterCatch', 'air_yards',
+      'yards_after_catch', 'complete_pass']);
+    play.driveId = String(driveId || raw.driveId || '');
+    play.type = pick(raw.type, ['id', 'text', 'abbreviation']);
+    if (raw.period !== undefined) play.period = pick(raw.period, ['number']);
+    if (raw.clock !== undefined) play.clock = pick(raw.clock, ['displayValue']);
+    ['start', 'end'].forEach(function (field) {
+      if (!object(raw[field])) return;
+      play[field] = pick(raw[field], ['down', 'distance', 'yardLine', 'yardsToEndzone',
+        'downDistanceText', 'shortDownDistanceText', 'possessionText']);
+      if (object(raw[field].team)) play[field].team = pick(raw[field].team, ['id']);
+    });
+    ['scoringType', 'pointAfterAttempt'].forEach(function (field) {
+      if (object(raw[field])) play[field] = pick(raw[field], ['id', 'name', 'text', 'abbreviation', 'value']);
+      else if (typeof raw[field] === 'boolean') play[field] = raw[field];
+    });
+    return play;
+  }
+
+  function fromSummary(summary, options) {
+    options = options || {};
+    if (options.league !== 'cfb' && options.league !== 'nfl') fail('league must be cfb or nfl');
+    if (!string(options.gameId) || !/^\d+$/.test(options.gameId)) fail('game id must be an ESPN event id');
+    if (!object(summary) || !object(summary.header)) fail('finished summary is unavailable');
+    var header = summary.header;
+    var competition = Array.isArray(header.competitions) && header.competitions[0];
+    if (String(header.id || '') !== options.gameId || !object(competition) ||
+        String(competition.id || '') !== options.gameId) fail('summary does not match the requested game');
+    var status = competition.status && competition.status.type;
+    if (!status || status.completed !== true || status.state !== 'post' ||
+        !/^STATUS_FINAL(?:_|$)/.test(String(status.name || ''))) fail('source is not a final summary');
+    var teams = (competition.competitors || []).map(function (competitor) {
+      var team = pick(competitor.team, ['id', 'location', 'name', 'nickname',
+        'abbreviation', 'displayName', 'shortDisplayName', 'color', 'alternateColor']);
+      team.logos = ((competitor.team || {}).logos || []).map(function (logo) { return pick(logo, ['href', 'alt']); });
+      return { id: String(competitor.id || ''), homeAway: competitor.homeAway, team: team };
+    });
+    var drives = summary.drives || {};
+    var groups = Array.isArray(drives.previous) ? drives.previous.slice() : [];
+    // ESPN can keep the last possession in current even after the game is final.
+    if (object(drives.current)) groups.push(drives.current);
+    var reports = [];
+    groups.forEach(function (drive) {
+      if (!object(drive)) fail('a drive report is invalid');
+      if (!Array.isArray(drive.plays)) return;
+      drive.plays.forEach(function (play) { reports.push(playReport(play, drive.id)); });
+    });
+    if (!reports.length) fail('play-by-play reports are unavailable for this finished game');
+    var plays = dedupe(reports);
+    if (!terminal(plays[plays.length - 1])) {
+      var last = plays[plays.length - 1];
+      // The header proves completion, but supplies no scores or clock. Releasing
+      // this explicit final marker leaves missing report values unknown.
+      var end = { id: options.gameId + ':replay-final', driveId: last.driveId,
+        type: { text: 'End of Game' }, text: 'Game finished (final summary).'};
+      if (last.period) end.period = clone(last.period);
+      if (last.clock) end.clock = clone(last.clock);
+      plays.push(end);
+    }
+    var moments = [{ label: 'Start', count: 0 }], periods = Object.create(null);
+    plays.forEach(function (play, index) {
+      var period = play.period && play.period.number;
+      if (!period || periods[period] || marker(play)) return;
+      periods[period] = true;
+      if (period === 1) return;
+      moments.push({ label: period > 4 ? 'Overtime ' + (period - 4) : 'Quarter ' + period, count: index + 1 });
+    });
+    moments.push({ label: 'Final', count: plays.length });
+    var away = teams.find(function (team) { return team.homeAway === 'away'; });
+    var home = teams.find(function (team) { return team.homeAway === 'home'; });
+    function name(team) { return team && ((options.league === 'nfl' && team.team.name) ||
+      team.team.shortDisplayName || team.team.location || team.team.displayName || team.team.abbreviation); }
+    return prepare({ schemaVersion: 1, kind: 'football-replay', gameId: options.gameId,
+      league: options.league, label: name(away) + ' at ' + name(home),
+      playedAt: competition.date, retrievedAt: options.retrievedAt || new Date().toISOString(),
+      sourceUrl: 'https://site.api.espn.com/apis/site/v2/sports/football/' +
+        (options.league === 'cfb' ? 'college-football' : 'nfl') + '/summary?event=' + options.gameId,
+      sourceStatus: 'final', sourceNote: 'Final ESPN play reports can differ from reports released live.',
+      season: pick(header.season, ['year', 'type']), teams: teams,
+      plays: plays, momentSpecs: moments, initialCount: 0 });
+  }
+
   function statusFor(prefix, complete) {
     var last = prefix[prefix.length - 1];
     var period = last && last.period && last.period.number || null;
@@ -139,7 +238,7 @@
     var name = complete ? 'STATUS_FINAL' : halftime ? 'STATUS_HALFTIME' : prefix.length ? 'STATUS_IN_PROGRESS' : 'STATUS_SCHEDULED';
     var state = complete ? 'post' : prefix.length ? 'in' : 'pre';
     var detail = complete ? 'Final' : halftime ? 'Halftime' : prefix.length ?
-      (period ? 'Q' + period + (clock ? ' · ' + clock : '') : clock || 'Replay in progress') : 'Replay start';
+      (period ? (period > 4 ? 'OT' + (period - 4) : 'Q' + period) + (clock ? ' · ' + clock : '') : clock || 'Replay in progress') : 'Replay start';
     var status = { type: { name: name, state: state, completed: complete, description: detail, detail: detail, shortDetail: detail } };
     if (period !== null) status.period = period;
     if (clock !== null) { status.displayClock = clock; status.clock = clock; }
@@ -192,7 +291,7 @@
     };
   }
 
-  var api = { version: VERSION, prepare: prepare, snapshot: snapshot };
+  var api = { version: VERSION, prepare: prepare, fromSummary: fromSummary, snapshot: snapshot };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.FootballReplay = api;
 })(typeof window !== 'undefined' ? window : null);

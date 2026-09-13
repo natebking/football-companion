@@ -26,7 +26,7 @@ function polling() {
     clearTimeout: id => timers.delete(id),
     summaryUrl: (league, game) => league + '/' + game,
     applySummary: value => applied.push(value),
-    renderPicker: () => {}, renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}, waitingMessage: () => '',
+    renderPicker: () => {}, renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}, waitingMessage: () => '', cancelArchive: () => {},
     $: () => ({ className: '' })
   });
   vm.runInContext(loop, context);
@@ -221,13 +221,13 @@ function liveQueue(delay = 10000) {
 
 test('seeking backward rebuilds live analysis without later reports, scores or totals', () => {
   const replay = require('../web/replay.js');
-  const model = replay.prepare(require('../web/replays/louisville-ole-miss-2026.json'));
+  const model = replay.prepare(require('./fixtures/louisville-ole-miss-2026.json'));
   const h = liveQueue(0), c = h.context;
   Object.assign(c, { URL, gameGeneration: 0, pollTimer: null, pollRequest: null,
     clearTimeout: () => {}, $: () => ({}), renderReplayControls: () => {},
     replaySession: model, replayCount: null });
   Object.assign(c.window, { FootballReplay: replay,
-    location: { href: 'https://example.test/?replay=louisville-ole-miss-2026' },
+    location: { href: 'https://example.test/?replay=cfb:401856661' },
     history: { replaceState: (_state, _title, url) => { c.window.location.href = String(url); } } });
   vm.runInContext(source.slice(source.indexOf('function resetGame('), source.indexOf('function clearLeague(')), c);
   vm.runInContext(source.slice(source.indexOf('function seekReplay('), source.indexOf('function startReplay(')), c);

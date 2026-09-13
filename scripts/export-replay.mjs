@@ -3,7 +3,7 @@ import replay from '../web/replay.js';
 
 const gameId = '401856661';
 const sourceUrl = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${gameId}`;
-const output = new URL('../web/replays/louisville-ole-miss-2026.json', import.meta.url);
+const output = new URL('../tests/fixtures/louisville-ole-miss-2026.json', import.meta.url);
 
 function fail(message) { throw new Error(`Replay export failed: ${message}`); }
 function pick(source, keys) {
@@ -95,6 +95,6 @@ const data = {
 };
 
 replay.prepare(data);
-await mkdir(new URL('../web/replays/', import.meta.url), { recursive: true });
+await mkdir(new URL('../tests/fixtures/', import.meta.url), { recursive: true });
 await writeFile(output, `${JSON.stringify(data, null, 2)}\n`);
 console.log(`Wrote ${plays.length} reports to ${output.pathname}`);

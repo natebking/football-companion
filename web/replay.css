@@ -1,8 +1,4 @@
-.replay-invite, .replay-controls { grid-column: 1 / -1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; }
-.replay-invite { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.replay-invite p { font-size: .875rem; color: var(--dim); margin-top: 4px; }
-.replay-invite a, .replay-picker a { color: var(--accent); font-weight: 600; text-decoration-thickness: 1px; text-underline-offset: 4px; }
-.replay-invite a { flex-shrink: 0; padding: 10px 0; }
+.replay-controls { grid-column: 1 / -1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
 .replay-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 28px; row-gap: 8px; padding: 16px 20px; }
 .replay-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .replay-heading h1 { font-size: 1.25rem; letter-spacing: -.025em; margin-top: 3px; }
@@ -17,16 +13,22 @@
 .replay-actions select { background: var(--card); color: var(--text); max-width: 100%; }
 .replay-status { grid-column: 1; min-height: 1.5em; }
 .replay-keyboard { color: var(--faint); margin-left: 12px; }
-.replay-picker { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 20px; margin-top: 24px; }
-.replay-picker small { color: var(--dim); }
 select:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 @media (max-width: 759px) {
-  .replay-invite, .replay-controls { margin-bottom: 18px; padding: 17px; }
+  .replay-controls { margin-bottom: 18px; padding: 17px; }
   .replay-controls { grid-template-columns: minmax(0, 1fr); }
-  .replay-invite { align-items: flex-start; flex-direction: column; gap: 8px; }
   .replay-actions { grid-column: 1; grid-row: auto; margin-top: 4px; }
   .replay-step-buttons button { flex: 1; }
   .replay-heading { align-items: flex-start; }
   #replayDate { text-align: right; }
 }
 @media (pointer: coarse) { .replay-keyboard { display: none; } }
+
+.game-browser-modes { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.game-browser-modes button { flex: 1; min-height: 44px; padding: 10px 8px; font: inherit; font-size: .875rem; color: var(--dim); background: transparent; border: 0; border-bottom: 2px solid transparent; }
+.game-browser-modes button[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.archive-date-field { margin-bottom: 18px; }
+.archive-date-field label { display: flex; align-items: center; gap: 12px; font-size: .875rem; font-weight: 600; }
+.archive-date-field input { min-height: 44px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--card); color: var(--text); font: inherit; }
+.archive-date-field p { font-size: .8125rem; color: var(--dim); margin-top: 8px; }
+.archive-date-field button { margin-top: 12px; }

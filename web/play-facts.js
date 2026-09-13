@@ -68,12 +68,17 @@
 
   // Keep the names ESPN actually reports. Jersey numbers and abbreviated names
   // are useful without a roster request; unmatched prose remains in `raw`.
-  function reportedPlayers(text) {
-    text = text.replace(/^\s*(?:\(\d{1,2}:\d{2}\)\s*)?(?:No Huddle(?:-Shotgun)?\s+|Shotgun\s+)?/i, '');
+  function reportedPlayers(text, type) {
+    text = text.replace(/^\s*(?:\(\d{1,2}:\d{2}\)\s*)?(?:(?:No Huddle(?:-Shotgun)?|Shotgun)\s+|\((?:No Huddle(?:,\s*Shotgun)?|Shotgun)\)\s*)?/i, '');
     var name = '((?:#\\d{1,2}\\s+)?[A-Z][A-Za-z.\u2019\u0027 -]{1,60}?)';
-    var actor = new RegExp('^' + name + '\\s+(?:pass\\s+(?:complete|incomplete|intercepted)|rush|run|scramble|sacked)\\b').exec(text);
+    var actor = new RegExp('^' + name + '\\s+(?:pass\\s+(?:complete|incomplete|intercepted|short|deep)|rush|run|scrambl(?:e|es|ed|ing)|sacked)\\b').exec(text);
+    // NFL rush reports can name the carrier directly before the reported run
+    // location, without a "rush" verb. Require both that syntax and a run type.
+    if (!actor && /^(?:rush|rushing touchdown|run)$/.test(type || '')) {
+      actor = new RegExp('^' + name + '\\s+(?:(?:left|right) (?:end|tackle|guard)|up the middle)\\b').exec(text);
+    }
     if (!actor) return '';
-    var receiver = new RegExp('\\bpass (?:complete|incomplete)(?: (?:short|deep))?(?: (?:left|middle|right))? to ' + name + '(?=\\s+(?:caught|thrown|for)\\b|,|$)').exec(text);
+    var receiver = new RegExp('\\bpass (?:(?:complete|incomplete) )?(?:(?:short|deep) )?(?:(?:left|middle|right) )?to ' + name + '(?=\\s+(?:caught|thrown|for|to|pushed|ran)\\b|\\s*(?:\\(|\\[)|\\.(?:\\s+[A-Z*]|$)|,|$)').exec(text);
     return actor[1].trim() + (receiver ? ' to ' + receiver[1].trim() : '');
   }
 
@@ -202,7 +207,7 @@
     }
 
     result.facts = reportedFacts(primary);
-    result.players = reportedPlayers(primary);
+    result.players = reportedPlayers(primary, type);
     if (penaltyParts.length) result.facts = result.facts.concat('Penalty declined').slice(-3);
 
     var touchdown = type.indexOf('touchdown') >= 0 || scoring === 'touchdown' ||

@@ -296,3 +296,31 @@ test('browser scripts expose the same pure insights API', () => {
   const result = context.window.FootballInsights.summarize(boiseDrive(), { teamAbbreviations: abbr });
   assert.equal(result.drive.netYards, 31);
 });
+
+test('NFL literal names enter released counts while sacks, unreported targets and revisions keep honest denominators', () => {
+  const reports = [
+    ['run', 'Rush', 'J.Price right tackle to SEA 37 for 13 yards (K.Byard; E.Ponder).', 13],
+    ['scramble', 'Rush', 'D.Maye scrambles up the middle to NE 21 for 10 yards (E.Jones; D.Witherspoon).', 10],
+    ['complete', 'Pass Reception', 'S.Darnold pass short middle to J.Smith-Njigba to 50 for 13 yards (R.Spillane).', 13],
+    ['incomplete', 'Pass Incompletion', '(Shotgun) S.Darnold pass incomplete short right to R.Shaheed.', 0],
+    ['unknown', 'Pass Incompletion', '(Shotgun) D.Maye pass incomplete short right [D.Witherspoon].', 0],
+    ['sack', 'Sack', '(Shotgun) S.Darnold sacked at SEA 49 for -5 yards (D.Jones).', -5],
+    ['no-play', 'Penalty', 'D.Maye pass incomplete deep left to A.Brown (J.Jobe).PENALTY on SEA-J.Jobe, Defensive Pass Interference, 34 yards, enforced at SEA 36 - No Play.', 34]
+  ].map(([id, type, text, statYardage]) => ({id,driveId:'nfl-drive',type:{text:type},text,statYardage,start:spot(70,3,10),end:spot(60,1,10)}));
+  let team = forRead(inspect(reports), 'nfl-game').teams[0];
+  assert.equal(team.actions.runs, 2);
+  assert.equal(team.coverage.namedCarries, 2);
+  assert.deepEqual(team.runners.map(p => p.name).sort(), ['D.Maye', 'J.Price']);
+  assert.equal(team.actions.passes, 3);
+  assert.equal(team.actions.sacks, 1);
+  assert.equal(team.actions.dropbacks, 4);
+  assert.equal(team.coverage.namedTargets, 2);
+  assert.equal(team.thirdDowns.namedTargets, 2);
+  assert.deepEqual(team.receivers.map(p => p.name), ['J.Smith-Njigba', 'R.Shaheed']);
+  assert.equal(team.receivers.some(p => /Witherspoon|Jones|Brown/.test(p.name)), false);
+  const correction = {...reports[2],text:'S.Darnold pass incomplete short right.'};
+  team = forRead(inspect([...reports, correction]), 'nfl-game').teams[0];
+  assert.equal(team.actions.passes, 3);
+  assert.equal(team.coverage.namedTargets, 1);
+  assert.deepEqual(team.receivers.map(p => p.name), ['R.Shaheed']);
+});

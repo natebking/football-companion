@@ -2,7 +2,7 @@
 
 A second screen for following a football game and learning what to watch. [Open Fluent in Football](https://fluentin.football/).
 
-No live game? [Replay Louisville–Ole Miss from September 6](https://fluentin.football/?replay=louisville-ole-miss-2026). Use Previous/Next or jump to a selected moment. It runs the current analysis on final ESPN reports through the selected point, with no future scores or player totals. Final details and timing may differ from the original live feed. Replay leaves live journals, predictions and saved TV delay untouched. See [replay implementation and verification](docs/REPLAY-2026-09-07.md).
+Use **Games → Finished games** to choose a date and search for a team in College or NFL. Completed games with ESPN play reports can be replayed with Previous/Next and quarter jump points. The current analysis uses only reports through the chosen point; final reports can differ from live versions. Replay leaves live journals, predictions and saved TV delay untouched. There is no featured one-game replay on the homepage. See the [September 13 game audit and replay update](docs/RECENT-GAME-AUDIT-2026-09-13.md).
 
 The two-F logo follows connected player routes: a rounded first F flows into a taller second F, with one starting dot and one forward arrow. Light and dark assets are `web/brand-mark.svg` and `web/brand-mark-dark.svg`. The header colors and matching favicon follow the selected appearance.
 

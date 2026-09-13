@@ -528,3 +528,21 @@ test('advanced consequences keep useful state changes and drop bare scoring defi
     scoringType: { name: 'fieldGoal' }, text: '42 yard field goal is GOOD' }).gameConsequence, '');
   assert.equal(describe({ type: { text: 'Safety' }, scoringType: { name: 'safety' } }).gameConsequence, '');
 });
+
+// Literal ESPN NFL final report wording inspected September 13, 2026.
+test('NFL report names survive verb-less runs and parenthesized formations without naming tacklers', () => {
+  const cases = [
+    ['40187265664', 'Rush', 'J.Price right tackle to SEA 37 for 13 yards (K.Byard; E.Ponder).', { passer: '', receiver: '', runner: 'J.Price' }],
+    ['401872656535', 'Rush', '(No Huddle) J.Price right end to SEA 29 for no gain (C.Davis; K.Byard). NE-C.Davis was injured during the play.', { passer: '', receiver: '', runner: 'J.Price' }],
+    ['40187265686', 'Pass Reception', 'S.Darnold pass short middle to J.Smith-Njigba to 50 for 13 yards (R.Spillane).', { passer: 'S.Darnold', receiver: 'J.Smith-Njigba', runner: '' }],
+    ['401872656157', 'Pass Incompletion', '(Shotgun) S.Darnold pass incomplete short right to R.Shaheed.', { passer: 'S.Darnold', receiver: 'R.Shaheed', runner: '' }],
+    ['401872657863', 'Pass Reception', '(No Huddle, Shotgun) M.Stafford pass deep right to P.Nacua to SF 8 for 41 yards (M.Sigle; R.Green).', { passer: 'M.Stafford', receiver: 'P.Nacua', runner: '' }],
+    ['401872656180', 'Sack', '(Shotgun) S.Darnold sacked at SEA 49 for -5 yards (D.Jones). SEA-S.Darnold was injured during the play.', { passer: 'S.Darnold', receiver: '', runner: '' }],
+    ['401872656249', 'Rush', 'D.Maye scrambles up the middle to NE 21 for 10 yards (E.Jones; D.Witherspoon).', { passer: '', receiver: '', runner: 'D.Maye' }],
+    ['401872656407', 'Pass Incompletion', '(Shotgun) D.Maye pass incomplete short right [D.Witherspoon].', { passer: 'D.Maye', receiver: '', runner: '' }],
+    ['4018726571130', 'Pass Interception Return', 'B.Purdy pass short right intended for G.Kittle INTERCEPTED by Q.Lake at LA 31. Q.Lake to LA 31 for no gain (G.Kittle).', { passer: 'B.Purdy', receiver: '', runner: '' }]
+  ];
+  for (const [id, type, text, people] of cases) assert.deepEqual(describe({id, type:{text:type}, text}).people, people, id);
+  // The same location syntax in a non-run report does not establish a runner.
+  assert.equal(describe({type:{text:'Punt'},text:'J.Price right tackle to SEA 37 for 13 yards (K.Byard).'}).players, '');
+});
