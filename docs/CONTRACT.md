@@ -1,5 +1,9 @@
 # Build contract
 
+## Advanced-mode editorial standard — September 13, 2026
+
+`read-7` keeps selection and evidence rules intact while replacing elementary watching instructions with tactical observations. Default copy should connect the reported context to a defender's decision, route interaction, protection timing or blocking consequence. A prompt to count yards or locate first contact alone does not meet this bar. Conditional visual cues are things for the viewer to check, never claims that the feed identified an assignment or formation. Beginner explanations remain available in Beginner mode. See [the copy review](ADVANCED-COPY-2026-09-13.md).
+
 Interfaces every module codes against. Written before implementation so parallel work composes. If an implementation needs to deviate, it says so in its output rather than silently diverging.
 
 ## Cue selection — September 13, 2026 (`read-6`)

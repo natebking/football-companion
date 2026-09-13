@@ -74,7 +74,7 @@ test('every shorter hint keeps an observation prompt and is shorter than its ful
   assert.match(learning.get('motion').shortWatch, /^If /);
   assert.match(learning.get('screen_blockers').shortWatch, /^On a short pass/);
   assert.match(learning.get('pocket_edges').shortWatch, /^On a pass play/);
-  assert.match(learning.get('first_down_line').shortWatch, /^On a catch/);
+  assert.match(learning.get('first_down_line').shortWatch, /^Watch /);
 });
 
 test('instructional diagrams are accessible examples with no live data or executable markup', () => {
@@ -173,7 +173,7 @@ test('the deeper reads keep their limits explicit instead of diagnosing a live p
   assert.match(learning.observationResponse('motion', 'followed'), /alone does not prove man coverage/);
   assert.match(learning.observationResponse('pocket_edges', 'free'), /without deciding who missed an assignment/);
   assert.match(learning.get('defender_conflict').followUp, /not the quarterback’s known read/);
-  assert.match(learning.get('catch_and_run').followUp, /total yards alone cannot locate the catch/);
+  assert.match(learning.get('catch_and_run').followUp, /written report may not establish the cause/);
   assert.match(learning.get('recurring_look').watch, /If you see that look again/);
   assert.match(learning.observationResponse('recurring_look', 'same'), /not enough to know/);
   for (const lesson of learning.all()) assert.ok(lesson.followUp, lesson.id);

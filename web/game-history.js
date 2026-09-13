@@ -75,14 +75,14 @@
       result = { id: 'history_third_down', headline: 'How these third downs went last season.',
         detail: off.team + ' converted ' + off.cell.conversions + ' of ' + off.cell.conversionKnown + ' similar third downs. Offenses facing ' + def.team +
           ' converted ' + def.cell.conversions + ' of ' + def.cell.conversionKnown + '. These counts use plays with a clear result.',
-        watch: 'Watch where the ball is caught relative to the first-down line.', lessonId: 'first_down_line' };
+        watch: 'On a pass, watch the defender nearest the short route. Does he close before the catch, or does another receiver hold him deeper? That space can decide whether an underneath throw has a chance to convert.', lessonId: 'first_down_line' };
       refs = [reference(h, off), reference(h, def)];
     } else if (s.down <= 2 && s.distance >= 7 && off) {
       var runs = metric(off.cell, 'run');
       if (!runs || runs.twoOrLess / runs.yardsKnown < .35) return null;
       result = { id: 'history_short_runs', headline: 'Short runs left this offense with ground to make up.',
         detail: 'In ' + h.season + ', ' + runs.twoOrLess + ' of ' + runs.yardsKnown + ' ' + off.team + ' runs with clear yardage gained two yards or less in similar situations.',
-        watch: 'A two-yard gain here would leave ' + (s.distance - 2) + ' to go on ' + (s.down === 1 ? 'second' : 'third') + ' down. Watch where the runner meets the first defender.' };
+        watch: 'On a run, watch where the blocking first breaks down: does a defender cross the line untouched, shed a block, or meet the runner farther upfield? That helps distinguish a blocked path from a run that reaches the next layer of defenders.' };
       refs = [reference(h, off)];
     }
     if (!result) return null;

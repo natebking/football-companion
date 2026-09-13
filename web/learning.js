@@ -252,8 +252,8 @@
     },
     first_down_line: {
       title: 'Read the routes around the marker',
-      watch: 'If there’s a catch, compare the catch point, the nearest defender and the first-down marker. Where could the receiver find the remaining yards?',
-      shortWatch: 'On a catch, compare the defender’s position with the marker.',
+      watch: 'Before a short throw, watch whether the nearest defender is already moving toward the receiver or is held deeper by another route. Can the receiver turn upfield before that defender closes?',
+      shortWatch: 'Watch what holds the nearest defender away from the short route.',
       question: 'What was between the catch and the marker?',
       explanation: 'The first-down marker shapes the contest, especially on third down. A defender may protect the line and allow a catch in front of it; the offense may try to create room to run after a shorter throw. A completion short of the marker is not enough to judge the decision without seeing the space and the alternatives.',
       followUp: 'Compare the catch point with the final spot. The distance left and the defender’s angle help explain whether the receiver could keep going.',
@@ -284,12 +284,12 @@
       diagramCaption: 'Example only. Two depths ask a defender to divide his attention; other defensive help is not shown.'
     },
     {
-      id: 'catch_and_run', title: 'Separate the throw from the run',
-      watch: 'If a pass is caught, note where the catch happens and where the play ends. What let the receiver keep going, or stopped him?',
-      shortWatch: 'On a catch, compare the catch point with the final spot.',
+      id: 'catch_and_run', title: 'What created the room after the catch?',
+      watch: 'Before the catch, follow the nearest defender. Is another route pulling him away, is a blocker between him and the receiver, or does he have a clear path to the tackle?',
+      shortWatch: 'Before the catch, watch what separates the receiver from the nearest defender.',
       question: 'What happened immediately after the catch?',
-      explanation: 'A pass play’s total gain combines the distance to the catch with the yards afterward. A short throw can become a long gain through spacing, a useful block or a missed tackle. Watch the receiver’s speed and the nearest defender at the catch to see where those extra yards came from.',
-      followUp: 'Keep the catch point and the final spot separate. Use reported catch-position details when available; total yards alone cannot locate the catch.',
+      explanation: 'Room after a short catch can be created before the ball arrives. A deeper route may hold a defender away; a crossing route may make him work through traffic; a blocker may close his path to the receiver. Separate that space from a gain the receiver creates by breaking a tackle. The same total yardage can come from very different plays.',
+      followUp: 'On the replay, trace the nearest defender backward from the tackle. What delayed his arrival: another route, a block, his starting position, or the receiver beating him? The written report may not establish the cause.',
       concepts: ['receiver', 'line_of_scrimmage', 'sticks'],
       choices: [
         { id: 'stride', label: 'He caught it with room to run', response: 'Catching in stride can help the receiver use that room before defenders close. Compare his path with the nearest defender’s angle. The space may come from several routes or defensive choices we cannot see.' },

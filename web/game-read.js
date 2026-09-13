@@ -3,7 +3,7 @@
  * selections. An observation never establishes the next formation or call. */
 (function (root) {
   'use strict';
-  var VERSION = 'read-6';
+  var VERSION = 'read-7';
   var history = typeof module !== 'undefined' && module.exports ? require('./game-history.js') : root.FootballHistory;
   function valid(s) {
     return s && Number.isInteger(s.down) && s.down >= 1 && s.down <= 4 &&
@@ -39,9 +39,9 @@
     var detail = uses + ' of ' + total + ' ' + unit + context + ' have gone ' + (receiving ? 'toward ' : 'to ') + player.name + '.';
     if (namedCount < total) detail += ' ' + (receiving ? 'A receiver' : 'A runner') + ' is named on ' + namedCount + ' of the ' + total + ' reports.';
     var watch = 'Find ' + player.name + ' before the snap. ';
-    if (receiving && s.down === 3) watch += 'If a pass goes that way, compare the target or catch point with the first-down line.';
-    else if (receiving) watch += 'Watch the first few steps and how much room there is if a throw goes that way.';
-    else watch += 'On a run, watch the first cut and where the first contact comes.';
+    if (receiving && s.down === 3) watch += 'Watch whether a second defender moves toward him near the first-down line. If two stay with him, look for the teammate left one-on-one.';
+    else if (receiving) watch += 'Watch whether a second defender moves toward him before the throw. Extra attention here can leave another receiver one-on-one.';
+    else watch += 'If his first cut comes behind the line, look for a defender forcing him off his path. If he gets through cleanly, watch how he sets up the next defender.';
     return candidate(scope === 'third_down' ? 'third_down_target' : scope === 'drive' ? 'drive_player' : 'game_player', priority,
       'Watch ' + player.name + (scope === 'third_down' ? ' on this third down.' : '.'), detail, watch,
       { source: 'ESPN · released ' + (scope === 'drive' ? 'drive' : 'game') + ' reports · count, not a forecast',
@@ -144,7 +144,8 @@
       if (t && t.attempts >= 4 && t.knownDistances === t.attempts && t.long >= 3 && t.long / t.attempts >= 0.6) {
         add(candidate('long_thirds', s.down >= 2 && s.distance >= 7 ? 75 : 49, 'Long third downs are making these possessions harder.',
           t.long + ' of ' + t.attempts + ' reported third-down plays needed at least seven yards.',
-          s.down < 3 ? 'Watch how much the next play leaves them to gain.' : 'Watch where the catch happens relative to the first-down line.',
+          s.down < 3 ? 'On a short throw, watch whether the nearest defender is already closing before the catch. That can leave another long third down even when the pass is complete.' :
+            'Watch whether defenders protect the first-down line and let the short route come to them. The receiver needs to catch it with room to turn before they close.',
           { source: 'ESPN · third downs this game', playIds: t.playIds, lessonId: 'first_down_line',
             key: 'long_thirds:' + off }));
       }
@@ -185,23 +186,26 @@
     if (d && d.sacks >= 2) {
       add(candidate('drive_sacks', 95, 'Two or more sacks have interrupted this drive.',
         'They have allowed ' + d.sacks + ' sacks on this possession. Another loss would leave more ground to make up.',
-        'On a pass, watch whether the quarterback can step forward or has to leave the pocket.',
+        'Watch the quarterback at the end of his drop. Can he step into a throw, or does pressure make him move before a receiver breaks?',
         { source: 'ESPN · released drive reports', playIds: d.playIds, lessonId: 'pocket_edges', key: 'drive_sacks:' + d.id }));
     }
     if (goal && s.down < 4) {
-      add(candidate('goal_to_go', 65, 'The defense has less depth to protect here.',
-        'With ' + s.yardsToGoal + ' yards to the end zone, there is less space behind the defenders for a receiver to use.',
-        'Watch whether receivers separate across the field or toward the back of the end zone.', { lessonId: 'red_zone' }));
+      add(candidate('goal_to_go', 65, 'Can the routes force defenders to switch responsibilities?',
+        'With ' + s.yardsToGoal + ' yards to the end zone, the offense has less room to run past defenders. Crossing routes can create a brief opening while defenders follow or exchange receivers.',
+        'If two receivers cross, watch their defenders: do they switch cleanly, follow through traffic, or both follow the same player?', { lessonId: 'red_zone' }));
     } else if (s.down === 3) {
+      var shortThird = s.distance <= 3;
       add(candidate('third_down_distance', 60,
-        s.distance >= 7 ? 'A completion can still leave them short.' : 'This is a chance to extend the possession.',
-        'They need ' + s.distance + ' yards. A catch or first contact short of the line leaves the ball carrier with more work to do.',
-        'Watch where the catch or first contact happens relative to the first-down line.',
-        { lessonId: 'first_down_line', question: { kind: 'conversion', q: 'Will this play gain enough for a first down?' } }));
+        shortThird ? 'Does a defender commit to the run and leave space behind?' : 'Is the defense inviting a throw short of the first-down line?',
+        shortThird ? 'With ' + s.distance + ' to gain, the run threat can draw a defender toward the line. If the quarterback keeps the ball to throw, that first step can open a window behind him.' :
+          'With ' + s.distance + ' to gain, the defense can protect the first-down line and close on an underneath throw. The key is whether the receiver has room to turn before the tackle arrives.',
+        shortThird ? 'If the quarterback shows a handoff, follow the defender just behind the line. Does he step toward the runner or stay with a receiver?' :
+          'Watch the defender nearest the short route before the throw. Is he already moving toward it, or does a deeper receiver hold him back?',
+        { lessonId: shortThird ? 'handoff_fake' : 'first_down_line', question: { kind: 'conversion', q: 'Will this play gain enough for a first down?' } }));
     } else if (s.down === 2 && s.distance >= 10) {
-      add(candidate('second_long', 55, 'This play can make third down manageable—or leave a lot to do.',
-        'They still need ' + s.distance + ' yards. A short gain leaves the next play needing most of that distance.',
-        'On a catch, compare the yards from the throw with the yards gained afterward.', { lessonId: 'catch_and_run' }));
+      add(candidate('second_long', 55, 'Can they make one defender choose between two receivers?',
+        'On second-and-' + s.distance + ', a short completion helps more if a deeper route holds the nearest defender away. If he closes on the short receiver instead, a window may open behind him.',
+        'If two routes develop at different depths on the same side, watch the defender between them. Does he close on the short route or stay underneath the deeper one?', { lessonId: 'defender_conflict' }));
     }
     var historical = history.read(s, past);
     if (historical) add(candidate(historical.id, historical.priority, historical.headline, historical.detail, historical.watch, historical));
