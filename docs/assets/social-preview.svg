@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Fluent in Football — Know what to watch next</title>
+  <desc id="desc">Live context and game replays for college and NFL football, with the two-color Fluent in Football route logo.</desc>
+  <!-- Editable source for web/social-preview-v1.png. Use the DM Sans fonts in web/fonts when rendering. -->
+  <rect width="1200" height="630" fill="#0c1722"/>
+  <rect width="1200" height="7" fill="#d4f76b"/>
+  <g stroke="#233b46" stroke-width="1">
+    <path d="M805 164V458M870 164V458M935 164V458M1000 164V458M1065 164V458M1130 164V458"/>
+    <path d="M794 208H816M859 208H881M924 208H946M989 208H1011M1054 208H1076M1119 208H1141M794 414H816M859 414H881M924 414H946M989 414H1011M1054 414H1076M1119 414H1141"/>
+  </g>
+  <g font-family="DM Sans, Arial, sans-serif">
+    <text x="68" y="106" fill="#edf2f4" font-size="32" font-weight="600" letter-spacing="-.8">Fluent in Football</text>
+    <text x="66" y="247" fill="#edf2f4" font-size="78" font-weight="600" letter-spacing="-3">Know what to</text>
+    <text x="66" y="332" fill="#d4f76b" font-size="78" font-weight="600" letter-spacing="-3">watch next.</text>
+    <text x="70" y="399" fill="#adbcc6" font-size="26">Live context and game replays.</text>
+    <text x="70" y="438" fill="#adbcc6" font-size="26">Follow along with the game on your TV.</text>
+    <path d="M68 508H1132" stroke="#2b3f4c"/>
+    <text x="70" y="564" fill="#edf2f4" font-size="24" font-weight="600">fluentin.football</text>
+    <text x="1132" y="564" text-anchor="end" fill="#adbcc6" font-size="23">College + NFL</text>
+  </g>
+  <g transform="translate(829 190) scale(4.3)" fill="none" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 53V22C9 15 14 10 21 10H29M9 33H27C34 33 39 28 39 21" stroke="#d4f76b"/>
+    <circle cx="9" cy="53" r="4.5" fill="#d4f76b"/>
+    <path d="M39 57V9H65M39 34H59M59 3L65 9L59 15" stroke="#8bddc5"/>
+  </g>
+</svg>
