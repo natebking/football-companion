@@ -119,3 +119,27 @@ test('invalid source relationships and duplicate records fail explicitly', () =>
   ]) { const game = fixture(); mutate(game); assert.throws(() => auditGame(game)); }
   assert.throws(() => auditGame({ status: 'final', plays: [] }));
 });
+
+test('saved roster labels reproduce wording without changing cue evidence or accepting the wrong scope', () => {
+  const game = fixture(), shown = game.shown[0];
+  shown.situation.season = 2026;
+  const label = { athleteId: '9', reportedName: '#19 R.Jones', label: '#19 Receiver Jones',
+    fullName: 'Receiver Jones', jersey: '19', numberSource: 'report',
+    roster: { league: 'cfb', teamId: '68', season: 2026, retrievedAt: new Date(1300).toISOString() } };
+  const display = require('../web/player-display.js');
+  const view = display.read(shown.read, '68', () => label);
+  shown.read.identities = view.identities;
+  shown.lines = { watch: view.headline, detail: view.detail, observation: view.watch, playerContext: view.playerContext };
+  assert.equal(auditGame(game).summary.reproduced, 1);
+  assert.equal(auditGame(game).summary.unsupportedByReleasedReports, 0);
+  for (const edit of [
+    g => g.shown[0].lines.detail = 'Invented claim about Receiver Jones',
+    g => g.shown[0].read.identities[0].roster.teamId = '99',
+    g => g.shown[0].read.identities[0].roster.league = 'nfl',
+    g => g.shown[0].read.identities[0].roster.season = 2025,
+    g => g.shown[0].read.identities[0].roster.retrievedAt = new Date(1600).toISOString()
+  ]) {
+    const bad = structuredClone(game); edit(bad);
+    assert.equal(auditGame(bad).summary.notReproduced, 1);
+  }
+});

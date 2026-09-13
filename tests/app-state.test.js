@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const noRosters = { setContext: () => Promise.resolve(), clearContext: () => {}, resolve: () => null, revision: () => 0 };
+const playerDisplay = require('../web/player-display.js');
 const source = fs.readFileSync(path.join(__dirname, '../web/app.js'), 'utf8');
 const loop = source.slice(source.indexOf('var pollTimer ='), source.indexOf('// ---------------------------------------------------------------- wiring'));
 const grading = source.slice(source.indexOf('function grade('), source.indexOf('// ---------------------------------------------------------------- events'));
@@ -17,7 +19,7 @@ function polling() {
     window: { FootballDepth: { renderInsights: value => insights.push(value) } },
     st: { gameId: 'A', games: [], gameState: 'in' },
     sh: {
-      POLL_MS: 3000, SB_MS: 12000, LS: { game: 'game' },
+      rosters: noRosters, POLL_MS: 3000, SB_MS: 12000, LS: { game: 'game' },
       league: () => league, tend: () => ({}), diag: () => {}, lsSet: () => {}, bus: { emit: () => {} },
       showErr: message => { if (message) errors.push(message); },
       jget: (url, signal) => new Promise((resolve, reject) => requests.push({ url, signal, resolve, reject }))
@@ -197,7 +199,7 @@ function liveQueue(delay = 10000) {
   let now = 100000;
   const context = vm.createContext({
     window: {
-      FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js'),
+      FootballPlayerDisplay: playerDisplay, FootballPlay: require('../web/play-facts.js'), FootballFeed: require('../web/feed-health.js'),
       FootballLearning: require('../web/learning.js'),
       FootballInsights: { forRead: require('../web/game-insights.js').forRead, summarize: (plays, options) => {
         insightInputs.push(structuredClone(Array.from(plays)));
@@ -207,7 +209,7 @@ function liveQueue(delay = 10000) {
     },
     Date: { now: () => now },
     st: { gameId: 'A', seen: {}, queue: [], rows: [], released: {}, primed: false, lastQueuedSit: '', lastOk: 0, timingBreak: null },
-    sh: { FEED_MAX: 25, STALE_MS: 9000, delayMs: () => delay, diag: (name, value) => diagnostics.push({ name, value }), bus: { emit: (name, value) => events.push({ name, value }) } },
+    sh: { rosters: noRosters, league: () => 'cfb', FEED_MAX: 25, STALE_MS: 9000, delayMs: () => delay, diag: (name, value) => diagnostics.push({ name, value }), bus: { emit: (name, value) => events.push({ name, value }) } },
     renderFeed: () => {}, renderHeader: () => {}, refreshSyncCandidate: () => {}
   });
   const start = source.indexOf('function collectPlays(');
@@ -954,8 +956,8 @@ function feedView(count = 8) {
     FEED_PREVIEW: 3,
     st: { rows, released: Object.fromEntries(rows.map(r => [r.id, { id: r.id }])),
       sum: null, health: null, feedExpanded: false },
-    sh: { esc: value => String(value ?? ''), teachingLevel: () => 'game', journalShown: entry => saved.push(entry) },
-    window: { FootballGlossary: { annotate: value => value }, FootballPlay: { describe: report => report } },
+    sh: { rosters: noRosters, esc: value => String(value ?? ''), teachingLevel: () => 'game', journalShown: entry => saved.push(entry) },
+    window: { FootballPlayerDisplay: playerDisplay, FootballGlossary: { annotate: value => value }, FootballPlay: { describe: report => report } },
     teamAbbrs: () => ({}),
     $: id => elements[id] || (elements[id] = {
       innerHTML: '', hidden: false, textContent: '', attributes: {},
@@ -1034,4 +1036,21 @@ test('a revised latest takeaway replaces the visible wording and is recorded as 
   assert.equal(h.saved.length, 2);
   assert.equal(h.saved.at(-1).lines.takeaway, null);
   assert.ok(!h.elements.feed.innerHTML.includes('Initially reported detail'));
+});
+
+test('roster repaint enriches only released names and leaves cue evidence and the delay queue intact', () => {
+  const h = liveQueue(), a = syntheticTimedRun('roster-visible'), b = syntheticTimedRun('roster-held', 1);
+  b.text = b.text.replace('Test Runner', 'Held Player');
+  h.context.applySummary(summaryOf([a])); h.tick(110000);
+  h.tick(111000); h.context.applySummary(summaryOf([a, b]));
+  const queue = JSON.stringify(h.context.st.queue);
+  const before = h.events.filter(event => event.name === 'evidence').at(-1).value;
+  h.context.sh.rosters = { ...noRosters, resolve: (teamId, name) => ({
+    reportedName: name, label: name.includes('Held Player') ? '#25 Hidden Future Player' : '#25 Expanded Player Name' }) };
+  h.context.renderInsights();
+  assert.match(h.insights.at(-1).teams[0].summaries.join(' '), /#25 Expanded Player Name/);
+  assert.doesNotMatch(h.insights.at(-1).teams[0].summaries.join(' '), /Hidden Future Player/);
+  assert.equal(JSON.stringify(h.context.st.queue), queue);
+  assert.deepEqual(h.events.filter(event => event.name === 'evidence').at(-1).value, before);
+  assert.deepEqual(h.insightInputs.at(-1).map(play => play.id), [a.id]);
 });

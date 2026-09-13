@@ -5,6 +5,7 @@ const insights = require('../web/game-insights.js');
 const read = require('../web/game-read.js');
 const journal = require('../web/journal.js');
 const history = require('../web/game-history.js');
+const display = require('../web/player-display.js');
 
 function auditGame(game, review, historyData) {
   if (!game || game.schemaVersion !== 1 || !Array.isArray(game.shown) || !Array.isArray(game.sources) || !Array.isArray(game.releases)) {
@@ -66,10 +67,18 @@ function auditGame(game, review, historyData) {
       past.rows.some(row => row.side === ref.side && row.team === ref.team));
     const missingSupport = recorded ? (recorded.playIds || []).filter(id => !retained.has(String(id))) : [];
     const sameVersion = recorded && recorded.version === read.version;
-    const reproducible = sameVersion && historyAvailable ? eligible.some(c => c.key === recorded.key &&
-      c.headline === shown.lines.watch && c.detail === shown.lines.detail && c.watch === shown.lines.observation &&
-      (c.supportingPlayer ? 'Player workload · ' + c.supportingPlayer.detail : '') === (shown.lines.playerContext || '') &&
-      JSON.stringify(c.supportingPlayer || null) === JSON.stringify(recorded.supportingPlayer || null)) : null;
+    // Reproduce the display with the labels saved at that moment. Identity
+    // metadata is not an additional report, a player count or a forecast input.
+    const resolveLabel = (teamId, name) => (recorded && recorded.identities || []).find(item =>
+      item.reportedName === name && item.roster && item.roster.teamId === teamId &&
+      item.roster.league === game.meta.league && item.roster.season === shown.situation.season &&
+      Date.parse(item.roster.retrievedAt) <= at) || null;
+    const reproducible = sameVersion && historyAvailable ? eligible.some(c => {
+      const view = display.read(c, shown.situation.offenseTeam && shown.situation.offenseTeam.id, resolveLabel);
+      return c.key === recorded.key && view.headline === shown.lines.watch && view.detail === shown.lines.detail &&
+        view.watch === shown.lines.observation && view.playerContext === (shown.lines.playerContext || '') &&
+        JSON.stringify(c.supportingPlayer || null) === JSON.stringify(recorded.supportingPlayer || null);
+    }) : null;
     const repeated = !!recorded && !(refresh && lastRecorded && recorded.key === lastRecorded.key) && recordedHistory.slice(-6).includes(recorded.key) &&
       !['fourth_down', 'protect_clock', 'chasing_score'].includes(recorded.id);
     if (moment.visible) rows.push({ shownId: shown.id, at, basisPlayId: shown.basisPlayId, recordedRead: recorded ? recorded.id : null,
@@ -97,6 +106,7 @@ function auditGame(game, review, historyData) {
     rows,
     limitations: [
       'This checks evidence and repetition. It does not establish learning or prediction accuracy.',
+      'Roster labels replay saved identity metadata; the audit does not independently verify the roster or the game-day lineup.',
       'Candidate proposals replay saved guidance moments, not every browser event. They are an offline comparison, not proof of a full runtime replay.',
       'Feedback is voluntary and describes the people who submitted journals, not all viewers.',
       'Future candidate changes must be selected on earlier games and evaluated on untouched later games.',
