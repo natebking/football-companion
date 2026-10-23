@@ -77,6 +77,8 @@ body[data-view="home"] .masthead { border-bottom: 0; }
 .home-intro { padding-top: 30px; }
 .home-intro > .eyebrow { color: var(--accent); }
 .home h1 { font-size: clamp(2.25rem, 4.1vw, 3.25rem); line-height: 1.08; letter-spacing: -.055em; font-weight: 600; margin: 18px 0 22px; max-width: 10ch; text-wrap: balance; }
+.home-what { font-size: 1.0625rem; line-height: 1.55; font-weight: 500; max-width: 39ch; margin-bottom: 14px; text-wrap: pretty; }
+.home-what a { color: var(--accent); white-space: nowrap; text-underline-offset: 3px; }
 .home-lede { color: var(--dim); font-size: 1.0625rem; line-height: 1.65; max-width: 39ch; text-wrap: pretty; }
 .home-rhythm { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
 .home-rhythm > div + div { margin-top: 17px; }
@@ -101,6 +103,7 @@ body[data-view="home"] .masthead { border-bottom: 0; }
   .home { display: block; padding: 0; }
   .home-intro { padding: 10px 4px 26px; }
   .home h1 { max-width: 15ch; font-size: 2.375rem; margin: 12px 0 16px; }
+  .home-what { font-size: 1rem; }
   .home-lede { font-size: 1rem; line-height: 1.55; }
   .home-rhythm { display: none; }
   .home-source { margin-top: 14px; max-width: none; }
@@ -419,3 +422,7 @@ button.chip { border: 1px solid var(--line); text-decoration: underline; text-de
 }
 
 .report-update { display: inline-block; margin-top: 6px; color: var(--dim); font-size: .6875rem; }
+.learn-page ul { padding-left: 1.25em; margin-bottom: 14px; }
+.learn-toc { color: var(--faint); font-size: .875rem; margin: 6px 0 8px; line-height: 1.9; }
+.learn-try { margin-top: -2px; }
+.learn-try a { font-weight: 600; }
