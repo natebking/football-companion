@@ -101,7 +101,10 @@ var replayMatch = /^(cfb|nfl):([0-9]+)$/.exec(replayParam || '');
 var replayMode = replayParam !== null;
 var league = replayMatch ? replayMatch[1] : lsGet(LS.league) === 'nfl' ? 'nfl' : 'cfb';
 var shortHints = lsGet(LS.shortHints) === '1';
-var teachingLevel = lsGet(LS.teachingLevel) === 'basics' ? 'basics' : 'game';
+// ?level=beginner (linked from /learn) turns on Beginner and keeps it, like the setting.
+var levelParam = new URLSearchParams(window.location.search).get('level');
+if (levelParam === 'beginner') lsSet(LS.teachingLevel, 'basics');
+var teachingLevel = lsGet(LS.teachingLevel) === 'basics' || levelParam === 'beginner' ? 'basics' : 'game';
 var predictionQuestions = lsGet(LS.questions) === '1';
 var savedDelay = (function () {
   var n = parseInt(lsGet(LS.delay), 10);

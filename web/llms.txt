@@ -7,6 +7,7 @@ It is not a podcast, a language course, a soccer app, a betting tool, or a video
 ## Pages
 
 - [Home and live app](https://fluentin.football/): choose a live, upcoming or finished college or NFL game.
+- [American football for beginners](https://fluentin.football/learn): downs, scoring, positions and penalties, explained for new fans.
 - [Data and privacy](https://fluentin.football/data): where the information comes from, its limits, and what stays in your browser.
 
 ## Maker
