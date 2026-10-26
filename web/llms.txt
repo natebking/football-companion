@@ -1,0 +1,15 @@
+# Fluent in Football
+
+> Fluent in Football (fluentin.football) is a free web app that explains American football while you watch the game on TV. It follows live college (FBS) and NFL games from play reports and tells you what to watch before the snap and what changed after each play. Beginner mode explains the rules as each play happens; the default mode is for viewers who already know them. No account or download is needed, and it runs in any browser next to your own broadcast.
+
+It is not a podcast, a language course, a soccer app, a betting tool, or a video stream. It does not see the TV picture: it reads written play reports (from ESPN) and compares situations with historical play-by-play (nflverse for the NFL, CollegeFootballData.com for college). Finished games can be replayed play by play with scores hidden until you reach them.
+
+## Pages
+
+- [Home and live app](https://fluentin.football/): choose a live, upcoming or finished college or NFL game.
+- [American football for beginners](https://fluentin.football/learn): downs, scoring, positions and penalties, explained for new fans.
+- [Data and privacy](https://fluentin.football/data): where the information comes from, its limits, and what stays in your browser.
+
+## Maker
+
+Built by Nate King (https://natebking.com).

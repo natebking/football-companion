@@ -5,27 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f1f4f5">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Know what to watch next. Follow player usage, the shape of a drive, and what each play changed alongside the game on your TV.">
+<meta name="description" content="A free web app that explains American football while you watch the game on TV. Beginner mode explains the rules as each play happens. Live context and replays for college and NFL games.">
 <meta property="og:site_name" content="Fluent in Football">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Fluent in Football — Know what to watch next">
+<meta property="og:title" content="Fluent in Football: learn American football while you watch">
 <meta property="og:url" content="https://fluentin.football/">
 <link rel="canonical" href="https://fluentin.football/">
-<meta property="og:description" content="Know what to watch next. Live football context and play-by-play replays for college and NFL games.">
+<meta property="og:description" content="A free web app that explains American football while you watch the game on TV. Beginner mode explains the rules as each play happens.">
 <meta property="og:image" content="https://fluentin.football/social-preview-v1.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Fluent in Football. Know what to watch next. Live context and game replays for college and NFL football.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Fluent in Football — Know what to watch next">
-<meta name="twitter:description" content="Live football context and play-by-play replays for college and NFL games. Follow along with the game on your TV.">
+<meta name="twitter:title" content="Fluent in Football: learn American football while you watch">
+<meta name="twitter:description" content="A free web app that explains American football while you watch the game on TV. Beginner mode explains the rules as each play happens.">
 <meta name="twitter:image" content="https://fluentin.football/social-preview-v1.png">
 <meta name="twitter:image:alt" content="Fluent in Football. Know what to watch next. Live context and game replays for college and NFL football.">
 <meta name="twitter:creator" content="@natebking">
 <meta name="application-name" content="Fluent in Football">
 <meta name="apple-mobile-web-app-title" content="Fluent in Football">
-<title>Fluent in Football</title>
+<title>Fluent in Football: learn American football while you watch</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Fluent in Football",
+  "alternateName": "fluentin.football",
+  "url": "https://fluentin.football/",
+  "applicationCategory": "SportsApplication",
+  "operatingSystem": "Web",
+  "browserRequirements": "Requires JavaScript and a modern web browser.",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "inLanguage": "en",
+  "description": "A free web app that explains American football while you watch the game on TV, with a beginner mode that explains the rules as each play happens. Fluent in Football is a free web app for watching American football, not a podcast or a language course.",
+  "image": "https://fluentin.football/social-preview-v1.png",
+  "creator": { "@type": "Person", "name": "Nate King", "url": "https://natebking.com" }
+}
+</script>
 <link id="favicon" rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js"></script>
 <link rel="stylesheet" href="styles.css">
@@ -71,12 +89,13 @@
     <div class="home-intro">
       <p class="eyebrow">Your football companion</p>
       <h1 id="homeTitle">Know what to watch next.</h1>
+      <p class="home-what">A free web app that explains American football while you watch the game on TV. Beginner mode explains the rules as each play happens. <a href="learn">New to football? Start with the rules →</a></p>
       <p class="home-lede">Follow the game on TV with a read on who’s getting the ball, what’s changing this drive, and what the last play set up.</p>
       <dl class="home-rhythm">
         <div><dt>Before the snap</dt><dd>A player or decision worth following.</dd></div>
         <div><dt>After the play</dt><dd>What changed, and why it matters for the next down.</dd></div>
       </dl>
-      <p class="home-source">Built from play reports and historical data. Bring your own broadcast.</p>
+      <p class="home-source">Built from play reports and historical data. Bring your own broadcast. Fluent in Football is a free web app for watching American football, not a podcast or a language course.</p>
     </div>
     <div id="homeGamePicker" class="home-game-picker">
   <div id="gameBrowser" class="sheetInner game-browser">
@@ -210,7 +229,7 @@
     <button id="openJournal" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="reviewSheet">Game journal <span aria-hidden="true">↗</span></button>
     <span id="journalStatus" role="status">Saved in this browser</span>
   </div>
-    <div class="footer-links"><button id="settingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings</button><a href="data.html" target="_blank" rel="noopener">Data and privacy ↗</a></div>
+    <div class="footer-links"><button id="settingsBtn" class="depth-link" type="button" aria-haspopup="dialog" aria-controls="settingsSheet">Settings</button><a href="learn">Football for beginners</a><a href="data.html" target="_blank" rel="noopener">Data and privacy ↗</a></div>
   </footer>
 </main>
 
