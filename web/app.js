@@ -960,7 +960,7 @@ function render() {
   var chips = [];
   var ten = st.ten;
   var sourceName = sh.league() === 'nfl' ? 'nflverse' : 'CollegeFootballData';
-  var sourceLink = '<a class="chip ' + (st.attributed && ten ? 'src' : 'srcl') + '" href="data.html#history" target="_blank" rel="noopener">';
+  var sourceLink = '<a class="chip ' + (st.attributed && ten ? 'src' : 'srcl') + '" href="data#history" target="_blank" rel="noopener">';
   if (st.attributed && ten) {
     chips.push(sourceLink + esc(ten.team) + ' · ' + sh.seasonsLabel() +
       ' · ' + ten.sample_size + ' plays · ' + sourceName + ' ↗</a>');

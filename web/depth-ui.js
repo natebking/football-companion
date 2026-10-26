@@ -85,7 +85,7 @@
     if (!(example.sources || []).some(function (source) { return source.label === 'FTN Data via nflverse'; })) return '';
     return '<p class="depth-caption">Adapted from FTN Data via nflverse: charted facts joined with play-by-play, summarized and illustrated for this lesson. ' +
       'This adaptation is available under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. ' +
-      '<a href="data.html#charting" target="_blank" rel="noopener">Source and licence details ↗</a></p>';
+      '<a href="data#charting" target="_blank" rel="noopener">Source and licence details ↗</a></p>';
   }
   function showExample(id) {
     var example = examples && examples.examples.find(function (entry) { return entry.id === id; });
